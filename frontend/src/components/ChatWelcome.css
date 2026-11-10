@@ -1,0 +1,66 @@
+@import '../assets/fonts/welcome/welcome-serif.css';
+
+.welcome-heading{text-align:center;margin:0 auto 24px;max-width:600px;padding:0 12px;color:var(--theme-text-primary,#e4e1d8)}
+.welcome-heading h1{margin:0;font-size:32px;font-weight:500;letter-spacing:-.8px;line-height:1.25;white-space:pre-line;overflow-wrap:anywhere;text-wrap:balance}
+.welcome-actor{display:flex;justify-content:center;align-items:center;gap:9px;margin-bottom:13px;color:var(--theme-text-muted,#aaa597);font-size:12px;line-height:1.5}
+.welcome-actor .avatar{width:30px;height:30px}
+.welcome-actor>span:last-child{max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.welcome-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin:16px auto 0;padding:0 4px}
+.welcome-actions>button{display:flex;align-items:center;justify-content:center;gap:7px;min-height:34px;padding:7px 11px;border-radius:11px;border:1px solid var(--theme-line-soft,#ffffff0a);background:var(--theme-fill-faint,#ffffff02);color:var(--theme-text-muted,#a6a093);font-size:12px;line-height:18px;transition:background .2s,border-color .2s,color .2s,transform .24s var(--ease)}
+.welcome-actions>button>svg{color:var(--theme-text-muted,#918978)}
+.welcome-short{display:none}
+@media(hover:hover){.welcome-actions>button:hover{background:var(--theme-fill-faint,#ffffff06);border-color:var(--theme-line,#c6bca42e);color:var(--theme-text-primary,#ded7c6);transform:translateY(-1px)}}
+.main-panel.empty-chat .composer-dock .composer-section .composer{padding:9px 11px;gap:6px;border-radius:20px}
+.main-panel.empty-chat .composer-dock .composer-section .composer textarea{min-height:36px;padding:5px 4px 6px;line-height:24px}
+@media(max-width:800px){
+ .welcome-heading{margin-bottom:21px;padding:0 10px}
+ .welcome-heading h1{font-size:24px;letter-spacing:-.6px}
+ .welcome-actions{gap:6px;margin-top:14px;padding:0}
+ .welcome-actions>button{min-height:38px;padding:8px 10px}
+ .main-panel.empty-chat .composer-dock .composer-section .composer{padding:9px;gap:5px}
+}
+@media(max-width:520px){.welcome-label{display:none}.welcome-short{display:inline}.welcome-actions>button{font-size:12px;gap:6px}}
+@media(max-width:360px){.welcome-actions>button>svg{display:none}}
+@media(prefers-reduced-motion:reduce){.welcome-actions>button{transition:none;transform:none!important}}
+
+.welcome-heading,.welcome-title{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.welcome-title{display:inline-flex;align-items:center;justify-content:center;gap:12px;max-width:100%}
+.welcome-title>span{min-width:0}
+.welcome-coffee{flex:none;width:1.05em;height:1.05em;color:#c97856}
+@media(max-width:800px){.welcome-title{gap:9px}.welcome-coffee{width:1em;height:1em}}
+
+/* Телефон, 08.11.2026 (по образцу раскладки Claude iOS): поле ввода внизу, на том же месте
+   и с той же механикой, что в открытом чате: док абсолютный, клавиатура двигает только его
+   `bottom` (--keyboard-inset). Приветствие висит над доком на высоте экрана без шапки и не
+   пересчитывается при клавиатуре — при открытой клавиатуре просто гаснет (opacity).
+   Прежний вариант (растянутый flex-док с padding-bottom) перекладывал весь экран на каждом
+   кадре клавиатуры, и приветствие с капсулой дёргались. */
+@media(max-width:800px){
+ :root:root[data-ui-size] .page-surface[data-page=chat] .main-panel.empty-chat .composer-dock{
+  position:absolute;top:auto;bottom:var(--keyboard-inset,0px);left:0;right:0;margin-inline:auto;transform:none;
+  width:calc(100% - 24px);max-width:560px;padding-top:6px;
+  padding-bottom:max(10px,calc(env(safe-area-inset-bottom,0px) - var(--keyboard-inset,0px)));
+  transition:bottom .18s cubic-bezier(.23,1,.32,1)
+ }
+ :root:root[data-ui-size][data-viewport-resizing=true] .page-surface[data-page=chat] .main-panel.empty-chat .composer-dock{transition:bottom var(--keyboard-motion-duration,400ms) var(--keyboard-ease)!important}
+ :root:root .page-surface[data-page=chat] .main-panel.empty-chat .composer-dock>.welcome-heading{
+  position:absolute;left:0;right:0;bottom:calc(100% - var(--keyboard-inset,0px));margin:0 auto;padding:0 10px 24px;
+  height:calc(var(--app-height,100svh) - 48px - env(safe-area-inset-top,0px) - 128px);
+  display:flex;flex-direction:column;justify-content:center;overflow:hidden;pointer-events:none;
+  transition:bottom .18s cubic-bezier(.23,1,.32,1)
+ }
+ /* Гашение при клавиатуре — на внутреннем слое: у самого .welcome-heading opacity ведёт motion,
+    и CSS-переход на том же свойстве в WebKit проигрывал появление второй раз (мерцание). */
+ :root:root .page-surface[data-page=chat] .main-panel.empty-chat .composer-dock>.welcome-heading>.mode-welcome-stage{transition:opacity .16s ease}
+ /* Встречный сдвиг на тот же --keyboard-inset и с тем же таймингом: приветствие стоит на месте. */
+ :root:root[data-ui-size][data-viewport-resizing=true] .page-surface[data-page=chat] .main-panel.empty-chat .composer-dock>.welcome-heading{transition:bottom var(--keyboard-motion-duration,400ms) var(--keyboard-ease)!important}
+ :root:root[data-keyboard=true] .page-surface[data-page=chat] .main-panel.empty-chat .composer-dock>.welcome-heading>.mode-welcome-stage{opacity:0}
+ :root:root[data-ui-size] .page-surface[data-page=chat] .main-panel.empty-chat .welcome-heading h1{font-size:26px;letter-spacing:-.4px;line-height:1.25}
+ :root:root[data-ui-size] .page-surface[data-page=chat] .main-panel.empty-chat .welcome-heading .welcome-title{display:flex;flex-direction:column;align-items:center;gap:14px}
+ :root:root[data-ui-size] .page-surface[data-page=chat] .main-panel.empty-chat .welcome-heading .welcome-coffee{width:36px;height:36px}
+}
+@media(max-width:800px) and (prefers-reduced-motion:reduce){
+ :root:root[data-ui-size] .page-surface[data-page=chat] .main-panel.empty-chat .composer-dock{transition:none!important}
+ :root:root .page-surface[data-page=chat] .main-panel.empty-chat .composer-dock>.welcome-heading,
+ :root:root .page-surface[data-page=chat] .main-panel.empty-chat .composer-dock>.welcome-heading>.mode-welcome-stage{transition:none}
+}

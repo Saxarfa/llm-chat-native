@@ -1,0 +1,72 @@
+/* Типографика: Inter (интерфейс и заголовки) + JetBrains Mono (код, техметки).
+   Пара из базы ui-ux-pro-max №60 «Modern Dark Cinema»; обе с кириллицей, раздаются локально (офлайн).
+   Акцентный антиквенный шрифт бренда и приветствия — 'Welcome Serif' (Source Serif 4).
+   Слой меняет только гарнитуры, насыщенность, трекинг, интерлиньяж и перенос — не размеры блоков и не цвета. */
+@import '@fontsource-variable/inter/opsz.css';
+@import '@fontsource-variable/jetbrains-mono/wght.css';
+@import './assets/fonts/welcome/welcome-serif.css';
+
+:root{
+ --font-ui:'Inter Variable',Inter,system-ui,-apple-system,'Segoe UI',Arial,sans-serif;
+ --font-mono:'JetBrains Mono Variable','JetBrains Mono','Cascadia Code',Consolas,monospace;
+ --font-display:'Welcome Serif',Georgia,'Times New Roman',serif;
+ /* Иерархия: display 32 → title-l 24 → title-m 18 → title-s 16 → body 14 → small 13 → meta 12 */
+ --type-weight-regular:400;--type-weight-medium:500;--type-weight-strong:600;
+ --type-tracking-display:-.022em;--type-tracking-title:-.016em;--type-tracking-heading:-.011em;--type-tracking-label:.01em;--type-tracking-caps:.06em;
+ --type-leading-display:1.2;--type-leading-title:1.25;--type-leading-heading:1.3;--type-leading-body:1.5;--type-leading-meta:1.4;
+ font-family:var(--font-ui);font-optical-sizing:auto;font-kerning:normal;font-feature-settings:'kern','calt'
+}
+body{font-family:var(--font-ui)}
+code,kbd,samp,pre{font-family:var(--font-mono)}
+kbd{font-family:var(--font-ui);font-variant-numeric:tabular-nums}
+
+/* Display — главные приветствия и герои (32px). */
+:root :is(.welcome-heading h1,.temporary-welcome h1,.nano-welcome-area h2,.workspace-heading h1){font-weight:var(--type-weight-medium);letter-spacing:var(--type-tracking-display);line-height:var(--type-leading-display);text-wrap:balance}
+:root :is(.welcome-heading.intro-hero h1,.auth-screen h1,.auth-story h1,.agent-welcome h1,.agent-changes h2,.startup-name){font-weight:var(--type-weight-regular);letter-spacing:-.012em;text-wrap:balance}
+
+/* Title L — заголовки экранов и карточек входа (20–24px). */
+:root :is(.auth-card h2,.workspace-empty h2){font-weight:var(--type-weight-strong);letter-spacing:var(--type-tracking-title);line-height:var(--type-leading-title);text-wrap:balance}
+
+/* Title M — заголовки окон, разделов настроек, студий (16–18px). */
+:root :is(.modal-heading h2,.settings-claude>.modal-heading h2,.settings-modal>.modal-heading h2,.settings-section h3,.settings-claude .settings-section h3,.settings-modal .settings-section h3,.studio-heading h1,.art-animator-heading h2,.art-animator-inline .art-animator-heading h1,.art-upscale-heading h2,.lazy-section-error h2,.nano-gallery-header-info h2,.workspace-editor>.modal-heading h2){font-weight:var(--type-weight-strong);letter-spacing:var(--type-tracking-heading);line-height:var(--type-leading-heading);text-wrap:balance}
+
+/* Title S — заголовки карточек, панелей и листов (14–16px). */
+:root :is(.workspace-card-heading h2,.studio-art-header h2,.studio-art-window .studio-art-header h2,.art-compare-header h2,.image-edit-heading h2,.mobile-studio-sheet>header h2,.mobile-studio-header h1,.nano-heading h1,.nano-surface h2,.knowledge-heading h3,.knowledge-library-heading h4,.knowledge-empty h4,.context-note-section h3,.agent-approval h3,.nano-branches h3){font-weight:var(--type-weight-strong);letter-spacing:-.006em;line-height:var(--type-leading-heading)}
+
+/* Label — подписи групп и мелкие подзаголовки (12px). */
+:root :is(.studio-parameters h2,.mobile-studio-translator h3){font-weight:var(--type-weight-strong);letter-spacing:var(--type-tracking-label);line-height:var(--type-leading-meta)}
+:root .code-heading{font-family:var(--font-mono);font-weight:var(--type-weight-medium);letter-spacing:.04em}
+:root .reading-preview small,:root .model-preview>small{font-weight:var(--type-weight-medium);letter-spacing:var(--type-tracking-caps)}
+
+/* Описания и мелкий текст: спокойный интерлиньяж, без висячих слов. */
+:root :is(.modal-heading p,.settings-section>p,.settings-intro,.explanation-card p){line-height:var(--type-leading-body);text-wrap:pretty}
+small{line-height:var(--type-leading-meta)}
+
+/* Текст ответов (гарнитура — из настройки «Шрифт ответов»).
+   Абзацы и списки — обычный перенос: Safari применяет text-wrap:pretty ко всему абзацу,
+   и на iPhone строки рвались раньше и правый край становился рваным (08.11.2026). */
+.prose :is(h1,h2,h3,h4){text-wrap:balance}
+.prose h1{line-height:1.2;letter-spacing:-.022em}
+.prose h2{line-height:1.25;letter-spacing:-.018em}
+.prose h3{line-height:1.3;letter-spacing:-.012em}
+.prose h4{font-size:1em;line-height:1.35;letter-spacing:0}
+.prose code{font-size:.85em}
+.prose pre code{font-variant-ligatures:none}
+
+/* Цифры в счётчиках и метках времени не «прыгают». */
+:root :is(output,time,.context-count,.settings-text-size output){font-variant-numeric:tabular-nums}
+
+/* Icon stroke token (icon audit 2026-11-08): UI icons are filled Framework7 glyphs (src/icons); the stroke token is kept for the few stroke drawings left. */
+:root{--icon-stroke:1.5;--icon-spinner-stroke:2.4;--icon-size-xs:12px;--icon-size-sm:14px;--icon-size-md:16px;--icon-size-control:18px;--icon-size-nav:20px;--icon-size-lg:24px}
+svg.app-icon{stroke-width:var(--icon-stroke)}
+/* F7 outlines are filled paths. Legacy stroke styles must not thicken them. */
+svg.app-icon.f7-icon{stroke:none}
+/* At 14–16px an F7 line is under one device pixel and renders mottled. A hairline of the same colour, constant in screen px at any icon size, makes it solid. Set on the path so svg-level stroke-width rules cannot scale it. */
+:root{--icon-f7-weight:.3px}
+svg.app-icon.f7-icon>path{stroke:currentColor;stroke-width:var(--icon-f7-weight);stroke-linejoin:round;vector-effect:non-scaling-stroke}
+svg.app-icon{flex-shrink:0;vertical-align:middle}
+
+/* Вордмарк «llm/chat» (вариант 13, 09.11.2026): одна гарнитура, курсив только у «llm» (латинский курсив урезан до a–z), косая — тон, не цвет. */
+.wordmark{display:inline-flex;align-items:baseline;white-space:nowrap;font-family:var(--font-display);font-weight:var(--type-weight-regular);font-style:normal;letter-spacing:-.01em;line-height:1}
+.wordmark>i{font-style:italic;letter-spacing:0;padding-right:.02em}
+.wordmark-slash{margin:0 .04em;opacity:.38}

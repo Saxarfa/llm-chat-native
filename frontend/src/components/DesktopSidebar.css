@@ -1,0 +1,7 @@
+/* The slot participates in layout only when pinned. A hover preview uses the
+   same mounted sidebar over the conversation, preserving history and focus. */
+.desktop-sidebar-slot{position:relative;flex:none;height:100%;z-index:30;overflow:visible}
+.desktop-sidebar-slot>.desktop-sidebar{position:absolute;inset:0 auto 0 0;width:var(--sidebar-width,292px);height:100%;overflow:hidden;transition:box-shadow var(--motion-exit,180ms) ease,border-radius var(--motion-exit,180ms) ease}
+.desktop-sidebar-slot>.desktop-sidebar[data-preview=true]{border-radius:0 16px 16px 0;box-shadow:12px 0 40px var(--theme-shadow,#0004)}
+.desktop-sidebar-slot>.desktop-sidebar[data-preview=true]>.sidebar-resizer{display:none}
+@media(prefers-reduced-motion:reduce){.desktop-sidebar-slot>.desktop-sidebar{transition:none}}

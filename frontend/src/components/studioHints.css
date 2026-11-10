@@ -1,0 +1,32 @@
+/* Explanations for why studio controls are unavailable. */
+.studio-offline{display:flex;align-items:center;gap:8px;margin:0 0 10px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--muted-foreground,inherit)}
+.studio-block-reason{margin:6px 0 0;font-size:12px;color:var(--muted-foreground,inherit)}
+.studio-generate-button kbd{margin-left:8px;font-size:12px;opacity:.7}
+.translator-insert{font-size:12px}
+/* Brief highlight on the prompt after a translation is inserted. */
+.studio-form textarea.is-flash{animation:studio-prompt-flash .9s ease-out}
+@keyframes studio-prompt-flash{from{box-shadow:0 0 0 3px rgba(222,216,196,.5)}to{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){.studio-form textarea.is-flash{animation:none}}
+.studio-params-disclosure,.lora-disclosure,.studio-controls-window .studio-advanced,.studio-form .studio-advanced{margin:8px 0;padding:0;border:0}
+/* Parameters toggle: a full-width bordered row like the neighbouring selects, one line with ellipsis. */
+.disclosure.studio-params-disclosure>button.disclosure-trigger,.disclosure.lora-disclosure>button.disclosure-trigger,.disclosure.studio-advanced>button.disclosure-trigger{
+ width:100%;min-height:44px;padding:0 14px;gap:10px;justify-content:space-between;
+ font-size:13px;color:var(--theme-text-muted,#aaa79d);
+ background:var(--theme-surface-raised,rgba(255,255,255,.04));
+ border:1px solid var(--border,rgba(255,255,255,.1));border-radius:12px;
+ cursor:pointer;
+}
+.disclosure.studio-params-disclosure>button.disclosure-trigger>span,.disclosure.lora-disclosure>button.disclosure-trigger>span,.disclosure.studio-advanced>button.disclosure-trigger>span{flex:1;min-width:0;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.disclosure.studio-params-disclosure>button.disclosure-trigger>svg,.disclosure.lora-disclosure>button.disclosure-trigger>svg,.disclosure.studio-advanced>button.disclosure-trigger>svg{flex:none}
+.disclosure.studio-params-disclosure>button.disclosure-trigger:focus-visible,.disclosure.lora-disclosure>button.disclosure-trigger:focus-visible,.disclosure.studio-advanced>button.disclosure-trigger:focus-visible{outline:2px solid var(--theme-text-muted,#aaa79d);outline-offset:-2px}
+@media (hover:hover) and (pointer:fine){
+ .disclosure.studio-params-disclosure>button.disclosure-trigger:hover,.disclosure.lora-disclosure>button.disclosure-trigger:hover,.disclosure.studio-advanced>button.disclosure-trigger:hover{color:var(--theme-text-primary,#e0ddd2);border-color:var(--theme-text-muted,#aaa79d)}
+}
+.disclosure.studio-params-disclosure>button.disclosure-trigger[aria-expanded=true],.disclosure.lora-disclosure>button.disclosure-trigger[aria-expanded=true],.disclosure.studio-advanced>button.disclosure-trigger[aria-expanded=true]{color:var(--theme-text-primary,#e0ddd2)}
+.studio-art-header{display:none}
+.studio-controls-window .studio-form,.studio-translator-window .studio-form{position:relative}
+.studio-controls-window .studio-heading,.studio-translator-window .studio-heading{height:6px;min-height:0;margin-bottom:6px!important}
+.studio-controls-window .studio-heading .studio-panel-reset,.studio-translator-window .studio-heading .studio-panel-reset{position:absolute;top:10px;right:10px;z-index:2}
+.studio-controls-window .studio-form,.studio-translator-window .studio-form{padding-top:10px!important}
+.studio-controls-window .studio-heading,.studio-translator-window .studio-heading{height:8px;margin-bottom:0!important}
+.translator-compact .translator-toolbar label>span:first-child{display:none}

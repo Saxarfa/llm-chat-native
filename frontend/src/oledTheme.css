@@ -1,0 +1,40 @@
+/* OLED is a distinct, neutral palette. Component accent opacity fallbacks
+   remain intact: those tokens serve both solid controls and tinted fills. */
+:root[data-theme=oled]{
+ /* Base colors stay independent of component-local --theme-* overrides. */
+ --oled-canvas:#000;--oled-inset:#080808;--oled-panel:#0c0c0c;--oled-raised:#141414;--oled-selected:#1c1c1c;
+ --oled-ink:#dededc;--oled-muted:#a3a3a0;--oled-subtle:#888885;
+ --oled-line:#ffffff24;--oled-line-soft:#ffffff12;--oled-line-strong:#b0ada080;
+ --oled-faint:#ffffff05;--oled-soft:#ffffff0b;--oled-hover:#ffffff12;--oled-active:#ffffff1b;
+ --oled-glass:#0c0c0ce8;--oled-scrim:#000a;
+ color-scheme:dark;
+ --canvas:var(--oled-canvas);--rail:var(--oled-canvas);--surface:var(--oled-panel);
+ --ink:var(--oled-ink);--muted:var(--oled-muted);--subtle:var(--oled-subtle);--line:var(--oled-line-soft);
+ --button-primary:#d6d4c9;--button-primary-text:#151513;
+ --button-secondary:var(--oled-raised);--surface-muted:var(--oled-inset);--surface-accent:var(--oled-selected);
+ --input-border:var(--oled-line);--focus-ring:#b0ada0;--surface-popover:var(--oled-panel);
+ --theme-text-primary:var(--oled-ink);--theme-text-muted:var(--oled-muted);--theme-text-subtle:var(--oled-subtle);
+ --theme-text-accent:#c8c1a9;--theme-text-red:#d5968a;--theme-text-blue:#92badd;--theme-text-green:#a6bc9b;
+ --theme-control-accent:#c7c3b4;
+ --theme-surface-deep:var(--oled-canvas);--theme-surface-inset:var(--oled-inset);--theme-surface-panel:var(--oled-panel);
+ --theme-surface-raised:var(--oled-raised);--theme-surface-elevated:var(--oled-selected);--theme-surface-glass:var(--oled-glass);
+ --theme-fill-faint:var(--oled-faint);--theme-fill-soft:var(--oled-soft);--theme-fill-hover:var(--oled-hover);--theme-fill-active:var(--oled-active);
+ --theme-fill-red:#d5968a14;--theme-fill-blue:#92badd14;--theme-fill-green:#a6bc9b14;
+ --theme-line-soft:var(--oled-line-soft);--theme-line:var(--oled-line);--theme-line-strong:var(--oled-line-strong);
+ --theme-shadow:#0009;--theme-highlight:#ffffff08;--theme-scrim:var(--oled-scrim);
+ --theme-choice-border:#aaa591;--theme-choice-fill:#c8c1a90d;
+ --dictation-wave:#c7c3b4;
+}
+html[data-theme=oled],html[data-theme=oled] body{background:#000}
+/* Browser and app chrome share the true-black canvas, including safe areas. */
+html[data-theme=oled] :is(.image-studio,.auth-screen,.boot-screen){background:#000}
+/* Keep text tokens from turning neutral tracks and scrollbars into white bars. */
+html[data-theme=oled] *{scrollbar-color:#424242 transparent}
+html[data-theme=oled] :is(.context-ring-track,.startup-orbit-track){stroke:#ffffff1c}
+html[data-theme=oled] .startup-orbit-arc{stroke:#c7c3b4a6}
+html[data-theme=oled] [data-slot=tooltip-content]>svg{fill:var(--theme-surface-raised);background:var(--theme-surface-raised)}
+html[data-theme=oled] .hljs{background:transparent;color:var(--ink)}
+/* Progress overlays sit above artwork; the artwork itself keeps its colors. */
+html[data-theme=oled] :is(.art-animator-progress,.art-upscale-progress,.art-upscale-comparison){background:var(--oled-glass);border-color:var(--theme-line);color:var(--ink)}
+html[data-theme=oled] :is(.mobile-studio-status,.mobile-studio-art-tools>*){background:var(--oled-glass);color:var(--ink);border-color:var(--theme-line-soft)}
+html[data-theme=oled] .chat-art-generating{background:#080808}

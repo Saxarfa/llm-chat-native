@@ -1,0 +1,110 @@
+/* Floating controls leave the full height available to the conversation. */
+.page-surface[data-page=chat]>.main-panel{position:relative}
+.page-surface[data-page=chat]>.main-panel>.chat-header{
+ position:absolute;inset:0 0 auto;background:transparent;pointer-events:none;isolation:isolate;
+}
+.page-surface[data-page=chat]>.main-panel>.chat-header>div{pointer-events:none}
+.page-surface[data-page=chat]>.main-panel>.chat-header :is(button,a){pointer-events:auto}
+
+.page-surface[data-page=chat] .message-scroll{scroll-padding-top:calc(var(--app-header-height) + 20px)}
+.page-surface[data-page=chat] .message-column{padding-top:calc(var(--app-header-height) + 28px)}
+.page-surface[data-page=chat] .main-panel:not(.empty-chat) .message-column{
+ padding-bottom:40px;
+}
+.page-surface[data-page=chat] .message-column> .message[data-last-message=true]{margin-bottom:0}
+
+.page-surface[data-page=chat] .main-panel:not(.empty-chat) .composer-dock::before{content:none}
+.page-surface[data-page=chat] .parameter-panel{margin-top:0;padding-top:var(--app-header-height);background:var(--theme-surface-inset,#1c1c1a);border-left:1px solid var(--line)}
+@media(max-width:800px){
+ .page-surface[data-page=chat] .message-column{padding-top:calc(var(--app-header-height) + 19px)}
+}
+
+
+/* Floating controls do not darken the content passing behind them. */
+.page-surface[data-page=chat]>.main-panel>.chat-header::after,
+.page-surface[data-page=chat] .conversation::after,
+.page-surface[data-page=chat] .parameter-panel::after{content:none}
+
+/* Temporary chat remains reachable with the rail closed. */
+.page-surface[data-page=chat] .chat-header :is(svg.app-icon,svg.new-chat-icon){stroke-width:var(--icon-stroke)}
+.page-surface[data-page=chat] .header-temporary{color:var(--theme-text-muted,#b8b6ac);border-radius:9px;transition:background-color .15s,color .15s}
+.page-surface[data-page=chat] .header-temporary[aria-pressed=true]{background:var(--theme-fill-soft,#ffffff0d);color:var(--theme-text-primary,#e8e6df)}
+@media(max-width:800px){
+ .page-surface[data-page=chat]>.main-panel>.chat-header{
+  background:var(--canvas,#141414);border-bottom:1px solid var(--theme-line-soft,var(--line));
+  box-sizing:border-box;pointer-events:auto;
+ }
+ .page-surface[data-page=chat]>.main-panel>.chat-header :is(.icon-button,.context-trigger){
+  width:44px;height:44px;min-width:44px;min-height:44px;color:var(--ink);
+ }
+ .page-surface[data-page=chat]>.main-panel>.chat-header>.header-actions{gap:4px;flex:none}
+ .page-surface[data-page=chat] .chat-header .header-temporary{width:44px;height:44px;min-width:44px;min-height:44px}
+ .page-surface[data-page=chat] .chat-navigation-group{flex:1;min-width:0}
+ .page-surface[data-page=chat] .temporary-chat-badge{flex-shrink:1;gap:5px;min-width:0}
+ .page-surface[data-page=chat] .temporary-chat-badge>span{overflow:hidden;text-overflow:ellipsis}
+ .page-surface[data-page=chat] .temporary-chat-badge>.icon-button{display:none}
+}
+@media(prefers-reduced-motion:reduce){.page-surface[data-page=chat] .header-temporary{transition:none}}
+
+@media(max-width:800px){
+ .page-surface[data-page=chat]>.main-panel>.chat-header{gap:6px;padding-inline:6px}
+ .page-surface[data-page=chat] .chat-navigation-group{gap:3px;overflow:hidden}
+ .mobile-chat-title{display:flex;align-items:center;gap:7px;flex:1;min-width:0;min-height:44px;padding:0 4px;border:0;border-radius:8px;background:transparent;color:var(--ink);font:inherit;font-size:16px;text-align:left;cursor:pointer}
+ .mobile-chat-title>span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+ .mobile-chat-title>svg{flex:none}
+ .mobile-chat-title:focus-visible{outline:1px solid var(--muted);outline-offset:-2px}
+ .page-surface[data-page=chat] .header-actions>.mode-header-control:has([aria-label="Параметры чата"]),
+ .page-surface[data-page=chat] .header-actions>.header-temporary{display:none}
+ .page-surface[data-page=chat]>.main-panel.empty-chat>.chat-header>.header-actions>.mobile-new{display:none}
+ .page-surface[data-page=chat]>.main-panel.empty-chat>.chat-header>.header-actions>.header-temporary{display:inline-flex}
+ .page-surface[data-page=chat] .chat-navigation-group>.branch-switcher{flex:none;width:32px;min-width:32px;padding:0;justify-content:center}
+ .page-surface[data-page=chat] .chat-navigation-group>.branch-switcher>span,
+ .page-surface[data-page=chat] .chat-navigation-group>.branch-switcher>svg:last-child{display:none}
+ .mobile-chat-title-menu{max-width:calc(100vw - 20px)}
+ .mobile-chat-title-menu [role=menuitem]{min-height:44px}
+}
+
+/* A compact mobile toolbar yields to forward reading. Its small edge fade
+   separates the controls without covering an extra line of the conversation. */
+@media(max-width:800px){
+ .page-surface[data-page=chat]>.main-panel{--app-header-height:48px}
+ .page-surface[data-page=chat]>.main-panel>.chat-header{
+  border-bottom-color:transparent;
+  transition:translate var(--motion-detail) var(--motion-ease),opacity var(--motion-micro) var(--motion-ease);
+ }
+ .page-surface[data-page=chat]>.main-panel>.chat-header[data-reading-hidden=true]{translate:0 calc(-100% - 10px);opacity:0;pointer-events:none}
+ .page-surface[data-page=chat]>.main-panel>.chat-header[data-reading-hidden=true] :is(button,a){pointer-events:none}
+ .page-surface[data-page=chat]>.main-panel>.chat-header::after{
+  content:"";display:block;position:absolute;inset:auto 0 -10px;height:10px;
+  background:linear-gradient(to bottom,var(--canvas,#141414),transparent);
+  pointer-events:none;z-index:-1;
+ }
+ .page-surface[data-page=chat] .message-column{padding-top:calc(var(--app-header-height) + 12px)}
+ .mobile-chat-title{font-size:14px;gap:5px}
+}
+@media(prefers-reduced-motion:reduce){
+ .page-surface[data-page=chat]>.main-panel>.chat-header{transition:none}
+}
+
+/* Desktop actions form a quiet rail outside the reading column. */
+@media(min-width:801px){
+ .page-surface[data-page=chat]>.main-panel>.chat-header .header-navigation{position:absolute;left:14px;top:12px}
+ .page-surface[data-page=chat]>.main-panel>.chat-header .header-navigation>.icon-button{width:30px;min-width:30px;height:34px;min-height:34px}
+ /* Кнопка меню вынута из потока — сдвигаем соседей, чтобы «Ветка» не налезала на неё. */
+ .page-surface[data-page=chat]>.main-panel>.chat-header .header-navigation~:is(.branch-switcher,.temporary-badge){margin-left:28px}
+ .page-surface[data-page=chat]>.main-panel>.chat-header>.header-actions{position:absolute;right:14px;top:12px;display:flex;flex-direction:column;align-items:center;gap:6px}
+ .page-surface[data-page=chat]>.main-panel>.chat-header .header-actions>.mobile-new{display:inline-flex}
+}
+
+@media(min-width:801px){
+ /* One reservation owns the reading column, composer, map and header rail.
+    The exiting panel remains painted without retaining a second flex slot. */
+ .page-surface[data-page=chat]>.main-panel>.conversation-layout{position:relative;padding-right:var(--parameter-width,0px)}
+ .page-surface[data-page=chat]>.main-panel>.chat-header>.header-actions{right:calc(14px + var(--parameter-width,0px));transition:none}
+ .page-surface[data-page=chat] .parameter-panel{position:absolute;inset:0 0 0 auto;padding-top:0}
+ :root .collapsed-settings{left:14px;bottom:12px}
+ :root .collapsed-settings .icon-button{width:30px;min-width:30px;height:34px;min-height:34px}
+}
+@media(min-width:801px) and (prefers-reduced-motion:reduce){
+ .page-surface[data-page=chat]>.main-panel>.chat-header>.header-actions{transition:none}
+}

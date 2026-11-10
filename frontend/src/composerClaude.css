@@ -1,0 +1,209 @@
+/* A spacious welcome capsule and a compact conversation input.
+   Focus changes only the outline; text and attachments own the geometry. */
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude{
+ --composer-action:32px;--composer-input-size:16px;--composer-meta-size:13px;
+ --composer-placeholder:#91918b;--composer-surface:#20201e;--composer-border:#ffffff1a;
+ display:flex;flex-direction:column;min-width:0;
+}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer{
+ display:grid;position:relative;grid-template-columns:var(--composer-action) auto minmax(0,1fr) var(--composer-action) var(--composer-action);
+ gap:10px 4px;padding:12px 8px 10px;margin:0;min-width:0;min-height:102px;
+ border:1px solid var(--composer-border);border-radius:16px;
+ background:var(--composer-surface);box-shadow:0 0 0 1px transparent;
+ backdrop-filter:none;-webkit-backdrop-filter:none;
+ transition:border-color .28s cubic-bezier(.23,1,.32,1),box-shadow .28s cubic-bezier(.23,1,.32,1);
+}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer:has(.composer-stop-extra){grid-template-columns:var(--composer-action) auto minmax(0,1fr) var(--composer-action) var(--composer-action) var(--composer-action)}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude :is(.composer-controls,.composer-toolbar,.composer-tools,.composer-right){display:contents}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer textarea{
+ grid-column:1/-1;grid-row:1;align-self:start;width:100%;min-width:0;min-height:36px;
+ padding:0 6px;margin:0;border:0;background:transparent;box-shadow:none;resize:none;
+ font-family:var(--font-ui,Arial,Helvetica,sans-serif);font-size:var(--composer-input-size)!important;font-weight:400;line-height:1.5;letter-spacing:0;
+}
+/* Whitespace-only restored drafts keep their contents and still show a hint. */
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-placeholder{
+ grid-column:1/-1;grid-row:1;align-self:start;min-width:0;max-width:100%;padding:0 6px;
+ pointer-events:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+ opacity:1;transition:none;
+ font:400 var(--composer-input-size)/1.5 var(--font-ui,Arial,Helvetica,sans-serif);color:var(--composer-placeholder);letter-spacing:0;
+}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-placeholder[data-visible=false]{opacity:0}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer:has(textarea:focus){border-color:color-mix(in srgb,var(--ink) 24%,var(--composer-surface));box-shadow:0 0 0 1px color-mix(in srgb,var(--ink) 3%,transparent)}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .attachment-tray{grid-column:1/-1;grid-row:1;min-width:0;padding:0 6px}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer:has(.attachment-tray) :is(textarea,.composer-placeholder){grid-row:2}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer:has(.attachment-tray) :is(.send-button,.composer-stop-extra,.attachment-trigger,.dictation-trigger,.composer-bottom-row,.composer-modes){grid-row:3}
+
+/* Attachments left, model and input actions right, all inside the capsule. */
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude :is(.attachment-trigger,.dictation-trigger,.send-button,.composer-stop-extra){
+ position:static;top:auto;left:auto;right:auto;bottom:auto;grid-row:2;align-self:center;justify-self:center;
+ width:var(--composer-action);height:var(--composer-action);min-height:var(--composer-action);
+ margin:0;padding:0;border:0;border-radius:8px;box-shadow:none;background:transparent;color:var(--ink);
+ transition:background-color .16s ease,color .16s ease,opacity .16s ease;
+}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .attachment-trigger{grid-column:1}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .dictation-trigger{grid-column:4}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-stop-extra{grid-column:-3/-2}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .send-button{grid-column:-2/-1;border-radius:50%;background:var(--ink);color:var(--composer-surface)}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .send-button:disabled{background:transparent;color:var(--muted);opacity:.4}
+@media (hover:hover) and (pointer:fine){
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .send-button:not(:disabled):hover{background:color-mix(in srgb,var(--ink) 88%,var(--composer-surface))}
+}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .send-button.stop-button{background:color-mix(in srgb,var(--ink) 10%,transparent);color:var(--ink)}
+@media (hover:hover) and (pointer:fine){
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .send-button.stop-button:hover{background:color-mix(in srgb,var(--ink) 16%,transparent)}
+}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-bottom-row{
+ position:static;grid-column:3;grid-row:2;align-self:center;justify-self:stretch;
+ display:flex;justify-content:flex-end;align-items:center;gap:0;min-width:0;height:var(--composer-action);max-width:100%;
+}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude :is(.model-trigger,.composer-reasoning-trigger){
+ position:static;display:inline-flex;align-items:center;justify-content:center;flex:0 1 auto;
+ width:auto;min-width:0;max-width:250px;height:var(--composer-action);min-height:var(--composer-action);
+ margin:0;padding:4px 5px;gap:4px;border:0;border-radius:7px;
+ background:transparent!important;box-shadow:none!important;filter:none!important;
+ backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+ color:var(--ink);font-family:var(--font-ui,Arial,Helvetica,sans-serif);font-size:var(--composer-meta-size);font-weight:400;line-height:20px;
+ transition:color .16s ease;
+}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .model-trigger>.avatar{display:none}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .model-trigger>.model-trigger-name{
+ display:block;position:static;visibility:visible;min-width:0;width:auto;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .model-trigger>.model-trigger-short{display:none}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude :is(.model-trigger,.composer-reasoning-trigger)>svg{display:block;flex:none;width:11px;height:11px;color:var(--muted)}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-reasoning-trigger{max-width:145px;color:var(--muted)}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-reasoning-trigger>span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude :is(.attachment-trigger,.dictation-trigger,.send-button,.composer-stop-extra,.model-trigger,.composer-reasoning-trigger) svg{stroke-width:var(--icon-stroke)}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude :is(.attachment-trigger,.dictation-trigger,.send-button,.composer-stop-extra) svg{width:20px;height:20px}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude :is(.stop-button,.composer-stop-extra) svg{width:14px;height:14px}
+@media (hover:hover) and (pointer:fine){
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude :is(.attachment-trigger,.dictation-trigger,.composer-stop-extra):hover{background:var(--theme-fill-hover,#ffffff0a);color:var(--ink)}
+}
+@media (hover:hover) and (pointer:fine){
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-reasoning-trigger:hover{color:var(--ink)}
+}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude :is(.model-trigger,.composer-reasoning-trigger,.attachment-trigger,.dictation-trigger,.send-button,.composer-stop-extra):focus-visible{outline:2px solid var(--theme-line-strong,#77766e);outline-offset:2px}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-status{margin:0;padding:0 2px;min-height:18px}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-status:empty{display:none}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-status:not(:empty){margin-top:6px}
+
+
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-modes{position:relative;grid-column:2;grid-row:2;align-self:center;justify-self:start;display:flex;align-items:center;gap:0;height:32px;padding:2px;border-radius:8px;background:var(--theme-fill-soft,#ffffff0a);isolation:isolate}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-modes button{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;min-width:40px;height:28px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--muted);font:400 14px/20px var(--font-ui,Arial,Helvetica,sans-serif);white-space:nowrap;transition:color .16s ease}
+@media (hover:hover) and (pointer:fine){
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-modes button:hover{color:var(--ink)}
+}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-modes button[aria-pressed=true]{color:var(--ink)}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-modes button:focus-visible{outline:2px solid var(--theme-line-strong,#77766e);outline-offset:2px}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-mode-highlight{position:absolute;top:0;left:0;z-index:0;border:1px solid color-mix(in srgb,var(--ink) 14%,transparent);border-radius:6px;background:color-mix(in srgb,var(--ink) 12%,var(--composer-surface));box-shadow:0 1px 2px #0000000a;pointer-events:none}
+@media(min-width:801px){
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel.empty-chat .composer-dock{transform:translateY(-1.5vh)}
+}
+
+/* Match the reference welcome rhythm: a centered capsule with a lighter,
+   close-set greeting. Its font is self-hosted so Cyrillic matches on iOS too. */
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-dock{
+ max-width:640px;
+}
+@media(prefers-reduced-motion:reduce){
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-dock{transition:none!important}
+}
+:root[data-ui-size][data-viewport-resizing=true] .page-surface[data-page=chat] .main-panel .composer-dock{transition:none!important}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .welcome-heading h1,
+:root .welcome-heading.intro-hero h1{font-family:var(--font-display);font-size:32px;font-weight:400;font-synthesis:none;letter-spacing:-.35px;line-height:1.25}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .welcome-heading{margin-bottom:14px}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel:not(.empty-chat) .composer-dock{z-index:4;isolation:isolate}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel:not(.empty-chat) .composer-dock::before{
+ content:"";position:absolute;z-index:-1;pointer-events:none;left:50%;width:100cqw;
+ top:-48px;bottom:-16px;transform:translateX(-50%);
+ background:linear-gradient(to bottom,transparent 0,var(--canvas) 48px,var(--canvas) 100%);
+}
+
+/* The recorder overlays the current dimensions instead of collapsing a draft. */
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer:has(.dictation-overlay){height:auto;min-height:102px;max-height:none;overflow:visible}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer:has(.dictation-overlay) .composer-controls{visibility:hidden}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .dictation-overlay{background:var(--composer-surface);padding:12px 16px}
+.composer-reasoning-menu.floating-panel{min-width:156px;width:max-content;max-width:calc(100vw - 24px);padding:4px;border-radius:11px}
+.composer-reasoning-menu [data-slot=dropdown-menu-label]{padding:4px 7px;font-size:12px;font-weight:400;line-height:15px;color:var(--muted)}
+.composer-reasoning-menu [role=menuitemradio]{min-height:32px;padding:6px 9px 6px 27px;border-radius:7px;font-size:14px;font-weight:400;line-height:20px}
+.composer-reasoning-menu [role=menuitemradio]>span:first-child{left:8px}
+
+:root[data-ui-size=compact] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude{--composer-input-size:15px;--composer-meta-size:13px}
+:root[data-ui-size=large] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude{--composer-input-size:18px;--composer-meta-size:15px}
+:root[data-ui-size][data-theme=light] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude{--composer-surface:var(--theme-surface-panel);--composer-border:var(--theme-line);--composer-placeholder:#7e796f}
+:root[data-ui-size][data-theme=oled] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude{--composer-surface:var(--theme-surface-panel);--composer-border:var(--theme-line)}
+
+@media(max-width:800px){
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude{--composer-action:44px;--composer-input-size:16px;--composer-meta-size:13px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-dock{width:calc(100% - 24px)}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel.empty-chat .composer-dock{max-width:560px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer{grid-template-columns:var(--composer-action) minmax(0,1fr) var(--composer-action) var(--composer-action);padding:10px 8px 6px;gap:4px 2px;min-height:104px;margin-bottom:48px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer:has(.composer-stop-extra){grid-template-columns:var(--composer-action) minmax(0,1fr) var(--composer-action) var(--composer-action) var(--composer-action)}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer textarea{min-height:38px}
+ /* One action row. The visible segment is inset within 44 px touch targets. */
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-modes{grid-column:2;grid-row:2;height:44px;max-width:100%;padding:0;background:transparent}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-modes::before{content:"";position:absolute;inset:5px 0;border-radius:8px;background:var(--theme-fill-soft,#ffffff0a);z-index:-1}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-modes button{height:44px;min-width:44px;padding:0 6px;font-size:14px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-mode-highlight{border:0;background:transparent;box-shadow:none}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-mode-highlight::before{content:"";position:absolute;inset:5px 0;border:1px solid color-mix(in srgb,var(--ink) 14%,transparent);border-radius:6px;background:color-mix(in srgb,var(--ink) 12%,var(--composer-surface))}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-bottom-row{position:absolute;top:calc(100% + 4px);left:6px;right:6px;grid-column:auto;grid-row:auto;height:44px;justify-content:flex-end;gap:4px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude :is(.dictation-trigger,.send-button,.composer-stop-extra){grid-row:2}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .dictation-trigger{grid-column:3}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude :is(.model-trigger,.composer-reasoning-trigger){min-width:44px;padding-inline:3px;gap:2px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-reasoning-trigger{max-width:110px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .model-trigger-name{font-weight:400}
+ /* A 36 px visual button inside the unchanged 44 px hit area. A background
+    also survives the visual clone used by the first-message transition. */
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude :is(.send-button,.send-button:disabled,.send-button.stop-button,.send-button:not(:disabled):hover,.send-button.stop-button:hover){background:radial-gradient(circle closest-side,var(--send-fill,var(--ink)) calc(100% - 4px),transparent calc(100% - 3px));box-shadow:none}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .send-button:disabled{--send-fill:transparent}
+ @media (hover:hover) and (pointer:fine){
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .send-button:not(:disabled):hover{--send-fill:color-mix(in srgb,var(--ink) 88%,var(--composer-surface))}
+ }
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .send-button.stop-button{--send-fill:color-mix(in srgb,var(--ink) 10%,transparent)}
+ @media (hover:hover) and (pointer:fine){
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .send-button.stop-button:hover{--send-fill:color-mix(in srgb,var(--ink) 16%,transparent)}
+ }
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer:has(.attachment-tray) :is(.dictation-trigger,.send-button,.composer-stop-extra){grid-row:3}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer:has(.dictation-overlay){min-height:104px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .welcome-heading{margin-bottom:20px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .welcome-heading h1{font-size:32px}
+ .composer-reasoning-menu [role=menuitemradio]{min-height:44px}
+}
+/* An open conversation has a compact input and its model controls below it.
+   The welcome screen keeps the larger field and section switch. */
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel:not(.empty-chat) .composer-dock{max-width:768px}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false]{--composer-meta-height:24px}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer{
+ grid-template-columns:var(--composer-action) minmax(0,1fr) var(--composer-action) var(--composer-action);
+ gap:0 6px;padding:7px 8px;min-height:48px;margin-bottom:30px;border-radius:14px;
+}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer:has(.composer-stop-extra){grid-template-columns:var(--composer-action) minmax(0,1fr) var(--composer-action) var(--composer-action) var(--composer-action)}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer textarea{grid-column:2;grid-row:1;align-self:center;min-height:28px;padding:2px 0}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer-placeholder{grid-column:2;grid-row:1;align-self:center;padding:2px 0}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] :is(.attachment-trigger,.dictation-trigger,.send-button,.composer-stop-extra){grid-row:1;align-self:end}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .dictation-trigger{grid-column:3}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer-bottom-row{
+ position:absolute;top:calc(100% + 4px);left:12px;right:8px;
+ grid-column:auto;grid-row:auto;justify-content:flex-end;height:var(--composer-meta-height);
+}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] :is(.model-trigger,.composer-reasoning-trigger){height:var(--composer-meta-height);min-height:var(--composer-meta-height);padding:2px 4px}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .model-trigger-name{font-weight:400}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer:has(.attachment-tray) :is(textarea,.composer-placeholder,.attachment-trigger,.dictation-trigger,.send-button,.composer-stop-extra){grid-row:2}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer:has(.dictation-overlay){min-height:48px}
+:root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .dictation-overlay{padding:6px 10px}
+@media(max-width:800px){
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false]{--composer-meta-height:44px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer{gap:0 4px;padding:5px 8px;min-height:56px;margin-bottom:48px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer textarea{min-height:32px;padding:4px 0}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer-placeholder{padding:4px 0}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer:has(.dictation-overlay){min-height:56px}
+ /* Expand wrapped drafts once, preserving the existing auto-grow behavior. */
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer[data-multiline=true] textarea{grid-column:1/-1;grid-row:1;align-self:start}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer[data-multiline=true] .composer-placeholder{grid-column:1/-1;grid-row:1;align-self:start}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer[data-multiline=true] :is(.attachment-trigger,.dictation-trigger,.send-button,.composer-stop-extra){grid-row:2}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer[data-multiline=true]:has(.attachment-tray) :is(textarea,.composer-placeholder){grid-row:2}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome=false] .composer[data-multiline=true]:has(.attachment-tray) :is(.attachment-trigger,.dictation-trigger,.send-button,.composer-stop-extra){grid-row:3}
+}
+@media(prefers-reduced-motion:reduce){
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude :is(.composer,.model-trigger,.composer-reasoning-trigger,.attachment-trigger,.dictation-trigger,.send-button,.composer-stop-extra,.composer-modes button){transition:none}
+}

@@ -1,0 +1,29 @@
+/* Message action icons share one size, stroke and ink under questions and answers. */
+:root :is(.user-message .question-actions,.assistant-message .answer-actions) svg{width:var(--icon-size-sm,14px);height:var(--icon-size-sm,14px);stroke-width:var(--icon-stroke)}
+:root :is(.user-message .question-actions,.assistant-message .answer-actions) .icon-button{color:var(--theme-text-muted,#a3a29a)}
+
+/* With a mouse the question actions appear for the hovered or focused question only; touch keeps them visible. */
+@media(hover:hover) and (pointer:fine){
+ :root .user-message .question-actions{opacity:0}
+ :root .user-message:hover .question-actions,:root .user-message:focus-within .question-actions{opacity:1}
+}
+
+/* Аудит открытого чата по ui-ux-pro-max (08.11.2026). */
+/* Скрытая область объявлений для экранного диктора (announce.ts). */
+.sr-announcer{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+/* Мелкие подписи ответа (время рассуждений, статистика, детали инструментов): не меньше 12px и контраст от 4.5:1. */
+:root :is(.assistant-message,.agent-shell,.image-edit-chat,.nano-progress){
+ --activity-meta-size:max(12px,var(--ui-meta,11px));
+ --activity-secondary:color-mix(in srgb,var(--theme-text-subtle,#7d7c76) 70%,var(--theme-text-muted,#a3a29a));
+}
+/* Время под вопросом в светлой теме было 3.6:1. */
+:root[data-theme=light] .user-message .question-actions time{color:var(--theme-text-muted,#655f53)}
+/* Карта вопросов: штрих 16px, зона наведения/клика — не меньше 24px. */
+.conversation-map-marker::after{content:'';position:absolute;inset:-4px 0}
+@media(max-width:800px){
+ /* «Рассуждения» и строка инструментов стоят вплотную, поэтому зона растёт за счёт высоты и всей ширины колонки. */
+ :root .page-surface .assistant-message.message :is(.reasoning,.tools-disclosure)>.disclosure-trigger{width:100%;min-height:44px}
+ /* Кнопка статистики 34×36 → зона 44×44 без сдвига. */
+ :root .page-surface[data-page=chat] .assistant-message .stats-trigger{position:relative}
+ :root .page-surface[data-page=chat] .assistant-message .stats-trigger::after{content:'';position:absolute;inset:-4px -5px}
+}

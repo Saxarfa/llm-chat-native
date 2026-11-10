@@ -1,0 +1,22 @@
+/* Pressed feedback on touch: a row or control fills the moment a finger lands and
+   fades on release (the ordinary button transition returns it). Colour only, so
+   nothing moves under the finger and reduced motion needs no special case. The
+   fill follows the theme tokens, so classic dark, OLED and light each keep their own. */
+@media(hover:none) and (pointer:coarse){
+ :root :is(
+  .mobile-sidebar-modal .sidebar-section-button,
+  .mobile-sidebar-modal .new-chat-button,
+  .mobile-sidebar-modal .chat-row>button:first-child,
+  .mobile-sidebar-modal .sidebar-account,
+  .mobile-sidebar-modal .chat-list-toggle,
+  .settings-nav>button,
+  .model-option>button:first-child,
+  .answer-actions button,
+  .question-actions button,
+  .composer-reasoning-trigger,
+  .model-trigger,
+  .context-trigger
+ ):not(:disabled):not([aria-disabled=true]):active{
+  background-color:var(--theme-fill-active,var(--theme-fill-hover,#ffffff14));
+ }
+}

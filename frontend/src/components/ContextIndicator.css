@@ -1,0 +1,64 @@
+/* Compact details keep exact counts readable without large statistic tiles. */
+.context-popover.floating-panel{
+ width:260px;padding:6px 10px;border-radius:12px;
+ background:var(--theme-surface-panel,#242422);background-image:none;
+ -webkit-backdrop-filter:none;backdrop-filter:none;
+ max-height:calc(var(--radix-popover-content-available-height,100dvh) - 12px);overflow-y:auto;
+}
+.context-popover>header{gap:6px;min-height:28px;font-size:var(--ui-small,13px)}
+.context-popover>header>strong{font-weight:500}
+.context-popover>header .icon-button{width:28px;height:28px;min-height:28px;min-width:28px;flex:none;border-radius:5px}
+.context-popover .context-numbers{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;margin:6px 0 8px}
+.context-popover .context-numbers>div{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.context-popover .context-numbers>div>span{margin:0;font-size:var(--ui-small,13px);line-height:20px;color:var(--muted)}
+.context-popover .context-numbers strong{flex:none;font-size:var(--ui-small,13px);line-height:20px;font-weight:400;white-space:nowrap;font-variant-numeric:tabular-nums}
+.context-popover .context-meter{height:2px;border-radius:1px}
+.context-popover>footer{align-items:baseline;margin-top:6px;gap:10px;font-size:var(--ui-meta,11px);line-height:18px;font-variant-numeric:tabular-nums}
+.context-popover>footer strong{font-weight:400;white-space:nowrap}
+.context-popover .context-code-note{margin:7px 0 0;font-size:var(--ui-meta,11px);line-height:1.45}
+.context-popover .context-manage-button{
+ justify-content:flex-start;width:100%;height:auto;min-height:30px;margin:6px 0 0;padding:5px 0;
+ border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none;background:transparent;
+ font-size:var(--ui-small,13px);line-height:20px;font-weight:400;color:var(--muted);gap:7px;
+}
+@media(hover:hover) and (pointer:fine){
+ .context-popover .context-manage-button:hover{color:var(--ink);background:transparent}
+}
+@media(max-width:800px){
+ .context-popover>header .icon-button{width:44px;height:44px;min-width:44px;min-height:44px;margin-right:-6px}
+ .context-popover .context-manage-button{min-height:44px}
+}
+
+/* The context meter shares the model footer, using a full touch target on phones. */
+.context-trigger.context-trigger-linear{
+ display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:5px;
+ flex:0 1 160px;min-width:96px;width:clamp(100px,32vw,160px);min-height:44px;height:44px;
+ margin-right:auto;padding:6px 5px;border:0;border-radius:7px;background:transparent;
+ color:var(--theme-text-muted,var(--muted));font-size:12px;line-height:14px;text-align:left;
+ font-variant-numeric:tabular-nums;
+}
+.context-trigger.context-trigger-linear>.context-linear-track{display:block;height:2px;width:100%;background:color-mix(in srgb,var(--ink) 14%,transparent);overflow:hidden;border-radius:1px}
+.context-linear-track>span{display:block;width:100%;height:100%;background:currentColor;border-radius:inherit;transform-origin:left;transition:transform var(--motion-detail,220ms) var(--ease-out,cubic-bezier(.23,1,.32,1))}
+.context-trigger.context-trigger-linear>.context-linear-value{display:block;white-space:nowrap}
+.context-linear-value .context-value-short{display:none}
+.context-trigger.context-trigger-linear[data-level=high]{color:var(--theme-text-red,#d99783)}
+.context-trigger.context-trigger-linear:focus-visible{outline:2px solid var(--muted);outline-offset:-2px}
+@media(min-width:801px){
+ .context-trigger.context-trigger-linear{height:30px;min-height:30px;padding-block:2px;gap:4px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome] .composer:has(.context-trigger-linear){margin-bottom:36px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome] .composer-bottom-row:has(.context-trigger-linear){
+  position:absolute;top:calc(100% + 4px);left:12px;right:8px;
+  grid-column:auto;grid-row:auto;justify-content:flex-end;height:30px;
+ }
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude[data-welcome] .composer-bottom-row:has(.context-trigger-linear) :is(.model-trigger,.composer-reasoning-trigger){height:30px;min-height:30px}
+}
+@media(max-width:420px){
+ .context-trigger.context-trigger-linear{min-width:96px}
+ .context-linear-value .context-value-full{display:none}
+ .context-linear-value .context-value-short{display:inline}
+}
+
+@media(max-width:360px){
+ .context-trigger.context-trigger-linear{flex:0 0 82px;width:82px;min-width:82px;padding-inline:2px}
+ :root[data-ui-size] .page-surface[data-page=chat] .main-panel .composer-section.composer-claude .composer-bottom-row :is(.model-trigger,.composer-reasoning-trigger){font-size:12px;padding-inline:3px;gap:3px}
+}

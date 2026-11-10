@@ -1,0 +1,40 @@
+/* Both workspaces stay mounted so changing tabs preserves drafts and playback state. */
+.generation-studio-shell{position:relative;display:flex;flex:1;min-height:0;min-width:0;height:100%;isolation:isolate}
+.generation-studio-pane{display:flex;flex:1;min-width:0;min-height:0;height:100%}
+.generation-studio-pane[hidden]{display:none}
+.generation-studio-pane[data-preparing=true]{position:absolute;inset:0;visibility:hidden;pointer-events:none}
+.studio-mode-error{position:absolute;z-index:40;bottom:16px;left:16px;right:16px;display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font-size:14px}
+.studio-mode-error>span{flex:1;overflow-wrap:anywhere}
+.studio-mode-error>button:not(.icon-button){text-decoration:underline;text-underline-offset:3px}
+.generation-studio-tabs{position:absolute;z-index:35;left:24px;top:10px;display:flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:12px;background:var(--theme-surface-glass,var(--surface));isolation:isolate}
+.generation-studio-shell.has-menu-trigger .generation-studio-tabs{left:58px}
+.generation-studio-tabs>button{position:relative;z-index:1;padding:7px 13px;border-radius:8px;font-size:14px;line-height:18px;color:var(--muted);white-space:nowrap;transition:color .16s ease}
+.generation-studio-tabs>button[aria-selected=true]{color:var(--ink)}
+.generation-studio-tabs>button:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+.generation-tab-highlight{position:absolute;left:0;top:0;z-index:0;border-radius:8px;background:var(--theme-fill-active,#ffffff12);pointer-events:none}
+.video-studio{position:relative;overflow:hidden}
+.video-studio>.chat-header{position:absolute;inset:0 0 auto;z-index:30;background:transparent}
+.video-studio-workspace{position:relative;z-index:1;display:flex;flex:1;min-height:0;min-width:0;padding:76px 24px 24px;align-items:center;justify-content:center}
+.video-studio .art-animator-inline{position:relative;inset:auto;z-index:1;transform:none;animation:none;width:min(1060px,100%);height:100%;max-height:860px;min-height:0}
+.art-animator-inline .art-animator-heading h1{font-size:18px;font-weight:600;margin:4px 0 0}
+@media(max-width:800px),(pointer:coarse) and (max-height:500px){
+ .generation-studio-tabs,.generation-studio-shell.has-menu-trigger .generation-studio-tabs{left:54px;top:10px;padding:3px;gap:2px;border-radius:10px}
+ .generation-studio-tabs>button{font-size:12px;padding:6px 8px;line-height:18px}
+ .generation-studio-shell .mobile-studio-header h1,.generation-studio-shell .mobile-studio-header>.art-animate-button{display:none}
+ .generation-studio-shell .mobile-studio-header{justify-content:flex-end}
+ .generation-studio-shell .mobile-studio-header>.icon-button:first-child{margin-right:auto}
+ .video-studio-workspace{padding:62px 8px 8px}
+ .video-studio .art-animator-inline{width:100%;height:100%;max-height:none;border-radius:18px}
+ .art-animator-inline .art-animator-heading{padding:13px 17px 8px}
+ .art-animator-inline .art-animator-heading h1{font-size:16px}
+}
+@media(prefers-reduced-motion:reduce){.generation-studio-tabs>button{transition:none}}
+
+/* Keep import, history and navigation reachable on narrow phones. */
+.generation-tab-short{display:none}
+@media(max-width:360px){
+ .generation-studio-tabs .generation-tab-full{display:none}
+ .generation-studio-tabs .generation-tab-short{display:inline}
+}
+
+.premium-modal.studio-clear-modal{z-index:230!important}[data-slot=dialog-overlay]:has(+.studio-clear-modal){z-index:229}

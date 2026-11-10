@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'"><title>Типы редакторов</title><style>
+html{color-scheme:light dark;font:16px/1.5 system-ui,sans-serif}body{margin:20px;max-width:600px}h1{font-size:22px}label{display:block;margin:24px 0 8px}input,[contenteditable]{box-sizing:border-box;width:100%;font:16px/1.5 system-ui,sans-serif;padding:12px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit}input{height:50px}[contenteditable]{min-height:110px;white-space:pre-wrap;overflow-wrap:break-word}small{display:block;margin-top:20px}a{display:inline-block;margin-top:20px}
+</style></head><body><h1>Два других типа ввода</h1><p>Введи букву в каждом поле, удали всё и повтори. Это отдельная страница без скриптов приложения.</p>
+<label for="line">1. Однострочное поле</label><input id="line" type="text" aria-label="Однострочное поле" autocomplete="off" autocorrect="off" spellcheck="false" writingsuggestions="false">
+<label for="editor">2. Редактируемый блок</label><div id="editor" contenteditable="plaintext-only" role="textbox" aria-multiline="true" aria-label="Редактируемый блок" autocorrect="off" spellcheck="false" writingsuggestions="false"></div>
+<small>Текст не отправляется и не сохраняется.</small><a href="/">Вернуться в чат</a></body></html>

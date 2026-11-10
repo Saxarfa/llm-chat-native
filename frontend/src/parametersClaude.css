@@ -1,0 +1,169 @@
+/* Chat parameters — editorial minimal (variant N, 09.11.2026).
+   Monochrome: ink is the only accent; serif only for the model name; hairlines instead of boxes.
+   Rules: VectorLab UX — weights 400/500, sizes ≥12px, 8pt rhythm, motion 150ms on colour/transform only.
+   Markup and behaviour are unchanged; everything here is visual. */
+:root[data-ui-size] :is(.parameters-claude,.parameter-select-menu){
+ --parameters-bg:var(--oled-panel,#1a1a19);--parameters-fill:var(--oled-raised,#262625);--parameters-hover:var(--oled-selected,#30302e);
+ --ink:var(--oled-ink,#e8e6e1);--muted:var(--oled-muted,#a3a299);--subtle:var(--oled-subtle,#85847c);--line:var(--oled-line-soft,#ffffff0b);
+ --theme-text-primary:var(--ink);--theme-text-muted:var(--muted);--theme-text-subtle:var(--subtle);
+ --theme-surface-panel:var(--parameters-bg);--theme-surface-inset:var(--parameters-fill);--theme-surface-raised:var(--parameters-fill);
+ --theme-line:var(--oled-line,#ffffff14);--theme-line-soft:var(--line);--theme-line-strong:var(--oled-line-strong,#ffffff32);
+ --theme-fill-faint:var(--oled-faint,#ffffff06);--theme-fill-soft:var(--oled-soft,#ffffff0a);--theme-control-accent:var(--ink);
+ --parameters-hairline:var(--theme-line);--parameters-ease:cubic-bezier(.23,1,.32,1);
+ color:var(--ink);font-family:var(--font-ui,Arial,Helvetica,sans-serif);font-size:var(--ui-text);
+}
+:root[data-theme=light] :is(.parameters-claude,.parameter-select-menu){
+ --parameters-bg:#faf9f6;--parameters-fill:#eeede8;--parameters-hover:#e5e4de;
+ --ink:#30302c;--muted:#66655d;--subtle:#62615a;--line:#24241d12;
+ --theme-line:#24241d20;--theme-line-strong:#24241d45;--theme-fill-faint:#24241d05;--theme-fill-soft:#24241d09;
+}
+:root[data-ui-size] .parameter-panel.parameters-claude{background:var(--parameters-bg);border-left:1px solid var(--theme-line)}
+:root[data-ui-size] .parameters-claude svg.app-icon{stroke-width:var(--icon-stroke);flex-shrink:0}
+
+/* Heading */
+:root[data-ui-size] .parameters-claude .parameter-panel-heading{flex:none;min-height:56px;padding:8px 16px 8px 24px;border-bottom:1px solid var(--line);background:var(--parameters-bg)}
+:root[data-ui-size] .parameters-claude .parameter-panel-heading>span{gap:8px;font-size:var(--ui-text);font-weight:500;line-height:20px;color:var(--ink)}
+.parameters-claude .parameter-panel-heading>span>svg{color:var(--subtle)}
+:root[data-ui-size] .parameters-claude .parameter-close{width:32px;height:32px;min-height:32px;border-radius:8px;color:var(--muted);transition:background-color 150ms var(--parameters-ease),color 150ms var(--parameters-ease)}
+@media (hover:hover) and (pointer:fine){
+.parameters-claude .parameter-close:hover{background:var(--parameters-hover);color:var(--ink)}
+}
+:root[data-ui-size] .parameters-claude .parameter-scroll{padding:24px 24px 16px;scrollbar-width:thin;scrollbar-color:var(--parameters-hover) transparent;overscroll-behavior:contain}
+
+/* Model: the only serif moment */
+:root[data-ui-size] .parameters-claude .profile-link{padding:0;gap:12px;min-height:48px;margin:0 0 16px;border:0;border-radius:0;background:none;transition:color 150ms var(--parameters-ease)}
+.parameters-claude .profile-link .avatar{width:40px;height:40px;background:var(--parameters-fill);color:var(--muted);font-size:16px;box-shadow:inset 0 0 0 1px var(--theme-line)}
+:root[data-ui-size] .parameters-claude .profile-link strong{font-family:var(--font-display);font-size:22px;font-weight:400;line-height:1.2;letter-spacing:-.01em;color:var(--ink)}
+:root[data-ui-size] .parameters-claude .profile-link small{margin-top:4px;font-size:max(12px,var(--ui-meta));line-height:16px;color:var(--muted)}
+.parameters-claude .profile-link>svg{color:var(--subtle);transition:transform 150ms var(--parameters-ease),color 150ms var(--parameters-ease)}
+@media (hover:hover) and (pointer:fine){
+.parameters-claude .profile-link:hover{background:none}
+.parameters-claude .profile-link:hover>svg{color:var(--ink);transform:translateX(2px)}
+.parameters-claude .profile-link:hover small{color:var(--ink)}
+}
+:root[data-ui-size] .parameters-claude .chat-scope-hint{margin:0;padding:0 0 24px;gap:8px;background:none;border-bottom:1px solid var(--parameters-hairline);color:var(--muted);font-size:max(12px,var(--ui-meta));line-height:1.5}
+.parameters-claude .chat-scope-hint>svg{margin-top:2px;color:var(--subtle)}
+
+/* Sections: hairlines, no boxes */
+:root[data-ui-size] .parameters-claude .parameter-scroll>.disclosure{margin:0;padding:0;border-bottom:1px solid var(--line)}
+:root[data-ui-size] .parameters-claude .disclosure-trigger{min-height:48px;padding:12px 0;gap:8px;font-size:var(--ui-text);font-weight:400;line-height:24px;color:var(--ink)}
+.parameters-claude .disclosure-trigger>svg{color:var(--subtle);transition:color 150ms var(--parameters-ease)}
+@media (hover:hover) and (pointer:fine){
+.parameters-claude .disclosure-trigger:hover{color:var(--ink);background:none}
+.parameters-claude .disclosure-trigger:hover>svg{color:var(--ink)}
+}
+:root[data-ui-size] .parameters-claude .disclosure-body{padding:0 0 16px}
+:root[data-ui-size] .parameters-claude .parameter-scroll>.settings-row{grid-template-columns:minmax(0,1fr) 132px;gap:12px;min-height:64px;margin:0;padding:16px 0;border-bottom:1px solid var(--line)}
+:root[data-ui-size] .parameters-claude .settings-field>span{font-size:var(--ui-text);font-weight:400;line-height:24px;color:var(--ink)}
+
+/* Model runtime */
+:root[data-ui-size] .parameters-claude .model-runtime-status{gap:8px;font-size:max(12px,var(--ui-meta));color:var(--muted)}
+:root[data-ui-size] .parameters-claude .model-runtime-status i{width:6px;height:6px;background:none;box-shadow:inset 0 0 0 1px var(--subtle)}
+:root[data-ui-size] .parameters-claude .model-runtime-status[data-state=ready] i{background:var(--ink);box-shadow:none}
+/* Status reads as the section's subtitle; the reveal clip forbids pulling it up with a negative margin. */
+:root[data-ui-size] .parameters-claude .parameter-scroll .model-runtime>header{justify-content:flex-start;margin:0 0 16px}
+:root[data-ui-size] .parameters-claude .model-runtime-actions{gap:8px;margin-bottom:16px}
+:root[data-ui-size] .parameters-claude .model-runtime-label{margin-bottom:8px;font-size:max(12px,var(--ui-meta));font-weight:400;color:var(--muted)}
+:root[data-ui-size] .parameters-claude .model-runtime-context{gap:8px}
+:root[data-ui-size] .parameters-claude .model-runtime-note{margin:8px 0 0!important;color:var(--muted)!important;line-height:1.5!important}
+:root[data-ui-size] .parameters-claude .model-runtime [disabled]{opacity:.4}
+
+/* Controls: transparent with a hairline; ink is the only accent */
+:root[data-ui-size] .parameters-claude :is(.app-select,input[type=number],textarea){border:1px solid var(--parameters-hairline);border-radius:8px;background:transparent;color:var(--ink);box-shadow:none;font-family:inherit;font-weight:400;transition:border-color 150ms var(--parameters-ease),background-color 150ms var(--parameters-ease)}
+@media (hover:hover) and (pointer:fine){
+:root[data-ui-size] .parameters-claude :is(.app-select,input[type=number],textarea):hover:not(:disabled){border-color:var(--theme-line-strong)}
+}
+:root[data-ui-size] .parameters-claude :is(.app-select,input[type=number],textarea):focus-visible{border-color:var(--theme-line-strong)}
+:root[data-ui-size] .parameters-claude .app-select{min-height:36px;padding:8px 12px;font-size:var(--ui-small);line-height:20px;font-variant-numeric:tabular-nums}
+
+/* Parameters */
+:root[data-ui-size] .parameters-claude .parameter{padding:16px 0;border-bottom:1px solid var(--line)}
+:root[data-ui-size] .parameters-claude .parameter-header{gap:4px;margin-bottom:8px;min-width:0}
+:root[data-ui-size] .parameters-claude .parameter-header>label{font-size:var(--ui-text);font-weight:400;line-height:20px}
+:root[data-ui-size] .parameters-claude .parameter-header input{height:36px;padding:4px 12px;font-size:var(--ui-text);font-variant-numeric:tabular-nums;text-align:right}
+:root[data-ui-size] .parameters-claude .parameter-header input::placeholder{color:var(--ink);opacity:1}
+:root[data-ui-size] .parameters-claude .parameter-header input:disabled{border-color:transparent;padding-right:0;opacity:1}
+:root[data-ui-size] .parameters-claude .parameter-header .hint-button{min-width:28px;min-height:28px;color:var(--subtle)}
+@media (hover:hover) and (pointer:fine){
+.parameters-claude .parameter-header .hint-button:hover{background:var(--parameters-hover);color:var(--ink)}
+}
+:root[data-ui-size] .parameters-claude .parameter-explanation{margin:4px 0 12px;padding:0 0 0 12px;background:none;border-left:1px solid var(--theme-line-strong);border-radius:0;color:var(--muted);font-size:var(--ui-small);line-height:1.55}
+:root[data-ui-size] .parameters-claude .parameter input.range{--range-fill:var(--ink);--range-rail:var(--theme-line-strong);--canvas:var(--parameters-bg);margin:0;min-height:28px}
+:root[data-ui-size] .parameters-claude .parameter input.range::-webkit-slider-runnable-track{height:2px;border-radius:2px}
+:root[data-ui-size] .parameters-claude .parameter input.range::-webkit-slider-thumb{width:12px;height:12px;margin-top:-5px;border:0;box-shadow:0 0 0 3px var(--parameters-bg)}
+:root[data-ui-size] .parameters-claude .parameter input.range::-moz-range-track{height:2px;border-radius:2px}
+:root[data-ui-size] .parameters-claude .parameter input.range::-moz-range-thumb{width:12px;height:12px;border:0;box-shadow:0 0 0 3px var(--parameters-bg)}
+@media (hover:hover) and (pointer:fine){
+:root[data-ui-size] .parameters-claude .parameter input.range:hover::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--parameters-bg),0 0 0 6px var(--theme-fill-soft)}
+}
+:root[data-ui-size] .parameters-claude .range-endpoints{margin:0;font-size:max(12px,var(--ui-meta));line-height:16px;color:var(--subtle)}
+:root[data-ui-size] .parameters-claude .parameter-source{min-height:20px;margin-top:8px;gap:8px;font-size:max(12px,var(--ui-meta));line-height:16px;color:var(--subtle)}
+.parameters-claude .parameter-source button{border-radius:6px;padding:4px 6px;color:var(--muted);font:inherit;white-space:nowrap;transition:background-color 150ms var(--parameters-ease),color 150ms var(--parameters-ease)}
+@media (hover:hover) and (pointer:fine){
+.parameters-claude .parameter-source button:hover{background:var(--parameters-hover);color:var(--ink)}
+}
+:root[data-ui-size] .parameters-claude .maximum-output{margin:0;min-height:28px;gap:8px;font-size:var(--ui-small);line-height:20px;color:var(--muted);cursor:pointer}
+.parameters-claude .maximum-output input{flex:none;width:16px;height:16px;accent-color:var(--ink)}
+
+/* Switch: ink when on */
+:root[data-ui-size] .parameters-claude .switch-row{gap:16px;padding:16px 0;min-height:56px}
+:root[data-ui-size] .parameters-claude .switch-row strong{font-size:var(--ui-text);font-weight:400;line-height:20px}
+:root[data-ui-size] .parameters-claude .switch-row small{margin-top:4px;font-size:max(12px,var(--ui-meta));line-height:1.5;color:var(--muted)}
+.parameters-claude .switch-row input[type=checkbox]{width:32px;height:20px;background:var(--parameters-hover);border:1px solid var(--theme-line);box-shadow:none;transition:background-color 150ms var(--parameters-ease),border-color 150ms var(--parameters-ease)}
+.parameters-claude .switch-row input[type=checkbox]:before{top:1px;left:1px;width:16px;height:16px;background:var(--muted);box-shadow:none;transition:transform 150ms var(--parameters-ease),background-color 150ms var(--parameters-ease)}
+.parameters-claude .switch-row input[type=checkbox]:checked{background:var(--ink);border-color:var(--ink)}
+.parameters-claude .switch-row input[type=checkbox]:checked:before{background:var(--parameters-bg);transform:translateX(12px)}
+
+/* Instructions */
+:root[data-ui-size] .parameters-claude .prompt-textarea{min-height:152px;padding:12px;font-size:var(--ui-small);line-height:1.6;resize:vertical}
+:root[data-ui-size] .parameters-claude .settings-field>small{margin-top:8px;font-size:max(12px,var(--ui-meta));line-height:16px;color:var(--subtle)}
+:root[data-ui-size] .parameters-claude .settings-intro{margin:0;padding:0;font-size:var(--ui-small);line-height:1.6;color:var(--muted)}
+
+/* Buttons: quiet outline */
+:root[data-ui-size] .parameters-claude [data-slot=button]:not(.parameter-close){min-height:36px;border:1px solid var(--parameters-hairline);border-radius:8px;padding:8px 12px;background:transparent;color:var(--ink);box-shadow:none;font-size:var(--ui-small);font-weight:400;line-height:20px;transition:background-color 150ms var(--parameters-ease),border-color 150ms var(--parameters-ease)}
+@media (hover:hover) and (pointer:fine){
+:root[data-ui-size] .parameters-claude [data-slot=button]:not(.parameter-close):hover:not(:disabled){background:var(--theme-fill-soft);border-color:var(--theme-line-strong)}
+}
+.parameters-claude :is(button,input,textarea):focus-visible{outline:2px solid var(--muted);outline-offset:2px}
+
+/* Footer */
+:root[data-ui-size] .parameters-claude .parameter-actions{flex:none;width:330px;padding:16px 24px;border-top:1px solid var(--line);background:var(--parameters-bg)}
+:root[data-ui-size] .parameters-claude .parameter-actions .reset-profile{margin:0;width:100%;gap:8px;min-height:40px;border-radius:999px}
+:root[data-ui-size] .parameters-claude .reset-confirm p{margin:0 0 12px;font-size:var(--ui-small);line-height:1.5;color:var(--ink)}
+:root[data-ui-size] .parameters-claude .reset-confirm>div{display:flex;gap:8px;justify-content:flex-end}
+:root[data-ui-size] .parameters-claude .reset-confirm [data-slot=button]{flex:0 0 auto;gap:8px;min-height:40px;padding-inline:16px;border-radius:999px}
+:root[data-ui-size] .parameters-claude .reset-confirm [data-slot=button]:last-child{flex:1 1 auto;min-width:0}
+:root[data-ui-size] .parameters-claude .reset-confirm [data-slot=button][data-variant=ghost],:root[data-ui-size] .parameters-claude .reset-confirm>div>button:first-child{background:none;border-color:transparent}
+
+/* Selects are portalled; carry the palette explicitly instead of recoloring every menu. */
+:root[data-ui-size] .parameter-select-menu{padding:4px;border:1px solid var(--theme-line);border-radius:12px;background:var(--parameters-fill);box-shadow:0 8px 24px #0003;font-size:var(--ui-small)}
+.parameter-select-menu .app-select-option{min-height:36px;font-weight:400;line-height:20px;font-variant-numeric:tabular-nums}
+.parameter-select-menu .app-select-option:is([data-highlighted],[data-state=checked]){background:var(--parameters-hover);color:var(--ink);font-weight:400}
+
+@media(max-width:800px){
+ :root[data-ui-size] .premium-modal.parameter-modal.parameters-claude{display:flex;flex-direction:column;gap:0;background:var(--parameters-bg)}
+ :root[data-ui-size] .parameters-claude .parameter-panel-heading{width:100%;min-height:64px;padding:8px 16px;padding-top:max(8px,env(safe-area-inset-top));}
+ :root[data-ui-size] .parameters-claude .parameter-scroll{width:100%;padding:24px 16px}
+ :root[data-ui-size] .parameters-claude .parameter-actions{width:100%;padding:12px 16px max(16px,env(safe-area-inset-bottom))}
+ /* The sheet already has its own animated close button; a second one painted over it as a doubled X. */
+ :root[data-ui-size] .parameters-claude .parameter-close{display:none}
+ :root[data-ui-size] .premium-modal.parameters-claude>[data-slot=dialog-close]{color:var(--muted);opacity:1;border-radius:8px;z-index:5}
+ :root[data-ui-size] .parameters-claude .profile-link{min-height:56px}
+ :root[data-ui-size] .parameters-claude .profile-link strong{font-size:24px}
+ :root[data-ui-size] .parameters-claude .disclosure-trigger{min-height:52px}
+ :root[data-ui-size] .parameters-claude :is(.app-select,[data-slot=button]:not(.parameter-close),.parameter-actions .reset-profile){min-height:44px}
+ :root[data-ui-size] .parameters-claude .parameter-header input{height:44px;font-size:16px}
+ :root[data-ui-size] .parameters-claude .parameter-header .hint-button{min-width:44px;min-height:44px}
+ :root[data-ui-size] .parameters-claude .parameter-source button{min-height:44px}
+ :root[data-ui-size] .parameters-claude .maximum-output{min-height:44px}
+ :root[data-ui-size] .parameters-claude .parameter input.range{min-height:44px}
+ :root[data-ui-size] .parameters-claude .parameter input.range::-webkit-slider-thumb{width:16px;height:16px;margin-top:-7px}
+ :root[data-ui-size] .parameters-claude .parameter input.range::-moz-range-thumb{width:16px;height:16px}
+ :root[data-ui-size] .parameters-claude .switch-row{min-height:60px}
+ :root[data-ui-size] .parameters-claude .prompt-textarea{font-size:16px}
+ :root[data-ui-size] .parameter-select-menu .app-select-option{min-height:44px}
+}
+@media(prefers-reduced-motion:reduce){
+ .parameters-claude :is(.profile-link,.profile-link>svg,.app-select,input[type=number],textarea,.parameter-close,.disclosure-trigger>svg,[data-slot=button],.parameter-source button,.switch-row input,.switch-row input:before){transition:none}
+ .parameters-claude .profile-link:hover>svg{transform:none}
+}

@@ -1,0 +1,99 @@
+/* Density changes geometry directly, preserving canvas coordinates and the
+   independent --reading-size preference used by conversation prose. */
+/* Density may tighten controls, but supporting text must remain readable. */
+:root{--ui-text:14px;--ui-small:13px;--ui-meta:12px;--ui-control:38px;--ui-row:38px;--ui-composer-text:16px;--ui-composer-action:36px;--ui-composer-padding:11px}
+:root[data-ui-size=compact]{--ui-text:13px;--ui-small:12px;--ui-meta:12px;--ui-control:34px;--ui-row:36px;--ui-composer-text:15px;--ui-composer-action:34px;--ui-composer-padding:9px}
+:root[data-ui-size=large]{--ui-text:16px;--ui-small:14px;--ui-meta:12px;--ui-control:42px;--ui-row:44px;--ui-composer-text:18px;--ui-composer-action:40px;--ui-composer-padding:12px}
+html[data-ui-size] .app{font-size:var(--ui-text)}
+html[data-ui-size] :is(.premium-modal,.floating-panel,.app-select-menu){font-size:var(--ui-small)}
+html[data-ui-size] :is(.premium-modal,.studio-form,.workspace-content,.parameter-scroll,.profile-body) [data-slot=button],
+html[data-ui-size] :is(.settings-nav>button,.settings-field>span,.settings-row>span,.switch-row strong,.parameter-header>span,.disclosure-trigger,.app-select,.workspace-sections>button){font-size:var(--ui-text)}
+html[data-ui-size] :is(.settings-field,.settings-row,.studio-form,.translator-panel) :is(input:not([type=checkbox]):not([type=range]):not([type=radio]),textarea){font-size:var(--ui-text)}
+html[data-ui-size] :is(.premium-modal,.studio-form,.workspace-content,.parameter-scroll,.profile-body) :is([data-slot=button],button.app-select){min-height:var(--ui-control)}
+html[data-ui-size] :is(.settings-field>small,.settings-row>small,.settings-scope,.switch-row small,.parameter-source,.range-endpoints,.workspace-eyebrow,.workspace-heading p,.sidebar-empty){font-size:var(--ui-meta)}
+html[data-ui-size] :is(.settings-nav>button,.workspace-sections>button){color:var(--muted)}
+html[data-ui-size] :is(.settings-nav>button[aria-current=page],.workspace-sections>button[aria-selected=true]){color:var(--ink)}
+html[data-ui-size] :is(.settings-field>span,.settings-row>span,.parameter-header>span){color:var(--ink)}
+html[data-ui-size] .theme-selector legend{font-size:var(--ui-text)}
+html[data-ui-size] .theme-choice-label{font-size:var(--ui-small)}
+html[data-ui-size] .app-select-menu{font-size:var(--ui-text)}
+html[data-ui-size] .app-select-option{min-height:var(--ui-control)}
+html[data-ui-size] .app-select-group-label{font-size:var(--ui-meta)}
+html[data-ui-size] .floating-panel [role^=menuitem]{font-size:var(--ui-small)}
+html[data-ui-size] .composer-tools-menu strong{font-size:var(--ui-text)}
+html[data-ui-size] .composer-tools-menu small{font-size:var(--ui-small)}
+html[data-ui-size] .composer-tools-menu :is(.composer-tool-value,.composer-tools-label){font-size:var(--ui-meta)}
+html[data-ui-size] .model-picker-updated .model-option strong{font-size:var(--ui-text)}
+html[data-ui-size] .model-picker-updated :is(.model-option small,.model-search input,.model-menu-header){font-size:var(--ui-small)}
+html[data-ui-size] .model-picker-updated :is(.model-picker-section,.model-picker-default-summary>span,.model-picker-default,.model-picker-actor){font-size:var(--ui-meta)}
+html[data-ui-size] .model-picker-updated .model-picker-default-summary strong{font-size:var(--ui-text)}
+html[data-ui-size] .model-picker-updated .model-option>button:first-child:active{transform:none;scale:1}
+
+html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer{grid-template-columns:var(--ui-composer-action) minmax(0,1fr) auto var(--ui-composer-action);gap:6px;padding:var(--ui-composer-padding) 12px;background:var(--theme-surface-panel,#20201f)}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer:has(.composer-right>.icon-button){grid-template-columns:var(--ui-composer-action) minmax(0,1fr) auto var(--ui-composer-action) var(--ui-composer-action)}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer,
+html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer:focus-within{border-color:var(--theme-line,#e8dfc31c);box-shadow:0 4px 24px var(--theme-shadow,#00000018),inset 0 1px 0 var(--theme-highlight,#ffffff06)}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer textarea{font-size:var(--ui-composer-text);line-height:1.55;color:var(--ink)}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer textarea::placeholder{color:var(--muted)}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section :is(.attachment-trigger,.send-button,.composer-right>.icon-button){width:var(--ui-composer-action);height:var(--ui-composer-action);min-height:var(--ui-composer-action);border-radius:11px}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section :is(.attachment-trigger,.composer-right>.icon-button){color:var(--muted)}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section .model-trigger{height:var(--ui-composer-action);min-height:var(--ui-composer-action);max-width:230px;gap:8px;padding:5px 8px;font-size:var(--ui-small);font-weight:500;color:var(--ink)}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section .model-trigger>.avatar{width:22px;height:22px;flex-shrink:0}
+@media (hover:hover) and (pointer:fine){
+html[data-ui-size] [data-page=chat] .main-panel .composer-section :is(.attachment-trigger,.model-trigger,.send-button,.composer-right>.icon-button):hover{transform:none;scale:1;translate:none}}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section :is(.attachment-trigger,.model-trigger,.send-button,.composer-right>.icon-button):active{transform:none;scale:1;translate:none}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section :is(.attachment-trigger,.model-trigger,.send-button,.composer-right>.icon-button){transition-property:background-color,color,opacity;transition-duration:.18s}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section :is(.attachment-trigger,.model-trigger,.composer-right>.icon-button):active{background:var(--theme-fill-active,#ffffff15);color:var(--ink)}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section .send-button:active:not(:disabled){filter:brightness(.9)}
+html[data-ui-size] .welcome-actions button{font-size:var(--ui-small);min-height:var(--ui-composer-action)}
+@media(max-width:800px){
+ :root[data-ui-size]{--ui-composer-action:40px;--ui-composer-text:16px}
+ :root[data-ui-size=large]{--ui-composer-action:42px;--ui-composer-text:18px}
+ html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer{gap:4px;padding:10px}
+ html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer textarea{font-size:var(--ui-composer-text)!important}
+ html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer[data-multiline=true] textarea{grid-column:1/-1;grid-row:1;align-self:stretch;padding:4px;min-height:36px}
+ html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer[data-multiline=true] :is(.attachment-trigger,.model-trigger,.send-button,.composer-right>.icon-button){grid-row:2;margin-bottom:0;align-self:center}
+ html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer[data-multiline=true]:has(.attachment-tray) textarea{grid-row:2}
+ html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer[data-multiline=true]:has(.attachment-tray) :is(.attachment-trigger,.model-trigger,.send-button,.composer-right>.icon-button){grid-row:3}
+ html[data-ui-size] [data-page=chat] .main-panel .composer-section .model-trigger.is-compact{width:52px;min-width:52px;max-width:52px;gap:5px;padding:5px}
+ html[data-ui-size] :is(.premium-modal,.studio-form,.workspace-content,.parameter-scroll,.profile-body) :is([data-slot=button],button.app-select){min-height:max(44px,var(--ui-control))}
+ html[data-ui-size] :is(.settings-field,.settings-row,.studio-form,.translator-panel,.model-search) :is(input:not([type=checkbox]):not([type=range]):not([type=radio]),textarea){font-size:max(16px,var(--ui-text))}
+ html[data-ui-size] .app-select{font-size:max(16px,var(--ui-text))}
+ html[data-ui-size] .app-select-option{min-height:44px}
+ html[data-ui-size] .settings-nav>button{font-size:max(15px,var(--ui-text))}
+}
+@media(prefers-reduced-motion:reduce){html[data-ui-size] [data-page=chat] .main-panel .composer-section :is(.attachment-trigger,.model-trigger,.send-button,.composer-right>.icon-button){transition:none}}
+
+/* Compact vertical rhythm; multiline drafts still grow to fit their text. */
+@media(min-width:801px){
+ html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer{min-height:54px;padding:7px 10px;gap:4px 6px}
+ html[data-ui-size] [data-page=chat] .main-panel .composer-section .composer textarea{min-height:32px;padding:4px}
+ html[data-ui-size] [data-page=chat] .main-panel.empty-chat .composer-section .composer textarea{min-height:28px;padding:2px 4px}
+}
+@media(max-width:800px){
+ html[data-ui-size] [data-page=chat] .main-panel.empty-chat .composer-section .composer{padding:8px;gap:4px}
+ html[data-ui-size] [data-page=chat] .main-panel.empty-chat .composer-section .composer textarea{min-height:30px;padding:2px 4px}
+}
+/* Give the active input a little more air with balanced text padding. Keep
+   multiline mobile drafts on their existing separate row. */
+@media(min-width:801px){
+ html[data-ui-size] [data-page=chat] .main-panel:not(.empty-chat) .composer-dock{width:calc(100% - 40px);max-width:820px}
+ html[data-ui-size] [data-page=chat] .main-panel:not(.empty-chat) .composer-section .composer{min-height:60px;padding-block:10px}
+ html[data-ui-size] [data-page=chat] .main-panel:not(.empty-chat) .composer-section .composer textarea{padding-top:4px;padding-bottom:4px}
+}
+@media(max-width:800px){
+ html[data-ui-size] [data-page=chat] .main-panel:not(.empty-chat) .composer-section .composer{padding-block:13px}
+ html[data-ui-size] [data-page=chat] .main-panel:not(.empty-chat) .composer-section .composer:not([data-multiline=true]) textarea{padding-top:10px;padding-bottom:10px}
+}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section .send-button.stop-button{
+ background:color-mix(in srgb,var(--ink) 8%,transparent);color:var(--ink);
+ border:1px solid color-mix(in srgb,var(--ink) 20%,transparent);box-shadow:inset 0 1px 0 var(--theme-highlight,#ffffff06);
+}
+@media (hover:hover) and (pointer:fine){
+html[data-ui-size] [data-page=chat] .main-panel .composer-section .send-button.stop-button:hover:not(:disabled){background:color-mix(in srgb,var(--ink) 15%,transparent);border-color:color-mix(in srgb,var(--ink) 30%,transparent)}}
+html[data-ui-size] [data-page=chat] .main-panel .composer-section .send-button.stop-button svg{width:var(--icon-size-sm,14px);height:var(--icon-size-sm,14px);stroke-width:var(--icon-stroke)}
+/* These two controls have state feedback, without a hover animation. */
+:root :is(.attachment-trigger,.parameter-close),:root :is(.attachment-trigger,.parameter-close)>svg{transition:none!important}
+@media (hover:hover) and (pointer:fine){
+:root .parameter-close:hover{transform:none;scale:1;translate:none}}
+:root .parameter-close:active{transform:none;scale:1;translate:none}

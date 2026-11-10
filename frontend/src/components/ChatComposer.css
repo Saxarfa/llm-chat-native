@@ -1,0 +1,186 @@
+/* One layout owner. No legacy composer grid, flattened fieldsets or size mirror. */
+:root .chat-composer{
+ --chat-control:32px;--chat-input-size:16px;--chat-meta-size:13px;
+ --chat-surface:#20201e;--chat-border:#ffffff1a;--chat-hint:#91918b;--chat-input-min:28px;--chat-input-padding:2px 0;
+ display:flex;flex-direction:column;min-width:0;gap:4px;color:var(--ink);font-family:var(--font-ui,Arial,Helvetica,sans-serif);
+}
+:root .chat-composer .chat-composer-surface{
+ display:block;position:relative;min-width:0;margin:0;padding:7px 8px;min-height:48px;
+ border:1px solid var(--chat-border);border-radius:14px;background:var(--chat-surface);
+ box-shadow:none;filter:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+}
+:root .chat-composer .chat-composer-content{display:block;min-width:0}
+:root .chat-composer .chat-composer-content[data-recording=true]{visibility:hidden}
+:root .chat-composer .chat-composer-main{display:flex;align-items:flex-end;gap:6px;min-width:0}
+:root .chat-composer .chat-composer-leading{display:flex;align-items:center;flex:none}
+:root .chat-composer .chat-composer-editor{display:block;flex:1 1 0;min-width:0;align-self:center}
+:root .chat-composer textarea.chat-composer-input{
+ display:block;position:static;box-sizing:border-box;width:100%;min-width:0;height:56px;min-height:var(--chat-input-min);max-height:160px;
+ margin:0;padding:var(--chat-input-padding);border:0;border-radius:0;background:transparent;color:var(--ink);outline:none;box-shadow:none;
+ font:400 var(--chat-input-size)/24px var(--font-ui,Arial,Helvetica,sans-serif);letter-spacing:normal;
+ resize:none;overflow:auto;white-space:pre-wrap;overflow-wrap:break-word;field-sizing:fixed;
+ transform:none;filter:none;backdrop-filter:none;transition:none;animation:none;touch-action:auto;
+}
+:root .chat-composer textarea.chat-composer-input:focus{outline:none;border:0;box-shadow:none}
+:root .chat-composer textarea.chat-composer-input::placeholder{color:var(--chat-hint);opacity:1}
+:root .chat-composer textarea.chat-composer-input:placeholder-shown{white-space:pre;overflow-x:hidden;text-overflow:ellipsis}
+@supports(field-sizing:content){
+ :root .chat-composer textarea.chat-composer-input{height:auto;field-sizing:content}
+}
+:root .chat-composer .chat-composer-actions{display:flex;align-items:center;gap:4px;flex:none;min-height:var(--chat-control)}
+:root .chat-composer :is(.attachment-trigger,.dictation-trigger,.chat-composer-stop,.chat-composer-send){
+ position:static;display:inline-flex;align-items:center;justify-content:center;flex:none;
+ width:var(--chat-control);min-width:var(--chat-control);height:var(--chat-control);min-height:var(--chat-control);padding:0;margin:0;
+ border:0;border-radius:8px;background:transparent;color:var(--muted);box-shadow:none;transform:none;
+ transition:background-color var(--motion-micro,.15s) var(--motion-ease),color var(--motion-micro,.15s) var(--motion-ease);
+}
+/* One icon scale and the same muted ink for capsule controls. */
+:root .chat-composer .attachment-trigger svg,:root .chat-composer .dictation-trigger svg{width:var(--icon-size-control,18px);height:var(--icon-size-control,18px);stroke-width:var(--icon-stroke)}
+:root .chat-composer .composer-plus-glyph{width:var(--icon-size-control,18px);height:var(--icon-size-control,18px)}
+:root .chat-composer .chat-composer-send svg,:root .chat-composer .chat-composer-stop svg{width:var(--icon-size-control,18px);height:var(--icon-size-control,18px);stroke-width:var(--icon-stroke)}
+:root .chat-composer :is(.model-trigger,.composer-reasoning-trigger)>svg{stroke-width:var(--icon-stroke)}
+/* Open chat: a bare reply arrow instead of a filled circle, brighter once there is something to send. */
+:root .chat-composer .chat-composer-send[data-reply=true]::before{display:none}
+:root .chat-composer .chat-composer-send[data-reply=true][aria-disabled=false]{color:var(--ink)}
+:root .chat-composer .chat-composer-send[data-reply=true] svg{width:18px;height:18px;stroke-width:var(--icon-stroke)}
+/* Welcome: the active send control is a rounded terracotta square with a white arrow, as in the reference. */
+:root .chat-composer .chat-composer-send[data-reply=false]{border-radius:8px}
+:root .chat-composer .chat-composer-send[data-reply=false]{--send-fill-inset:2px}
+:root .chat-composer .chat-composer-send[data-reply=false] svg{width:16px;height:16px;stroke-width:var(--icon-stroke)}
+:root .chat-composer .chat-composer-send[data-reply=false]::before{border-radius:7px;background:#c6613f}
+@media(max-width:800px){:root .chat-composer .chat-composer-send[data-reply=false]{--send-fill-inset:8px}}
+:root .chat-composer .chat-composer-send[data-reply=false][aria-disabled=false]{color:#fff}
+@media(hover:hover) and (pointer:fine){
+ :root .chat-composer .chat-composer-send[data-reply=false][aria-disabled=false]:hover::before{background:#d06d4b}
+}
+/* Open chat on desktop, measured from the reference: 44px tall, 14px radius, 14px text. Panel colour stays ours by the user's choice. */
+:root .chat-composer[data-welcome=false] .chat-composer-editor{padding-left:6px}
+/* While generating, the stop control is a filled rounded square and the idle reply arrow steps aside; with text typed the arrow returns for queueing. */
+:root .chat-composer .chat-composer-stop svg{width:14px;height:14px;fill:currentColor;stroke-width:2.5}
+:root .chat-composer .chat-composer-actions:has(.chat-composer-stop) .chat-composer-send[data-reply=true][aria-disabled=true]{display:none}
+@media(min-width:801px){
+ :root .chat-composer[data-welcome=false]{--chat-control:28px;--chat-input-size:14px;--chat-input-min:28px}
+ :root .chat-composer[data-welcome=false] .chat-composer-surface{min-height:44px;border-radius:14px}
+}
+:root:not([data-theme=light]):not([data-theme=oled]) .chat-composer[data-welcome=false] .chat-composer-surface{border-color:#ffffff0a}
+/* An open tools menu keeps the trigger lit on touch too, where there is no hover to show it. */
+:root .chat-composer .attachment-trigger[data-state=open]{background:var(--theme-fill-hover,#ffffff0a);color:var(--ink)}
+/* Motion that answers an action: the send arrow nudges in its own direction while pressed. */
+:root .chat-composer .chat-composer-send svg{translate:0 0;transition:translate var(--motion-micro,.15s) var(--motion-ease)}
+:root .chat-composer .chat-composer-send[aria-disabled=false]:active svg{translate:0 -2px}
+:root .chat-composer .chat-composer-send[data-reply=true][aria-disabled=false]:active svg{translate:-2px 0}
+/* The only loop: a soft ring while recording, because it mirrors a real state. */
+:root .chat-composer .dictation-trigger{position:relative}
+:root .chat-composer .dictation-trigger:has(svg[data-recording=true])::after{content:"";position:absolute;inset:5px;border:1.5px solid var(--ink);border-radius:50%;opacity:0;pointer-events:none;animation:composer-record-ring 1.4s ease-out infinite}
+@keyframes composer-record-ring{0%{opacity:.45;scale:.7}100%{opacity:0;scale:1.4}}
+:root .chat-composer .composer-reasoning-trigger>svg{transition:transform .28s cubic-bezier(.23,1,.32,1)}
+:root .chat-composer .composer-reasoning-trigger[data-state=open]>svg{transform:rotate(180deg)}
+@media(prefers-reduced-motion:reduce){
+ :root .chat-composer .chat-composer-send svg,:root .chat-composer .composer-reasoning-trigger>svg{transition:none}
+ :root .chat-composer .dictation-trigger:has(svg[data-recording=true])::after{animation:none;opacity:.35;scale:1}
+}
+:root .chat-composer .chat-composer-send{position:relative;isolation:isolate;border-radius:50%;background:transparent;color:var(--chat-surface);opacity:1;
+ transition:color var(--motion-micro,.15s) var(--motion-ease),opacity var(--motion-micro,.15s) var(--motion-ease)}
+/* The fill grows from the arrow when sending becomes possible: scale/opacity only,
+   so the first typed letter never repaints the capsule. */
+:root .chat-composer .chat-composer-send::before{content:"";position:absolute;inset:var(--send-fill-inset,0px);z-index:-1;border-radius:50%;background:var(--ink);
+ transition:scale var(--motion-detail,.2s) var(--motion-ease),opacity var(--motion-micro,.15s) var(--motion-ease),background-color var(--motion-micro,.15s) var(--motion-ease)}
+:root .chat-composer .chat-composer-send[aria-disabled=true]{color:var(--muted);opacity:.45;cursor:default}
+:root .chat-composer .chat-composer-send[aria-disabled=true]::before{scale:.5;opacity:0}
+:root .chat-composer .chat-composer-send[aria-disabled=false]:active::before{scale:.9;transition-duration:var(--motion-micro,.15s)}
+/* A stop control that appears during generation fades and grows in place. */
+:root .chat-composer .chat-composer-stop{transition:background-color var(--motion-micro,.15s) var(--motion-ease),color var(--motion-micro,.15s) var(--motion-ease),opacity var(--motion-micro,.15s) var(--motion-ease),scale var(--motion-detail,.2s) var(--motion-ease)}
+@starting-style{:root .chat-composer .chat-composer-stop{opacity:0;scale:.6}}
+:root .chat-composer .chat-composer-stop{color:var(--ink)}
+:root .chat-composer :is(.attachment-trigger,.dictation-trigger,.chat-composer-stop,.chat-composer-send):focus-visible{outline:2px solid var(--muted);outline-offset:2px}
+:root .chat-composer .chat-composer-modes{position:relative;display:flex;align-items:center;flex:0 1 auto;gap:0;height:var(--chat-control);min-width:0;max-width:100%;padding:2px;border-radius:8px;background:var(--theme-fill-soft,#ffffff0a);isolation:isolate}
+:root .chat-composer .chat-composer-modes button{
+ position:relative;z-index:1;min-width:40px;height:28px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--muted);
+ font:400 14px/20px var(--font-ui,Arial,Helvetica,sans-serif);transition:background-color var(--motion-micro,.15s) var(--motion-ease),color var(--motion-micro,.15s) var(--motion-ease);
+}
+:root .chat-composer .chat-composer-modes button[aria-pressed=true]{color:var(--ink)}
+:root .chat-composer .chat-composer-mode-highlight{position:absolute;top:0;left:0;z-index:0;border-radius:6px;pointer-events:none}
+:root .chat-composer .chat-composer-mode-highlight::before{content:"";position:absolute;inset:var(--chat-mode-inset,0px) 0;border:1px solid color-mix(in srgb,var(--ink) 14%,transparent);border-radius:6px;background:color-mix(in srgb,var(--ink) 12%,var(--chat-surface));box-shadow:0 1px 2px #0000000a}
+:root .chat-composer .chat-composer-meta{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0;padding:0 8px 0 12px}
+:root .chat-composer .chat-composer-voice{display:contents}
+:root .chat-composer .chat-composer-meta-start{display:flex;align-items:center;gap:6px;min-width:0}
+:root .chat-composer .chat-composer-meta-tools{display:flex;align-items:center;flex:none}
+:root .chat-composer .chat-composer-meta[data-reply=true]{padding-left:4px}
+@media(max-width:800px){
+ /* Phones: the tools, context meter and model share one row, so the meter yields first. */
+ :root .chat-composer .chat-composer-meta-start{flex:1 1 0;min-width:0}
+ :root .chat-composer .chat-composer-meta-tools :is(.attachment-trigger,.dictation-trigger){width:44px;min-width:44px}
+ :root .chat-composer .chat-composer-meta-start .context-trigger.context-trigger-linear{flex:1 1 0;width:auto;min-width:64px;max-width:120px}
+ :root .chat-composer .chat-composer-models .model-trigger{max-width:min(112px,30vw)}
+ :root .chat-composer .chat-composer-meta-start .context-linear-value{overflow:hidden;text-overflow:ellipsis}
+ :root .chat-composer .chat-composer-models{flex:0 1 auto}
+}
+@media(max-width:420px){
+ /* The open chat row is full: the meter keeps the used count and drops the limit instead of cutting "1…" (limit stays in the popover and the label). */
+ :root .chat-composer .chat-composer-meta[data-reply=true] .context-value-limit{display:none}
+}
+:root .chat-composer .chat-composer-models{display:flex;align-items:center;justify-content:flex-end;gap:0;min-width:0;margin-left:auto}
+:root .chat-composer :is(.model-trigger,.composer-reasoning-trigger){
+ position:static;display:inline-flex;align-items:center;justify-content:center;gap:4px;
+ width:auto;max-width:230px;min-width:0;height:30px;min-height:30px;margin:0;padding:2px 5px;
+ border:0;border-radius:7px;box-shadow:none;background:transparent;color:var(--ink);
+ font:400 var(--chat-meta-size)/20px var(--font-ui,Arial,Helvetica,sans-serif);transform:none;
+}
+:root .chat-composer .model-trigger>.avatar{display:none}
+:root .chat-composer .model-trigger-name{font-weight:400;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:root .chat-composer .model-trigger>svg{width:10px;height:10px}
+:root .chat-composer .composer-reasoning-trigger{color:var(--muted);white-space:nowrap}
+:root .chat-composer .chat-composer-attachments{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;min-width:0;overflow:hidden;padding:0 2px 8px}
+:root .chat-composer .attachment>.icon-button{top:4px;right:4px}
+:root .chat-composer .attachment-document{padding-right:32px}
+:root .chat-composer .dictation-overlay{border-radius:14px;background:var(--theme-surface-panel,#20201e);padding:8px}
+:root .chat-composer .composer-status{height:auto;min-height:0;margin:0;padding:0 4px;font-size:12px;line-height:18px}
+:root .chat-composer .composer-status:empty{display:none}
+:root .chat-composer[data-welcome=true]{--chat-input-min:36px;--chat-input-padding:0}
+:root .chat-composer[data-welcome=true] .chat-composer-surface{min-height:102px;border-radius:16px;padding:12px 8px 10px}
+:root .chat-composer[data-welcome=true] .chat-composer-main{flex-wrap:wrap;align-items:center;row-gap:10px}
+:root .chat-composer[data-welcome=true] .chat-composer-editor{order:-1;flex:0 0 100%;padding:0 6px}
+:root .chat-composer[data-welcome=true] .chat-composer-actions{margin-left:auto}
+@media(hover:hover) and (pointer:fine){
+ :root .chat-composer :is(.attachment-trigger,.dictation-trigger,.chat-composer-stop):hover{background:var(--theme-fill-hover,#ffffff0a);color:var(--ink)}
+ :root .chat-composer .chat-composer-send[aria-disabled=false]:hover::before{background:color-mix(in srgb,var(--ink) 88%,var(--chat-surface))}
+}
+:root[data-ui-size=compact] .chat-composer{--chat-input-size:15px;--chat-meta-size:13px}
+:root[data-ui-size=large] .chat-composer{--chat-input-size:18px;--chat-meta-size:15px}
+@media(max-width:800px){
+ :root[data-ui-size] .chat-composer{--chat-control:44px;--chat-meta-size:13px;--chat-input-size:16px;--chat-mode-inset:5px;--chat-input-min:32px;--chat-input-padding:4px 0}
+ :root .chat-composer .chat-composer-surface{min-height:56px;padding:5px 8px}
+ :root .chat-composer .chat-composer-main{gap:4px}
+ :root .chat-composer .chat-composer-send{--send-fill-inset:4px}
+ :root .chat-composer .chat-composer-modes button{height:44px;min-width:44px;padding-inline:6px}
+ :root .chat-composer .chat-composer-meta{gap:4px}
+ :root .chat-composer[data-welcome=true]{--chat-input-min:38px;--chat-input-padding:0}
+ :root .chat-composer[data-welcome=true] .chat-composer-surface{min-height:104px;padding:10px 8px 6px}
+ :root .chat-composer[data-welcome=true] .chat-composer-main{row-gap:4px}
+ :root .chat-composer[data-welcome=true] .chat-composer-meta{padding-inline:6px}
+ :root .chat-composer .chat-composer-modes{padding:0;background:transparent}
+ :root .chat-composer .chat-composer-modes::before{content:"";position:absolute;inset:5px 0;border-radius:8px;background:var(--theme-fill-soft,#ffffff0a);z-index:-1}
+ :root .chat-composer :is(.model-trigger,.composer-reasoning-trigger){min-height:44px;height:44px;padding-inline:3px;gap:2px}
+ :root .chat-composer .composer-reasoning-trigger{max-width:110px}
+}
+@media(max-width:360px){
+ :root .chat-composer{--chat-meta-size:12px}
+ :root .chat-composer .chat-composer-main{gap:2px}
+ /* 320 px: 44 px wide tools squeeze the context line and the model name to an ellipsis, so only here they stay 36 wide (44 high). */
+ :root .chat-composer .chat-composer-meta-tools :is(.attachment-trigger,.dictation-trigger){width:36px;min-width:36px}
+ :root .chat-composer .chat-composer-meta-start .context-trigger.context-trigger-linear{min-width:32px}
+}
+@media(prefers-reduced-motion:reduce){
+ :root .chat-composer button,:root .chat-composer .chat-composer-send::before{transition:none}
+}
+
+:root .chat-composer iframe.chat-composer-editor-frame{display:block;position:static;width:100%;height:var(--chat-input-min);min-height:var(--chat-input-min);max-height:160px;margin:0;padding:0;border:0;background:transparent;outline:0;box-shadow:none;-webkit-tap-highlight-color:transparent;transform:none;transition:none;animation:none}
+:root[data-theme=light] .chat-composer{--chat-surface:var(--theme-surface-panel);--chat-border:var(--theme-line);--chat-hint:#6f6a60}
+:root[data-theme=oled] .chat-composer{--chat-surface:var(--oled-panel);--chat-border:var(--oled-line);--chat-hint:var(--oled-muted)}
+
+/* Аудит стартового экрана по ui-ux-pro-max (08.11.2026): у поля ввода был невидимый фокус —
+   рамка не менялась. Тройной :root перебивает темовые рамки вида :root:not(...) .chat-composer[data-welcome] .chat-composer-surface. */
+:root .chat-composer{--chat-border-focus:color-mix(in srgb,var(--muted) 42%,transparent)}
+:root:root:root .chat-composer .chat-composer-surface{transition:border-color var(--motion-micro,160ms) var(--motion-ease,ease)}
+:root:root:root .chat-composer .chat-composer-surface:has(textarea.chat-composer-input:focus){border-color:var(--chat-border-focus)}
+@media(prefers-reduced-motion:reduce){:root:root:root .chat-composer .chat-composer-surface{transition:none}}

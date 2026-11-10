@@ -1,0 +1,147 @@
+.mobile-studio-sheet-backdrop{position:fixed;inset:0;z-index:202;background:var(--theme-scrim,#0007);animation:studio-sheet-shade-in .3s ease both}
+.mobile-studio-sheet-backdrop[data-state=closed]{animation:studio-sheet-shade-out .2s ease both;pointer-events:none}
+.mobile-studio-sheet{position:fixed;z-index:203;bottom:max(0px,calc(var(--keyboard-inset,0px) - var(--viewport-top,0px)));left:0;right:0;display:flex;flex-direction:column;max-height:calc(var(--visible-height,100dvh) - 18px);background:var(--theme-surface-panel,#20201e);border:1px solid var(--theme-line-soft,#ffffff12);border-bottom:0;border-radius:24px 24px 0 0;box-shadow:0 -20px 80px var(--theme-shadow,#0004);outline:none;color:var(--ink);overflow:hidden;animation:studio-sheet-in .3s var(--motion-ease) both}
+.mobile-studio-sheet[data-state=closed]{animation:studio-sheet-out .2s var(--motion-ease) both;pointer-events:none}
+.mobile-studio-sheet-grip{width:34px;height:4px;background:var(--theme-fill-active,#ffffff25);border-radius:6px;margin:9px auto 2px;flex:none}
+.mobile-studio-sheet>header{display:flex;align-items:center;gap:12px;padding:7px 16px 12px;flex:none}
+.mobile-studio-sheet>header h2{font-size:16px;font-weight:600;line-height:1.25;margin:0;flex:1}
+.mobile-studio-sheet-close{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;color:var(--muted);transition:background .2s,transform .2s}
+.mobile-studio-sheet-body{overflow-y:auto;overflow-x:hidden;min-height:0;padding:0 18px max(20px,env(safe-area-inset-bottom));overscroll-behavior:contain;scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch}
+.mobile-studio-sheet-body::-webkit-scrollbar{display:none;width:0;height:0}
+.mobile-studio-sheet.is-history{height:auto;max-height:min(76dvh,calc(var(--visible-height,100dvh) - 18px))}
+.mobile-studio-sheet.is-history>header{padding:5px 14px 6px;gap:8px}
+.mobile-studio-sheet.is-history>header h2{font-size:16px}
+.mobile-studio-sheet.is-history .mobile-studio-sheet-body{padding:0 12px max(12px,env(safe-area-inset-bottom))}
+.mobile-studio-sheet.is-history .mobile-studio-history-toolbar{margin:0;font-size:12px}
+.mobile-studio-sheet.is-history .mobile-studio-history-toolbar button{padding:6px 0 6px 8px}
+.mobile-studio-sheet.is-history .studio-history-filters{padding:2px 0 6px}
+.mobile-studio-sheet.is-history .studio-history-filters button{padding:6px 9px;font-size:12px}
+.mobile-studio-sheet.is-history .studio-history-gallery.is-grid{gap:8px}
+.mobile-studio-sheet.is-history .studio-history-thumbnail{aspect-ratio:4/3}
+.mobile-studio-sheet.is-history .studio-history-caption{padding:7px 9px;gap:2px}
+.mobile-studio-sheet.is-history .studio-history-card-actions{display:flex;align-items:center;gap:4px;padding:4px 6px;border-top:1px solid var(--theme-line-soft,#ffffff0d)}
+.mobile-studio-sheet.is-history .studio-history-card-actions .icon-button{position:static;inset:auto;transform:none;min-width:44px;min-height:44px;height:44px;border-radius:8px;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none}
+.mobile-studio-sheet.is-history .studio-history-card-actions .studio-history-favorite{width:44px;flex:none}
+.mobile-studio-sheet.is-history .studio-history-card-actions .studio-history-delete{display:flex;align-items:center;justify-content:center;gap:6px;width:auto;flex:1;padding:0 6px;font-size:12px;color:var(--ink)}
+.mobile-studio-sheet.is-history .studio-history-card-actions .studio-history-delete span{white-space:nowrap}
+.mobile-studio-sheet.is-history .mobile-studio-history-toolbar{flex-wrap:wrap;gap:4px 10px}
+.mobile-studio-sheet.is-history .mobile-studio-history-toolbar button{min-height:44px;padding:8px 0;font-size:12px}
+.mobile-studio-sheet.is-history :is(.studio-history-pick-toggle,.studio-history-batch button,.studio-history-undo button){min-height:44px}
+.mobile-studio-sheet :is(button,a){transition:background-color .22s,color .22s,border-color .22s,opacity .22s,transform .2s}
+.mobile-studio-sheet :is(input,textarea,:is(select,.app-select)){width:100%;min-width:0;border:1px solid var(--theme-line-soft,#ffffff10);border-radius:11px;background:var(--theme-surface-inset,#171716);padding:10px 12px;font-size:16px;color:inherit;box-sizing:border-box}
+.mobile-studio-sheet :is(input,textarea,:is(select,.app-select)):focus-visible{outline:1px solid var(--theme-line-strong,#b6af8e88);outline-offset:2px}
+.mobile-studio-sheet input,.mobile-studio-sheet :is(select,.app-select){height:42px}.mobile-studio-sheet textarea{min-height:90px;resize:vertical;line-height:1.55;touch-action:pan-y;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
+.mobile-studio-sheet label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:600;color:var(--theme-text-primary,#c8c5bb);min-width:0}
+.mobile-studio-settings{display:flex;flex-direction:column;gap:16px;border:0;padding:4px 0 0;margin:0;min-width:0}
+.mobile-studio-settings .disclosure{margin:0;padding:0;border-top:1px solid var(--theme-line-soft,#ffffff09)}
+/* LoRA is a bordered field like the selects above (studioHints.css), not a divided section: a divider over its frame read as overlapping lines. */
+.mobile-studio-settings .disclosure.lora-disclosure{border-top:0}
+.mobile-studio-settings .disclosure-trigger{padding:15px 0;font-size:14px;font-weight:500}
+.mobile-studio-settings .disclosure-body{display:flex;flex-direction:column;gap:14px;padding:0 0 8px}
+.mobile-studio-fields{display:grid;gap:12px;min-width:0}.mobile-studio-fields.two{grid-template-columns:1fr 1fr}
+.mobile-studio-field-hint{display:block;color:var(--muted);font-size:12px;margin-top:8px;font-weight:400}
+.mobile-studio-done{width:100%;height:44px;margin-top:8px;border-radius:12px;font-size:14px;font-weight:600}
+.mobile-studio-models{display:flex;flex-direction:column;gap:6px}
+.mobile-studio-models button{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:11px 14px;border-radius:12px;border:1px solid transparent;text-align:left;font-size:14px;overflow-wrap:anywhere}
+.mobile-studio-models button[aria-pressed=true]{background:var(--theme-fill-faint,#ffffff07);border-color:var(--theme-line,#b6af8e35)}
+.mobile-studio-models button svg{flex:none;color:var(--theme-text-primary,#c7c0a9)}
+.mobile-studio-formats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:4px 0 18px}
+.mobile-studio-formats button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-height:108px;padding:16px 8px;border:1px solid var(--theme-line-soft,#ffffff0d);border-radius:14px;background:var(--theme-fill-faint,#ffffff02)}
+.mobile-studio-formats button[aria-pressed=true]{border-color:var(--theme-line,#c5bfa565);background:var(--theme-fill-accent,#b6af8e0c)}
+.mobile-studio-format-icon{height:25px;max-width:38px;border:1.5px solid var(--theme-line-strong,#b2afa2);border-radius:4px;margin:0 0 3px}
+.mobile-studio-formats strong{font-size:12px;font-weight:600}.mobile-studio-formats small{font-size:12px;color:var(--muted)}
+.mobile-studio-format-check{position:absolute;top:9px;right:9px;color:var(--theme-text-primary,#c7c0a9)}
+.mobile-studio-history-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;font-size:12px;color:var(--muted)}
+.mobile-studio-history-toolbar button{display:flex;align-items:center;gap:6px;padding:10px 0 10px 10px;font-size:12px}
+.mobile-studio-undo{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);padding:8px 14px;overflow:hidden}
+.mobile-studio-undo button{padding:8px 0;color:var(--ink);font-size:12px}
+.mobile-studio-art-specs{display:grid;grid-template-columns:1fr 1fr;gap:18px 14px;margin:4px 0 18px}
+.mobile-studio-art-specs span{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12px;min-width:0}.mobile-studio-art-specs strong{font-size:14px;color:var(--ink);font-weight:500;overflow-wrap:anywhere}
+.mobile-studio-art-info p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.6;color:var(--muted)}
+.mobile-studio-art-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 16px}
+.mobile-studio-art-actions>button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 12px;border:1px solid var(--theme-line-soft,#ffffff14);border-radius:12px;background:var(--theme-fill-faint,#ffffff04);color:var(--ink);font-size:14px;font-weight:500}
+.mobile-studio-art-actions>button:active{background:var(--theme-fill-active,#ffffff15)}
+.mobile-studio-delete-art{width:100%;height:44px;font-size:12px;margin-top:6px;color:var(--theme-text-muted,#cda598)}
+@media(max-width:800px),(pointer:coarse) and (max-height:500px){
+ .page-surface>.image-studio.studio-mobile{height:var(--visible-height,calc(100% - var(--keyboard-inset,0px)));max-height:calc(var(--app-height,100%) - var(--keyboard-inset,0px));min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:var(--canvas)}
+ .mobile-studio-header{height:52px;min-height:52px;flex:none;display:flex;align-items:center;gap:4px;padding:4px 10px;box-sizing:content-box}
+ .mobile-studio-header h1{flex:1;font-size:16px;font-weight:600;margin:0 0 0 4px;letter-spacing:-.2px}
+ .mobile-studio-header .icon-button{position:relative;width:36px;height:36px;min-width:36px;color:var(--theme-text-muted,#a9a69c)}
+ .mobile-studio-history-dot{position:absolute;top:8px;right:7px;width:4px;height:4px;background:var(--theme-fill-accent,#bfb79c);border-radius:50%}
+ .mobile-studio-stage{flex:1;min-height:0;position:relative;margin:0 12px 10px;isolation:isolate}
+ /* Typing is one CSS state: the prompt has focus. Layout changes in a single
+    step without a React render; layoutFollow.ts glides the composer to its new
+    place and fades the art back in. Do not transition flex/height here. */
+ .studio-mobile:is(:has(.mobile-studio-prompt:focus),[data-prompt-focus=true]) .mobile-studio-stage{flex:0 0 0px!important;height:0!important;min-height:0!important;max-height:0!important;margin-top:0!important;margin-bottom:0!important;padding:0!important;opacity:0!important;overflow:hidden!important;pointer-events:none!important}
+ .studio-mobile .mobile-studio-canvas{height:100%;width:100%;min-height:0;max-height:none;background:var(--theme-surface-inset,#181817);border:1px solid var(--theme-line-soft,#ffffff08);border-radius:19px;overflow:hidden;box-sizing:border-box}
+ .mobile-studio-canvas.has-art{background:var(--theme-surface-deep,#10100f)}
+ .mobile-studio-empty{height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:22px;color:var(--theme-text-muted,#b1ad9f);background:radial-gradient(ellipse at 50% 45%,var(--theme-fill-accent,#b6af8e07),transparent 65%)}
+ .mobile-studio-empty-icon{display:flex;align-items:center;justify-content:center;width:62px;height:62px;margin-bottom:18px;border:1px solid var(--theme-line,#b6af8e19);border-radius:19px;background:var(--theme-fill-faint,#ffffff02);color:var(--theme-text-muted,#a9a18a);animation:studio-empty-in .3s var(--motion-ease) both}
+ .mobile-studio-empty strong{font-size:16px;font-weight:600;color:var(--theme-text-primary,#dbd8ce);letter-spacing:-.25px}.mobile-studio-empty p{font-size:12px;line-height:1.6;margin:10px 0 0;color:var(--theme-text-muted,#8d897d)}
+ .mobile-studio-status{position:absolute;left:12px;top:12px;display:flex;align-items:center;gap:6px;max-width:calc(100% - 24px);padding:7px 10px;border:1px solid var(--theme-line-soft,#ffffff12);border-radius:20px;background:var(--theme-surface-panel,#20201e);font-size:12px;color:var(--ink);pointer-events:none}
+ .mobile-studio-status>i{width:4px;height:4px;border-radius:50%;background:var(--theme-text-muted,#aaa38d)}
+ /* On the art: favorite, download and «⋯» (the art sheet holds animate, upscale and details). */
+ .mobile-studio-art-tools{position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;justify-content:flex-end;gap:8px;pointer-events:none}
+ .mobile-studio-art-tools>*{pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--theme-surface-panel,#20201e);border:1px solid var(--theme-line-soft,#ffffff12);border-radius:20px;color:var(--ink)}
+ /* The theme's transparent icon-button rule outranks the plain child selector and left the favorite star without its disc. */
+ :root .studio-mobile .mobile-studio-art-tools>*{background:var(--theme-surface-panel,#20201e);border-color:var(--theme-line-soft,#ffffff12);border-radius:20px}
+ .mobile-studio-download,.mobile-studio-art-more{width:44px;height:44px}
+ .mobile-studio-composer{flex:none;margin:0 12px max(12px,env(safe-area-inset-bottom));border:1px solid var(--theme-line-soft,#ffffff10);border-radius:20px;background:var(--theme-surface-glass,#20201ecf);padding:10px 12px 12px;box-shadow:0 5px 25px var(--theme-shadow,#0002)}
+ .mobile-studio-composer fieldset{border:0;padding:0;margin:0;min-width:0}
+ .mobile-studio-quick{display:flex;align-items:center;gap:7px;min-width:0}
+ .mobile-studio-quick>button{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--theme-text-muted,#aaa698);min-height:34px;min-width:0;border-radius:9px}
+ .mobile-studio-model-chip{flex:1;overflow:hidden}.mobile-studio-model-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mobile-studio-model-chip svg{flex:none}
+ .mobile-studio-format-chip{flex:none;padding:0 5px}.mobile-studio-ratio{height:11px;max-width:17px;border:1px solid var(--theme-line-strong,#aaa698);border-radius:2px}
+ .mobile-studio-quick>.icon-button{width:32px;height:32px;min-height:32px;flex:none}
+ .mobile-studio-keyboard-done{margin-left:auto;padding:0 10px!important;background:var(--theme-fill-accent,#b6af8e24)!important;color:var(--theme-text-primary,#ded9cb)!important;border:1px solid var(--theme-line-strong,#b6af8e55)!important;font-weight:600;border-radius:9px;display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
+ .mobile-studio-keyboard-done:active{background:var(--theme-fill-accent-hover,#b6af8e38)!important}
+ .mobile-studio-composer textarea{width:100%;height:auto;min-height:52px;max-height:140px;resize:none;background:transparent;border:0;padding:8px 0 12px;border-radius:0;font-size:16px;line-height:1.5;color:var(--ink);outline:none;box-sizing:border-box;scrollbar-width:none;-ms-overflow-style:none;touch-action:pan-y;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
+ .mobile-studio-composer textarea::-webkit-scrollbar{display:none;width:0;height:0}
+ .mobile-studio-composer textarea[data-touch-scrolling=true],.mobile-studio-sheet textarea[data-touch-scrolling=true]{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+ .mobile-studio-composer textarea::placeholder{color:var(--theme-text-muted,#858175)}
+ .mobile-studio-translator>section+section{margin-top:16px;padding-top:14px;border-top:1px solid var(--theme-line-soft,#ffffff0d)}
+ .mobile-studio-translator h3{margin:2px 0 10px;font-size:12px;font-weight:600;color:var(--theme-text-primary,#c8c5bb)}
+ .mobile-studio-prompt-translation .prompt-translation{margin:0}
+ .mobile-studio-sheet.is-translator .mobile-studio-sheet-body{padding-top:2px;padding-bottom:0}
+ .mobile-studio-translator .translator-actions{position:sticky;bottom:0;z-index:10;margin:10px 0 0 0;padding:10px 0 14px;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;border-top:none;box-shadow:none}
+ .mobile-studio-translator .translator-submit{transform:none!important}
+ .mobile-studio-translator .translator-toolbar{margin-bottom:7px}
+ .mobile-studio-translator .translator-pane{height:clamp(112px,17dvh,148px)}
+ .mobile-studio-translator .translator-pane textarea{font-size:16px}
+ .mobile-studio-translator .translator-empty-state>small{display:none}
+ .mobile-studio-create-row{display:flex;gap:9px}
+ .mobile-studio-cycle,.mobile-studio-translate{display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex:none;border:1px solid var(--theme-line-soft,#ffffff14);border-radius:12px;color:var(--theme-text-muted,#9f9b8d);background:var(--theme-fill-faint,#ffffff02)}
+ .mobile-studio-cycle.is-active{background:var(--theme-fill-accent,#b6af8e16);border-color:var(--theme-line,#b6af8e4d);color:var(--theme-text-primary,#d8d0b7)}.mobile-studio-cycle.is-active svg{animation:studio-cycle-active 2.8s ease-in-out infinite}
+ .mobile-studio-create{flex:1;height:44px;border-radius:12px;font-size:14px;font-weight:600;gap:8px;min-width:0}
+ .mobile-studio-loop-note{margin:8px 0 0;font-size:12px;line-height:1.5;color:var(--theme-text-muted,#aaa590);overflow:hidden}
+ .mobile-studio-error{color:var(--theme-text-muted,#cba394);font-size:12px;line-height:1.5;margin:8px 0 0;overflow:hidden;max-height:54px;overflow-y:auto}
+ .studio-mobile:is(:has(.mobile-studio-prompt:focus),[data-prompt-focus=true]) .mobile-studio-recent{display:none}
+ /* The thumbnail stands in for the art only while typing collapses the stage; otherwise the art is already on screen. */
+ .studio-mobile:not(:is(:has(.mobile-studio-prompt:focus),[data-prompt-focus=true])) .mobile-studio-thumb{display:none}
+ .studio-mobile:not(:is(:has(.mobile-studio-prompt:focus),[data-prompt-focus=true])) .mobile-studio-keyboard-done{display:none}
+ .studio-mobile:is(:has(.mobile-studio-prompt:focus),[data-prompt-focus=true]) .mobile-studio-composer{margin-top:4px;margin-bottom:8px}
+ /* While typing the stage is collapsed, so the composer takes the rest of the screen down to the
+    keyboard and «Создать» sits right above it, instead of a short card under the header with an
+    empty gap to the keyboard. Same single layout step; layoutFollow still glides the top edge. */
+ .studio-mobile:is(:has(.mobile-studio-prompt:focus),[data-prompt-focus=true]) .mobile-studio-composer{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+ .studio-mobile:is(:has(.mobile-studio-prompt:focus),[data-prompt-focus=true]) .mobile-studio-composer>fieldset{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+ .studio-mobile:is(:has(.mobile-studio-prompt:focus),[data-prompt-focus=true]) .mobile-studio-create-row{margin-top:auto;padding-top:8px}
+ .studio-mobile:is(:has(.mobile-studio-prompt:focus),[data-prompt-focus=true]) .mobile-studio-composer textarea{min-height:80px;max-height:140px}
+ html[data-keyboard=true] .mobile-studio-empty-icon{display:none}
+ html[data-keyboard=true] .mobile-studio-empty p{display:none}
+}
+@keyframes studio-sheet-in{from{transform:translateY(105%);opacity:.7}to{transform:translateY(0);opacity:1}}
+@keyframes studio-sheet-out{to{transform:translateY(105%);opacity:.6}}
+@keyframes studio-sheet-shade-in{from{opacity:0}to{opacity:1}}
+@keyframes studio-sheet-shade-out{to{opacity:0}}
+@keyframes studio-empty-in{from{opacity:0;transform:translateY(8px) rotate(-5deg)}to{opacity:1;transform:translateY(0) rotate(0)}}
+@keyframes studio-cycle-active{0%,25%{transform:rotate(0)}70%,100%{transform:rotate(180deg)}}
+@media(prefers-reduced-motion:reduce){.mobile-studio-sheet,.mobile-studio-sheet-backdrop{animation-duration:.01s!important}.mobile-studio-empty-icon,.mobile-studio-cycle.is-active svg{animation:none!important}.mobile-studio-sheet :is(button,a){transition:none}}
+@media(max-width:800px),(pointer:coarse) and (max-height:500px){
+ .studio-mobile .mobile-studio-quick>.mobile-studio-thumb{flex:none;width:44px;height:44px;min-height:44px;padding:4px;border:0;border-radius:11px;overflow:hidden;background:transparent}
+ .studio-mobile .mobile-studio-quick>.mobile-studio-thumb:focus-visible{outline:2px solid var(--theme-line-strong,#77766e);outline-offset:2px}
+ .mobile-studio-thumb img{display:block;width:100%;height:100%;box-sizing:border-box;object-fit:cover;border:1px solid var(--theme-line-soft,#ffffff12);border-radius:9px;background:var(--theme-surface-deep,#10100f)}
+}
+/* iPhone: the prompt lives in the isolated editor document (ChatComposerEditor); it is transparent like the textarea above. */
+.mobile-studio-composer .chat-composer-editor{display:block;width:100%;min-width:0;--chat-input-size:16px;--chat-input-min:64px;--chat-input-padding:8px 0 12px;--chat-hint:var(--theme-text-muted,#858175)}
+.mobile-studio-composer iframe.chat-composer-editor-frame{display:block;width:100%;height:64px;min-height:64px;max-height:160px;margin:0;padding:0;border:0;background:transparent}

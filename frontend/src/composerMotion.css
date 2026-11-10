@@ -1,0 +1,65 @@
+/* Capsule motion, final layer (imported last). Rules from the animate skill:
+   press = scale on :active, ease-out; menus scale out of their trigger; enter/exit use ease-out;
+   moving glyphs use ease-in-out; nothing UI-sized is slower than 250ms. */
+
+/* 1. Press feedback on every pressable inside the capsule. */
+:root .chat-composer :is(.attachment-trigger,.dictation-trigger,.chat-composer-stop,.chat-composer-send,.model-trigger,.composer-reasoning-trigger,.context-trigger){
+ transition:
+  background-color var(--motion-micro,150ms) var(--ease-out),
+  color var(--motion-micro,150ms) var(--ease-out),
+  opacity var(--motion-micro,150ms) var(--ease-out),
+  scale 200ms var(--ease-out),
+  transform 160ms var(--ease-out);
+}
+:root .chat-composer :is(.attachment-trigger,.dictation-trigger,.chat-composer-stop,.chat-composer-send,.model-trigger,.composer-reasoning-trigger,.context-trigger):not([aria-disabled=true]):not(:disabled):active{
+ transform:scale(.95);
+}
+/* The model capsule is text only, so it presses more gently and stays lit while its menu is open. */
+:root .chat-composer .model-trigger:not([aria-disabled=true]):not(:disabled):active{transform:scale(.97)}
+:root .chat-composer .model-trigger[data-state=open]{background-color:color-mix(in srgb,var(--ink) 8%,transparent)}
+/* The glyph and arrow no longer move on their own: the whole control is what is pressed. */
+:root .chat-composer .attachment-trigger:active>.composer-plus-glyph{scale:1}
+:root .chat-composer .chat-composer-send[aria-disabled=false]:active svg,
+:root .chat-composer .chat-composer-send[data-reply=true][aria-disabled=false]:active svg{translate:0 0}
+:root .chat-composer .chat-composer-send[aria-disabled=false]:active::before{scale:1}
+
+/* 2. Send fill and stop control appear from 0.85-0.9, never from nothing. */
+:root .chat-composer .chat-composer-send::before{
+ transition:scale 200ms var(--ease-out),opacity var(--motion-micro,150ms) var(--ease-out),background-color var(--motion-micro,150ms) var(--ease-out);
+}
+:root .chat-composer .chat-composer-send[aria-disabled=true]::before{scale:.85;opacity:0}
+@starting-style{:root .chat-composer .chat-composer-stop{opacity:0;scale:.85}}
+
+/* 3. Glyphs that travel: ease-in-out, 200ms. */
+:root .chat-composer .composer-plus-glyph{transition:rotate 200ms var(--ease-in-out),scale 160ms var(--ease-out)}
+:root .chat-composer .composer-reasoning-trigger>svg,
+:root .chat-composer .model-trigger>svg:last-child{transition:transform 200ms var(--ease-in-out)}
+
+/* 4. Menus open out of the trigger. Modern browsers: scale .95 via surfaceMotion.css (--surface-scale); these keyframes are the fallback without transition-behavior support. */
+@keyframes composer-menu-in{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
+@keyframes composer-menu-out{from{opacity:1;transform:none}to{opacity:0;transform:scale(.95)}}
+:root:root .composer-menu.floating-panel:not(.model-picker-sheet){
+ transform-origin:var(--radix-dropdown-menu-content-transform-origin,var(--radix-popover-content-transform-origin,50% 100%));
+ translate:none;
+}
+:root:root .composer-menu.floating-panel:not(.model-picker-sheet)[data-state=open]{animation:composer-menu-in var(--motion-detail) var(--ease-out) both}
+:root:root .composer-menu.floating-panel:not(.model-picker-sheet)[data-state=closed]{animation:composer-menu-out var(--motion-exit) var(--ease-out) both;pointer-events:none}
+
+/* 5. Dictation: the capsule content crossfades with the recorder overlay instead of vanishing first.
+   Hiding waits for the fade; coming back is visible at once so the overlay fades out over it. */
+:root .chat-composer .chat-composer-content{transition:opacity var(--motion-micro,160ms) var(--ease-out)}
+:root .chat-composer .chat-composer-content[data-recording=true]{
+ opacity:0;
+ transition:opacity var(--motion-micro,160ms) var(--ease-out),visibility 0s linear var(--motion-micro,160ms);
+}
+
+@media(prefers-reduced-motion:reduce){
+ :root .chat-composer :is(.attachment-trigger,.dictation-trigger,.chat-composer-stop,.chat-composer-send,.model-trigger,.composer-reasoning-trigger,.context-trigger):active{transform:none}
+ :root .chat-composer .composer-plus-glyph,
+ :root .chat-composer .composer-reasoning-trigger>svg,
+ :root .chat-composer .model-trigger>svg:last-child{transition:none}
+ :root:root .composer-menu.floating-panel:not(.model-picker-sheet)[data-state=open]{animation:composer-menu-fade-in 150ms linear both}
+ :root:root .composer-menu.floating-panel:not(.model-picker-sheet)[data-state=closed]{animation:composer-menu-fade-out 100ms linear both}
+ @keyframes composer-menu-fade-in{from{opacity:0}to{opacity:1}}
+ @keyframes composer-menu-fade-out{from{opacity:1}to{opacity:0}}
+}

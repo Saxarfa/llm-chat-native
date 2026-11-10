@@ -1,0 +1,22 @@
+import {useEffect,useState} from 'react';
+import {imageGenerationPreference,type ImageGenerationPreference} from '../imageGeneration';
+import {api} from '../store';
+import {ImageModelOptions,imageModelName} from './imageModels';
+import {Select,SelectOption} from './Select';
+import type {StudioAIStudioConfig} from './studioTypes';
+import './ImageGeneratorSettings.css';
+
+type ImageGeneratorCatalog={online:boolean;model:string;models:string[];aistudio?:StudioAIStudioConfig};
+export function CloudImagePreferences({aspectRatio,imageSize,allowAuto4k=false,onChange,config}:{aspectRatio:string;imageSize:string;allowAuto4k?:boolean;onChange:(patch:{aspect_ratio?:string;image_size?:string;allow_auto_4k?:boolean})=>void;config?:StudioAIStudioConfig}){
+ const nano=config?.models?.find(model=>model.model==='aistudio/gemini-nano-banana-2.1')||config;
+ const ratios=[...new Set([...(nano?.aspect_ratios?.length?nano.aspect_ratios:['auto']),aspectRatio])],sizes=[...new Set(['auto',...(nano?.image_sizes?.length?nano.image_sizes:['1K','2K','4K']),imageSize])];
+ return <div className="generator-cloud-preferences"><p className="settings-intro">Nano Banana 2.1</p><div className="generator-cloud-pair"><label className="settings-field"><span>Формат</span><Select aria-label="Формат Nano Banana" value={aspectRatio} onChange={event=>onChange({aspect_ratio:event.target.value})}>{ratios.map(ratio=><SelectOption key={ratio} value={ratio}>{ratio==='auto'?'Авто':ratio}</SelectOption>)}</Select></label><label className="settings-field"><span>Разрешение</span><Select aria-label="Разрешение Nano Banana" value={imageSize} onChange={event=>onChange({image_size:event.target.value})}>{sizes.map(size=><SelectOption key={size} value={size}>{size==='auto'?'Авто':size==='512'?'512 px':size}</SelectOption>)}</Select></label></div><p className="settings-local-note">В режиме «Авто» модель выбирает параметры по запросу. При правке сохраняет формат и разрешение картинки. Указания в сообщении имеют приоритет над настройками.</p>{imageSize==='auto'&&<label className="generator-auto-4k"><input type="checkbox" checked={allowAuto4k} onChange={event=>onChange({allow_auto_4k:event.target.checked})}/><span>Разрешить автоматический выбор 4K</span></label>}{nano&&!nano.available&&<p className="settings-local-note" role="status">{nano.reason||'Подключите Google AI Studio в настройках подключения.'}</p>}</div>;
+}
+
+export function ModelImageGeneratorSettings({value,onChange,disabled=false}:{value?:Partial<ImageGenerationPreference>;onChange:(value:ImageGenerationPreference)=>void;disabled?:boolean}){
+ const values=imageGenerationPreference(value),[catalog,setCatalog]=useState<ImageGeneratorCatalog|null>(null);
+ useEffect(()=>{let alive=true;void api('/api/images/config').then(data=>{if(alive)setCatalog(data)}).catch(()=>{});return()=>{alive=false}},[]);
+ const models=[...new Set([...(catalog?.models||[]),values.local_model||catalog?.model||'anima_baseV10.safetensors'])];
+ const change=(patch:Partial<ImageGenerationPreference>)=>onChange({...values,...patch});
+ return <fieldset className="model-image-generator" disabled={disabled}><h4 className="settings-subheading">Генератор изображений</h4><label className="settings-field"><span>Источник изображений</span><Select aria-label="Источник изображений модели" value={values.source} onChange={event=>change({source:event.target.value as ImageGenerationPreference['source'],...(event.target.value==='local'&&!values.local_model?{local_model:catalog?.model||models[0]}:{})})}><SelectOption value="default">Общие настройки</SelectOption><SelectOption value="local">Локальные</SelectOption><SelectOption value="aistudio">Nano Banana</SelectOption></Select></label>{values.source==='local'&&<><label className="settings-field"><span>Чекпоинт</span><Select aria-label="Чекпоинт для модели" value={values.local_model} displayValue={imageModelName(values.local_model)} onChange={event=>change({local_model:event.target.value})}><ImageModelOptions models={models}/></Select></label><p className="settings-local-note">Параметры берутся из сохранённого профиля этой локальной модели в студии.</p></>}{values.source==='aistudio'&&<CloudImagePreferences aspectRatio={values.aspect_ratio} imageSize={values.image_size} allowAuto4k={values.allow_auto_4k} onChange={change} config={catalog?.aistudio}/>}<p className="settings-local-note">Применяется в чатах этой модели. Настройки изображений актёра имеют приоритет.</p></fieldset>;
+}

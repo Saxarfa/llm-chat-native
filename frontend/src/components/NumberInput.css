@@ -1,0 +1,16 @@
+.number-input{position:relative;display:block;width:100%;min-width:0}
+.number-input input[type=number]{width:100%;padding-right:66px!important;appearance:textfield}
+.number-input input::-webkit-inner-spin-button,.number-input input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.number-input-actions{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:flex;gap:3px}
+.number-input .number-input-actions button{display:grid;place-items:center;width:25px;height:26px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;transition:background-color .15s,color .15s;transform:none!important;scale:1!important}
+@media (hover:hover) and (pointer:fine){
+.number-input .number-input-actions button:hover{background:var(--theme-fill-soft,#ffffff0d);color:var(--ink)}}
+.number-input .number-input-actions button:active{background:var(--theme-fill-accent,#ffffff18)}
+.number-input .number-input-actions button:disabled{opacity:.35;cursor:default}
+/* Keep each step separate and tappable, including on a rotated phone. */
+@media(pointer:coarse){
+ .number-input{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px}
+ .number-input input[type=number]{padding-right:8px!important;min-height:44px;min-width:0}
+ .number-input-actions{position:static;transform:none;gap:0}
+ .number-input .number-input-actions button{width:44px;height:44px}
+}

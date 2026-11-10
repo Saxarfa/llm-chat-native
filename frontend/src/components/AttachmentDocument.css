@@ -1,0 +1,6 @@
+.attachment-document{display:flex;align-items:center;gap:9px;box-sizing:border-box;max-width:100%;width:210px;min-width:0;min-height:68px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;color:var(--ink);background:var(--theme-surface-panel);text-decoration:none;text-align:left}
+.attachment-document>svg{flex-shrink:0;color:var(--muted)}.attachment-document>span{min-width:0}.attachment-document strong{display:block;font-size:12px;font-weight:500;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.attachment-document small{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+.attachment-document:focus-visible{outline:2px solid var(--theme-line-strong,#bdb398);outline-offset:2px}
+:root .chat-composer .attachment-presence>.attachment:has(.attachment-document){width:210px}
+:root .chat-composer .chat-composer-attachments{overflow-x:auto;max-width:100%;padding-top:5px;scrollbar-width:thin}
+:root .chat-composer .chat-composer-attachments:has(.attachment){max-height:min(240px,32dvh);overflow:auto}

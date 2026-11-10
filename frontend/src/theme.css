@@ -1,0 +1,60 @@
+/* Dark colors retain their original fallbacks; light colors share a single palette. */
+:root[data-theme=light]{
+ color-scheme:light;
+ --canvas:#f7f5f0;--surface:#fffdf8;--rail:#eeebe3;
+ --ink:#302e28;--muted:#686256;--subtle:#71695b;--line:#5148321c;
+ --button-primary:#34382f;--button-primary-text:#fffdf7;
+ --button-secondary:#e8e3d8;--surface-muted:#f0ede5;--surface-accent:#e8e3d8;
+ --input-border:#d5cdbf;--focus-ring:#8b7d5e;--surface-popover:#fffdf8;
+ --theme-text-primary:#302e28;--theme-text-muted:#655f53;--theme-text-subtle:#71695b;
+ --theme-text-accent:#79623c;--theme-text-red:#a34432;--theme-text-blue:#346b91;--theme-text-green:#427051;
+ --theme-control-accent:#807356;
+ --theme-surface-deep:#ebe6dc;--theme-surface-inset:#f2eee6;--theme-surface-panel:#fffdf8;
+ --theme-surface-raised:#eee9de;--theme-surface-elevated:#e3dccf;--theme-surface-glass:#fffdf8ed;
+ --theme-fill-faint:#51483204;--theme-fill-soft:#51483208;--theme-fill-hover:#51483210;--theme-fill-active:#51483219;
+ --theme-fill-accent:#e4dbc8;--theme-fill-red:#b9584314;--theme-fill-blue:#397ca214;--theme-fill-green:#4b80561a;
+ --theme-line-soft:#51483212;--theme-line:#51483224;--theme-line-strong:#95897277;
+ --theme-shadow:#3b30221f;--theme-highlight:#ffffff99;--theme-scrim:#29251e55;
+ --theme-choice-border:#8d8061;--theme-choice-fill:#e7dfcd55;
+ --dictation-wave:#807356;
+}
+:root{--dictation-wave:#d9ccb0}
+
+/* Apply colors to native controls and browser chrome as well as the app. */
+html[data-theme=light] body{background:var(--canvas)}
+html[data-theme=light] :is(.send-button:not(:disabled):not(.is-stop),.studio-generate:not(:disabled),.mobile-studio-generate:not(:disabled)){
+ background:var(--button-primary);color:var(--button-primary-text);
+}
+html[data-theme=light] input[role=switch]:checked{background:#807356}
+html[data-theme=light] input[role=switch]:checked:after{background:#fffdf8}
+html[data-theme=light] .composer:focus-within{border-color:#b4a68a}
+html[data-theme=light] :is(.context-ring-track,.startup-orbit-track){stroke:#d7cfbf}
+html[data-theme=light] .startup-orbit-arc{stroke:#8b7d5e}
+html[data-theme=light] [data-slot=tooltip-content]>svg{fill:var(--theme-surface-raised);background:var(--theme-surface-raised)}
+
+/* Artwork pixels and comparison masks must never be recolored by the theme. */
+html[data-theme=light] :is(.art-editor-preview-column,.art-animator-stage){background:#171715;--ink:#e8e6df;--muted:#aaa69b;--line:#ffffff18}
+html[data-theme=light] :is(.art-editor-version,.art-editor-progress,.art-animator-progress){color:#e8e6df;--muted:#aaa69b}
+html[data-theme=light] .mobile-studio-canvas.has-art{background:#10100f}
+html[data-theme=light] .chat-art-generating{--ink:#e8e6df;--muted:#a3a29a}
+
+/* A separate light syntax palette keeps code readable without changing its contents. */
+html[data-theme=light] .hljs{color:#24292f;background:transparent}
+html[data-theme=light] :is(.hljs-comment,.hljs-code,.hljs-formula){color:#626a73}
+html[data-theme=light] :is(.hljs-keyword,.hljs-doctag,.hljs-template-tag,.hljs-variable.language_,.hljs-deletion){color:#cf222e}
+html[data-theme=light] :is(.hljs-string,.hljs-regexp,.hljs-template-variable){color:#0a3069}
+html[data-theme=light] :is(.hljs-number,.hljs-literal,.hljs-type,.hljs-attr,.hljs-attribute,.hljs-operator,.hljs-selector-attr,.hljs-variable,.hljs-section){color:#0550ae}
+html[data-theme=light] :is(.hljs-title,.hljs-title.function_,.hljs-title.class_){color:#8250df}
+html[data-theme=light] :is(.hljs-built_in,.hljs-symbol,.hljs-bullet,.hljs-selector-id,.hljs-selector-class){color:#953800}
+html[data-theme=light] :is(.hljs-meta,.hljs-link,.hljs-name,.hljs-quote,.hljs-selector-tag,.hljs-selector-pseudo){color:#116329}
+html[data-theme=light] :is(.hljs-subst,.hljs-emphasis,.hljs-strong){color:#24292f}
+html[data-theme=light] .hljs-addition{color:#116329;background:#dafbe1}
+html[data-theme=light] .hljs-deletion{background:#ffebe9}
+
+/* Only surfaces fade. Existing gesture, message and modal motion stays intact. */
+@media(prefers-reduced-motion:no-preference){
+ html[data-theme-changing=true],html[data-theme-changing=true] :is(.app,.desktop-sidebar,.sidebar-inner,.main-panel,.chat-header,.composer,.question-bubble,.prose,.premium-modal,.settings-nav,.settings-main,.parameter-panel,.model-picker,.workspace,.workspace-header,.workspace-card,.studio-main,.mobile-studio-composer,.mobile-studio-sheet,.theme-choice,.icon-button,[data-slot=button]){
+  transition-property:background-color,color,border-color,box-shadow;
+  transition-duration:200ms;transition-timing-function:ease;
+ }
+}

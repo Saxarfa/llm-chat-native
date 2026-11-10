@@ -1,0 +1,49 @@
+/* The same frame is reserved while generating, decoding and displaying the art. */
+.chat-arts .chat-art.chat-art-refined{
+ --chat-art-max-height:460px;
+ width:min(var(--chat-art-width),480px,calc(var(--chat-art-max-height)*var(--chat-art-ratio)));
+ background:var(--theme-surface-inset,#191918);border-radius:15px;
+}
+/* Touching an artwork while scrolling must not inherit the global button press scale. */
+.chat-art .chat-art-preview{scale:1;-webkit-tap-highlight-color:transparent}
+.chat-art .chat-art-preview:active:not(:disabled){scale:1}
+.chat-art-refined .chat-art-generating{background:var(--oled-inset,#1c1c1a)}
+.chat-art-refined .chat-art-atmosphere{opacity:.65}
+.chat-art-refined .chat-art-atmosphere i{animation:none;will-change:auto}
+.chat-art-refined .chat-art-atmosphere i{
+ background:radial-gradient(ellipse at center,#b6ab9626 0%,#aca08910 35%,transparent 68%);
+}
+.chat-art-refined .chat-art-atmosphere i:nth-child(2){
+ background:radial-gradient(ellipse at center,#95a0a226 0%,#7e898a10 38%,transparent 70%);
+}
+.chat-art-refined .chat-art-atmosphere i:nth-child(3){
+ background:radial-gradient(ellipse at center,#a193ad20 0%,#9686990d 35%,transparent 65%);
+}
+.chat-art-refined .chat-art-atmosphere i:nth-child(4){
+ background:radial-gradient(ellipse at center,#c2bfae1c 0%,#a8ab910b 40%,transparent 70%);
+}
+.chat-art-refined .chat-art-grain{opacity:.045}
+.chat-art-refined .chat-art-generating::after{
+ background:linear-gradient(180deg,transparent 35%,#11111038 70%,#1111109c 100%);
+ box-shadow:none;
+}
+.chat-art-refined .chat-art-generating{border-radius:inherit;clip-path:inset(0 round 15px)}
+.tools-disclosure .tool-image-detail{display:block;padding:4px 0 7px}
+.tools-disclosure .tool-image-detail::before{display:none}
+.tools-disclosure .tool-image-detail header{gap:10px;min-height:18px}
+.tools-disclosure .tool-image-detail strong{font-size:12px;color:var(--theme-text-muted,#b1ad9f);font-weight:500}
+.tools-disclosure .tool-image-detail .tool-image-stage{font-size:12px;color:var(--theme-text-muted,#8e8a7e);margin:3px 0}
+.tools-disclosure .tool-image-parameters{
+ display:flex;flex-wrap:wrap;gap:5px 16px;margin:4px 0 8px;font-size:12px;line-height:1.6;color:var(--theme-text-muted,#8e8a7e);
+}
+.tool-image-parameters>div{display:flex;gap:5px;min-width:0}
+.tool-image-parameters dt{color:var(--theme-text-subtle,#777469)}
+.tool-image-parameters dd{margin:0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+@media(max-width:800px){
+ .chat-arts .chat-art.chat-art-refined{--chat-art-max-height:min(460px,58svh);border-radius:13px}
+ .chat-art-refined .chat-art-generating{clip-path:inset(0 round 13px)}
+ .chat-art-refined .chat-art-generation-caption{left:16px;right:16px;bottom:16px}
+}
+:root[data-theme=oled] .chat-art-atmosphere{display:none}
+:root[data-theme=oled] .chat-art-generating::after{content:none}
+.chat-image-parameters{margin:8px 0 0;color:var(--text-secondary);font-size:12px;line-height:1.5}

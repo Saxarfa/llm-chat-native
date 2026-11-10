@@ -1,0 +1,8 @@
+/* Base durations shared by CSS and motion.ts. Reduced motion overrides the
+   CSS variables in motionSystem.css; JS uses the same base values and its hook. */
+:root{
+ --motion-micro:160ms;
+ --motion-detail:220ms;
+ --motion-surface:280ms;
+ --motion-exit:180ms;
+}

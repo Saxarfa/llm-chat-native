@@ -1,0 +1,62 @@
+.app-select{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-width:0;text-align:left;font:inherit;font-size:14px;font-weight:400;color:var(--ink);background:var(--theme-surface-inset,#191918);border:1px solid var(--theme-line,#ffffff1a);border-radius:9px;padding:10px 12px;line-height:1.4;cursor:pointer}
+.app-select>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.app-select .app-select-chevron{display:flex;flex-shrink:0;margin-left:auto;color:var(--muted)}
+/* Studio fields used display:block for native selects. Keep the arrow inline. */
+.studio-form button.app-select,.studio-history-select button.app-select{display:flex}
+.app-select[data-state=open],.app-select:focus-visible{border-color:var(--theme-line-strong,#7c7b71);outline:2px solid var(--theme-highlight,#ffffff0d);outline-offset:2px}
+.app-select:disabled,.app-select[data-disabled]{opacity:.45;cursor:default}
+/* Portaled lists must sit above media dialogs and their backdrops (310/311). */
+.app-select-menu{z-index:400;box-sizing:border-box;min-width:min(var(--radix-select-trigger-width),calc(100vw - 24px));max-width:min(calc(100vw - 24px),var(--radix-select-content-available-width,100vw));max-height:min(320px,var(--radix-select-content-available-height));overflow:hidden;border:1px solid var(--theme-line,#ffffff1a);border-radius:11px;padding:5px;background:var(--surface-popover,#252523);color:var(--ink);box-shadow:0 12px 38px var(--theme-shadow,#0005);font:14px/1.4 var(--font-ui);transform-origin:var(--radix-select-content-transform-origin);animation:app-select-enter .2s cubic-bezier(.23,1,.32,1) both}
+.app-select-viewport{overscroll-behavior:contain;scrollbar-width:thin}
+.app-select-option{position:relative;display:flex;align-items:center;gap:12px;min-height:34px;padding:8px 32px 8px 10px;border-radius:6px;outline:none;cursor:pointer;user-select:none;overflow-wrap:anywhere}
+.app-select-option[data-state=checked]{background:var(--theme-fill-soft,#ffffff0d);font-weight:500}
+.app-select-option[data-highlighted]{background:var(--theme-fill-accent,#b3a99526);color:var(--ink)}
+.app-select-option[data-disabled]{opacity:.4;pointer-events:none}
+.app-select-check{position:absolute;right:9px;display:flex;align-items:center;color:var(--ink)}
+.app-select-group+.app-select-group{border-top:1px solid var(--line);padding-top:4px;margin-top:4px}
+.app-select-group-label{padding:7px 10px 5px;font-size:12px;color:var(--muted)}
+@keyframes app-select-enter{from{opacity:0}to{opacity:1}}
+@media(max-width:800px){.app-select{min-height:44px;font-size:16px}.app-select-menu{font-size:14px}.app-select-option{min-height:44px}}
+@media(pointer:coarse){.app-select,.app-select-option{min-height:44px}}
+@media(prefers-reduced-motion:reduce){.app-select-menu{animation:none}}
+
+.app-select{transition:background-color .18s ease,border-color .18s ease,box-shadow .18s ease}
+.app-select-chevron svg{transition:rotate .22s cubic-bezier(.23,1,.32,1)}
+.app-select[data-state=open] .app-select-chevron svg{rotate:180deg}
+.app-select-option{transition:background-color .12s ease,color .12s ease}
+@media(prefers-reduced-motion:reduce){.app-select,.app-select-chevron svg,.app-select-option{transition:none}}
+
+/* Shared layout wins over form rules originally written for native selects. */
+button.app-select[role=combobox]{display:flex;flex-direction:row;align-items:center;justify-content:space-between}
+button.app-select[role=combobox]>.app-select-chevron{flex:0 0 auto;align-self:center;margin-left:auto}
+:root button.app-select[role=combobox]:active{transform:none;scale:1;translate:none}
+button.app-select[role=combobox][data-state=open]{outline:none}
+.app-select-menu{animation:app-select-enter .18s ease-out both;transform:none;translate:none}
+.app-select-menu[data-state=closed]{animation:app-select-exit .14s ease-out both;pointer-events:none}
+@keyframes app-select-exit{from{opacity:1}to{opacity:0}}
+@media(prefers-reduced-motion:reduce){.app-select-menu[data-state]{animation:none}}
+
+/* List triggers keep their geometry in every state, including focus return. */
+button.app-select[role=combobox],
+button.app-select[role=combobox]:is(:hover,:focus,:active,[data-state=open]),
+button.disclosure-trigger,
+button.disclosure-trigger:is(:hover,:focus,:active),
+button[aria-haspopup=menu],button[aria-haspopup=listbox]{
+ transform:none!important;scale:1!important;translate:none!important;
+ transition-property:background-color,border-color,color,box-shadow,opacity!important;
+ transition-duration:.18s!important;
+}
+
+/* Resolution picker rows: aspect-ratio preview, label, and aligned dimensions. */
+.app-select-option.image-resolution-select-option{display:flex;min-height:46px;padding:6px 34px 6px 8px;overflow:hidden}
+.image-resolution-select-option>span:first-child{display:block;width:100%;min-width:0;overflow:visible;white-space:normal}
+.image-resolution-option-content{display:flex;align-items:center;gap:10px;width:100%;min-width:0}
+.image-resolution-preview{display:grid;place-items:center;flex:none;width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:var(--muted)}
+.image-resolution-preview>i{display:block;box-sizing:border-box;max-width:20px;max-height:20px;border:1.5px solid currentColor;border-radius:2px;opacity:.8}
+.image-resolution-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.image-resolution-dimensions{flex:none;margin-left:auto;color:var(--muted);font:12px/1.2 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.image-resolution-select-option[data-state=checked]{border:1px solid var(--theme-line-strong,#ffffff2b);padding:5px 33px 5px 7px;background:var(--theme-fill-soft,#ffffff0d)}
+.image-resolution-select-option[data-highlighted] .image-resolution-preview{color:var(--ink)}
+.app-select-option.image-resolution-option-custom{margin-top:4px;border-top:1px solid var(--theme-line,#ffffff1a);border-radius:0 0 6px 6px;padding-top:9px}
+.app-select-option.image-resolution-option-custom[data-state=checked]{padding-top:8px}
+@media(max-width:800px){.app-select-option.image-resolution-select-option{min-height:48px}}

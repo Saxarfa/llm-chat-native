@@ -1,0 +1,145 @@
+/* ModelPicker behavioral, motion, drag-and-drop, scroll-fade, detail card and phone sheet styles.
+   Palette and base sizing are owned by composerMenusClaude.css. */
+.model-picker-updated.model-menu{outline:none}
+/* Suspend presentation while editing a profile. Keep the picker mounted so
+   returning preserves its category, search, row order and scroll position. */
+body:has(.profile-modal) .model-picker-updated.model-menu{visibility:hidden;pointer-events:none}
+.model-picker-updated.model-menu[data-state=closed]{animation:model-picker-fade-out .12s ease-out both;pointer-events:none}
+@keyframes model-picker-fade-out{from{opacity:1}to{opacity:0}}
+
+.model-picker-updated .model-option>button:first-child>span:not(.avatar):not(.model-picker-lead){flex:1;min-width:0}
+.model-picker-updated .model-option .avatar{width:23px;height:23px;flex-shrink:0}
+:root[data-ui-size] .model-picker-updated.model-menu .model-picker-default{display:inline-flex;align-items:center;flex:none;margin:0 0 0 5px;padding:0;border:0;background:none;color:var(--theme-text-accent,#c8c1a9);font-size:0;line-height:0}
+:root[data-ui-size] .model-picker-updated.model-menu .model-picker-default svg{fill:currentColor}
+/* The accent tint must outrank the shared composer-menu selection paint (:root[data-ui-size] scope). */
+:root[data-ui-size] .model-picker-updated.model-menu .model-option.selected{background:color-mix(in srgb,var(--theme-text-accent,#c8c1a9) 13%,transparent)}
+@media (hover:hover) and (pointer:fine){
+ :root[data-ui-size] .model-picker-updated.model-menu .model-option.selected:hover{background:color-mix(in srgb,var(--theme-text-accent,#c8c1a9) 19%,transparent)}
+}
+.model-picker-updated .model-picker-actor{display:inline-block;margin-left:6px;padding:1px 5px;font-size:12px;font-weight:400;line-height:14px;border-radius:4px;background:var(--theme-fill-faint,#ffffff07);color:var(--theme-text-muted,#b2ac98);vertical-align:1px}
+.model-picker-updated .model-picker-body>header .model-picker-categories{flex:1;min-width:0;margin:0}
+.model-picker-error{font-size:12px;line-height:1.5;color:var(--theme-text-red,#d5a79c);margin:8px 6px;overflow-wrap:anywhere}
+
+/* Selection is marked by an accent stripe; the detail card shows everything else. */
+:root .model-picker-updated .model-option{position:relative}
+/* One stripe for the whole list: ModelPicker.tsx moves it to the selected row, so a new choice
+   reads as the mark travelling. Height and first placement are immediate. */
+.model-picker-marker{position:absolute;z-index:1;left:0;top:0;width:3px;height:0;border-radius:3px;background:var(--theme-text-accent,#c8c1a9);opacity:0;pointer-events:none;transition:transform var(--motion-detail,220ms) var(--motion-ease,cubic-bezier(.23,1,.32,1))}
+
+/* Rows rise in a short cascade only right after the menu opens (data-cascade lives ~400ms);
+   searching and tab switches never replay it. Delay is capped in ModelPicker.tsx. */
+:root[data-ui-size] .composer-menu .model-picker-results[data-cascade=true]>.model-option{animation:motion-row-in var(--motion-detail,220ms) var(--motion-ease) both;animation-delay:var(--model-row-delay,0ms)}
+/* A tab switch brings the new list in from the side the indicator travels to. */
+.model-picker-results[data-dir]{animation:model-picker-tab-in var(--motion-detail,220ms) var(--motion-ease,cubic-bezier(.23,1,.32,1)) both}
+@keyframes model-picker-tab-in{from{opacity:0;translate:calc(var(--tab-dir,1)*14px) 0}to{opacity:1;translate:0 0}}
+
+/* Capsule: the avatar (shown outside the chat composer) arrives with the new model; a model that
+   is still loading breathes until it is ready. */
+.model-trigger>.avatar{animation:motion-mark-in var(--motion-detail,220ms) var(--motion-ease) both}
+.model-trigger[data-loading=true]>:is(.model-trigger-name,.model-trigger-short){animation:model-trigger-loading 1.1s cubic-bezier(.45,0,.55,1) infinite alternate}
+@keyframes model-trigger-loading{from{opacity:1}to{opacity:.4}}
+@media(prefers-reduced-motion:reduce){.model-trigger[data-loading=true]>:is(.model-trigger-name,.model-trigger-short){opacity:.6}}
+
+.model-picker-categories{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));isolation:isolate}
+.model-picker-category-indicator{position:absolute;z-index:-1;left:0;width:calc(100% / 3);transform:translateX(calc(var(--category-index)*100%));transition:transform var(--motion-detail,220ms) var(--motion-ease,cubic-bezier(.23,1,.32,1));will-change:auto}
+.model-picker-categories>button{min-width:0;border:0;background:transparent;transition:color .18s ease;transform:none!important}
+@media (hover:hover) and (pointer:fine){
+ .model-picker-categories>button:hover{color:var(--ink)}
+}
+@media(prefers-reduced-motion:reduce){.model-picker-category-indicator,.model-picker-categories>button{transition:none}}
+
+.model-picker-results{position:relative;width:100%}
+
+.model-picker-updated .model-option[draggable=true]{cursor:grab}
+.model-picker-updated .model-option[draggable=true]:active{cursor:grabbing}
+.model-picker-updated .model-option.is-drag-over{box-shadow:inset 0 2px 0 var(--ink);background:var(--theme-fill-faint,#ffffff07)}
+.model-picker-drag-grip{flex:none;color:var(--muted)}
+/* Reordering is rare: the grip waits for hover/focus on pointer devices and is
+   dropped on touch screens, where native drag-and-drop does not fire at all. */
+@media (hover:hover) and (pointer:fine){
+ :root .model-picker-updated .model-picker-drag-grip{opacity:0;transition:opacity .18s ease}
+ :root .model-picker-updated .model-option:hover .model-picker-drag-grip,:root .model-picker-updated .model-option:has(:focus-visible) .model-picker-drag-grip{opacity:.55}
+}
+@media (hover:none),(pointer:coarse){.model-picker-drag-grip{display:none}}
+@media(prefers-reduced-motion:reduce){.model-picker-updated .model-picker-drag-grip{transition:none}}
+
+/* Row actions (load/unload, default, profile) live in the detail card, so rows carry no buttons. */
+
+/* The list hides its scrollbar, so masked edges are the only cue that it continues. */
+.model-picker-updated .model-options.is-overflowing{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 14px,#000 calc(100% - 16px),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 14px,#000 calc(100% - 16px),transparent 100%)}
+.model-picker-updated .model-options.is-overflowing.is-at-top{-webkit-mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 16px),transparent 100%);mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 16px),transparent 100%)}
+.model-picker-updated .model-options.is-overflowing.is-at-bottom{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 14px,#000 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 14px,#000 100%)}
+
+/* Rows without a custom avatar show a provider glyph, so names always share one column. */
+.model-picker-lead,.model-detail-icon{display:grid;place-items:center;flex:none;color:var(--theme-text-muted,#a5a195);background:var(--theme-fill-faint,#ffffff0a);border-radius:7px}
+.model-picker-lead{width:23px;height:23px}
+/* index.css stretches every non-avatar row span; the glyph keeps its own size. */
+.model-picker-updated .model-option>button>.model-picker-lead{flex:none;min-width:23px}
+
+/* Desktop: list on the left, detail card for the hovered/focused row on the right. The card is a
+   grid child of .model-picker-body, so useSurfaceHeight still measures one intrinsic body. */
+:root[data-ui-size] .model-picker-updated.model-picker-split.composer-menu{width:min(600px,calc(100vw - 24px))}
+:root[data-ui-size] .model-picker-updated.model-picker-split.composer-menu:not(:has(.model-picker-detail)){width:min(320px,calc(100vw - 24px))}
+:root[data-ui-size] .model-picker-split .model-picker-body{display:grid;grid-template-columns:minmax(0,1fr) 264px;grid-template-rows:auto auto auto auto 1fr;column-gap:8px;align-content:start}
+:root[data-ui-size] .model-picker-split .model-picker-body:not(:has(.model-picker-detail)){grid-template-columns:minmax(0,1fr)}
+.model-picker-split .model-picker-body>:not(.model-picker-detail){grid-column:1;min-width:0}
+.model-picker-split .model-picker-detail{grid-column:2;grid-row:1/-1}
+/* The card's height depends on the hovered model (caps, facts, actions). Keep it out of the body's
+   intrinsic height (contain:size) and reserve a fixed floor instead, so hovering rows never resizes
+   the popover; a rare taller card scrolls inside itself. */
+:root[data-ui-size] .model-picker-split .model-picker-body:has(.model-picker-detail){min-height:min(320px,calc(min(calc(var(--app-height,100dvh) - 24px),var(--radix-popover-content-available-height,100dvh)) - var(--model-picker-chrome,14px)))}
+:root[data-ui-size] .model-picker-split .model-picker-detail{contain:size;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+.model-picker-split .model-option.is-inspected:not(.selected){background:var(--menu-hover,#ffffff08)}
+
+.model-picker-detail{display:flex;flex-direction:column;gap:12px;min-width:0;padding:12px;border:1px solid var(--theme-line-soft,#e8dfc314);border-radius:10px;background:var(--theme-fill-faint,#ffffff05)}
+.model-detail-head{display:flex;align-items:center;gap:10px;min-width:0}
+.model-detail-head>div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.model-detail-head strong{font-size:var(--ui-text,14px);font-weight:600;line-height:1.3;color:var(--ink);overflow-wrap:anywhere}
+.model-detail-head small{font-size:var(--ui-meta,12px);line-height:1.35;color:var(--theme-text-muted,#a5a195)}
+.model-detail-icon{width:38px;height:38px;border-radius:10px}
+:root .model-picker-detail .avatar{width:38px;height:38px;flex:none}
+.model-detail-caps{display:flex;flex-wrap:wrap;gap:5px;margin:0;padding:0;list-style:none}
+.model-detail-caps li{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:6px;background:color-mix(in srgb,var(--ink) 7%,transparent);font-size:var(--ui-meta,12px);line-height:1.4;color:var(--ink)}
+.model-detail-caps svg{flex:none;color:var(--theme-text-muted,#a5a195)}
+.model-detail-facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0;font-size:var(--ui-small,13px);line-height:1.4}
+.model-detail-facts dt{color:var(--theme-text-muted,#a5a195)}
+.model-detail-facts dd{display:flex;align-items:center;gap:7px;min-width:0;margin:0;color:var(--ink);font-variant-numeric:tabular-nums}
+.model-detail-dot{width:6px;height:6px;flex:none;border-radius:50%;background:var(--theme-text-muted,#a5a195);opacity:.55}
+.model-detail-dot.is-ok{background:var(--theme-text-green,#9fbf86);opacity:1;box-shadow:0 0 0 3px color-mix(in srgb,var(--theme-text-green,#9fbf86) 20%,transparent)}
+.model-detail-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+.model-detail-actions>*{flex:1 1 auto;min-width:0}
+.model-detail-action{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:6px 10px;border:0;border-radius:7px;background:color-mix(in srgb,var(--ink) 8%,transparent);color:var(--ink);font-size:var(--ui-small,13px);line-height:1.2;white-space:nowrap;transition:background-color var(--motion-micro,160ms) var(--motion-ease),color var(--motion-micro,160ms) var(--motion-ease)}
+.model-detail-action>span{overflow:hidden;text-overflow:ellipsis}
+.model-detail-action svg{flex:none}
+.model-detail-action.is-loaded svg{color:var(--theme-text-green,#9fbf86)}
+.model-detail-action:disabled{opacity:.45;cursor:default}
+.model-detail-action.is-primary{flex-basis:100%;background:var(--theme-text-accent,#c8c1a9);color:var(--theme-surface-panel,#1f1e1c);font-weight:600}
+@media (hover:hover) and (pointer:fine){
+ .model-detail-action:not(:disabled):not(.is-primary):hover{background:color-mix(in srgb,var(--ink) 13%,transparent)}
+}
+.model-detail-note{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;font-size:var(--ui-small,13px);color:var(--theme-text-accent,#c8c1a9)}
+.model-detail-back{display:inline-flex;align-self:flex-start;align-items:center;gap:4px;min-height:36px;margin:-4px 0 -4px -6px;padding:4px 8px 4px 2px;border:0;border-radius:7px;background:none;color:var(--theme-text-muted,#a5a195);font-size:var(--ui-small,13px)}
+
+/* Phone: the picker becomes a bottom sheet. Radix still owns open/close, outside taps and focus;
+   only the popper wrapper position is overridden. The spread shadow doubles as the scrim. */
+@media (max-width:800px){
+ [data-radix-popper-content-wrapper]:has(>.model-picker-sheet){transform:none!important;inset:auto 0 var(--keyboard-inset,0px) 0!important;min-width:0!important}
+ :root[data-ui-size] .model-picker-updated.model-picker-sheet.composer-menu.model-menu{
+  --radix-popover-content-available-height:calc(var(--visible-height,100dvh) - 40px)!important;
+  width:100%;max-width:none;max-height:calc(var(--visible-height,100dvh) - 40px);padding:6px 10px calc(10px + env(safe-area-inset-bottom));
+  border-width:1px 0 0;border-radius:20px 20px 0 0;box-shadow:0 0 0 100vmax rgb(0 0 0 / .42),0 -12px 40px rgb(0 0 0 / .28);transform-origin:bottom center
+ }
+ :root .model-picker-sheet.model-menu.floating-panel[data-side]{--surface-shift-x:0px;--surface-shift-y:105%;--surface-scale:1;--surface-duration:var(--motion-surface,280ms)}
+ @supports not (transition-behavior:allow-discrete){
+  :root .model-picker-sheet.model-menu.floating-panel{animation:model-picker-sheet-in var(--motion-surface) var(--motion-ease) both}
+  :root .model-picker-sheet.model-menu.floating-panel[data-state=closed]{animation:model-picker-sheet-out var(--motion-exit) var(--motion-ease) both;pointer-events:none}
+ }
+ .model-picker-sheet .model-picker-body::before{content:"";display:block;flex:none;width:36px;height:4px;margin:2px auto 8px;border-radius:2px;background:var(--theme-text-muted,#a5a195);opacity:.4}
+ :root[data-ui-size] .model-picker-updated.model-picker-sheet.composer-menu.model-menu .model-options{max-height:min(56dvh,calc(var(--visible-height,100dvh) - 200px))}
+ .model-picker-sheet .model-picker-body.is-detail>:not(.model-picker-detail):not(.model-picker-error){display:none!important}
+ .model-picker-sheet .model-picker-detail{padding:2px 4px 4px;border:0;background:none}
+ .model-picker-sheet .model-option>button:first-child{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+ .model-picker-sheet .model-detail-action{min-height:44px}
+}
+@keyframes model-picker-sheet-in{from{opacity:0;translate:0 105%}to{opacity:1;translate:0 0}}
+@keyframes model-picker-sheet-out{from{opacity:1;translate:0 0}to{opacity:0;translate:0 105%}}

@@ -1,0 +1,39 @@
+﻿/* SVG parts own interaction motion; containers and semantic state transforms
+ * keep their geometry. Shared by the web UI and the desktop shell. */
+svg:is(.app-icon,[data-icon-motion],.new-chat-icon,.brand-coffee){overflow:visible}
+svg:is(.app-icon,[data-icon-motion],.new-chat-icon,.brand-coffee)>:is(path,circle,rect,line,polyline,polygon,ellipse,g){transform-box:view-box;transform-origin:center}
+:where(svg.app-icon,svg[data-icon-motion]){transition:color 160ms var(--motion-ease,cubic-bezier(.23,1,.32,1))}
+:where([data-icon-motion-hover],[data-icon-motion-control]:focus-visible):not(:disabled,[aria-disabled=true],[data-disabled]) svg.app-icon:not(.spin){color:color-mix(in srgb,currentColor 86%,var(--theme-text-primary,var(--text,#e8e6dc)))}
+/* Earlier button rules scaled labels and the entire control; the delegated
+ * press animation now scales only SVG parts, including on touch/keyboard. */
+:root [data-icon-motion-control]:active{scale:1!important}
+:root [data-icon-motion-control]:active>svg:not(.spin){scale:1!important}
+:root [data-icon-motion-control]:active>.composer-plus-glyph{scale:1!important}
+:root .art-viewer-zoom-btn[data-icon-motion-control]:active{transform:none}
+:root .sidebar-inner .chat-action-slot>.chat-action-layer:has(button:active:not(:disabled)){scale:1}
+.sidebar-brand .coffee-steam,.window-rain path{animation:none!important}
+.sidebar-brand .coffee-steam{opacity:.6}
+.window-rain path{opacity:.55}
+svg[data-panel-state]>path{transition:transform 220ms var(--motion-ease,cubic-bezier(.23,1,.32,1))}
+svg[data-panel-state=closed]>path{transform:translateX(-1.5px)}
+svg[data-panel-state=open]>path{transform:translateX(0)}
+.copy-success-mark>path{animation:icon-copy-success 220ms var(--motion-ease,cubic-bezier(.23,1,.32,1))}
+.copy-feedback>.state-transition.is-icon{width:var(--icon-size-sm,14px);height:var(--icon-size-sm,14px)}
+.state-transition.auth-eye-state{width:var(--icon-size-control,18px);height:var(--icon-size-control,18px)}
+.floating-panel [data-slot=dropdown-menu-item]>.state-transition.is-icon{width:16px;height:16px}
+@keyframes icon-copy-success{
+ from{stroke-dasharray:32 32;stroke-dashoffset:32}
+ to{stroke-dasharray:32 32;stroke-dashoffset:0}
+}
+.dictation-trigger svg[data-recording=true]>rect{transform-origin:12px 8.5px;animation:icon-mic-start 220ms var(--motion-ease,cubic-bezier(.23,1,.32,1))}
+@keyframes icon-mic-start{0%{transform:scale(.96)}60%{transform:scale(1.025)}100%{transform:none}}
+.pin-state-glyph{position:relative;display:inline-flex;width:14px;height:14px;flex:none}
+.pin-state-glyph>svg{position:absolute;inset:0}
+.pin-state-glyph>svg[data-pinned]{transition:opacity 160ms var(--motion-ease,cubic-bezier(.23,1,.32,1))}
+.pin-state-glyph[data-busy=true]>svg[data-pinned]{opacity:0}
+svg[data-pinned]>path{transform:rotate(-14deg);transition:transform 220ms var(--motion-ease,cubic-bezier(.23,1,.32,1))}
+svg[data-pinned=true]>path{transform:translateY(.8px)}
+@media(prefers-reduced-motion:reduce){
+ :where(svg.app-icon,svg[data-icon-motion]),svg[data-panel-state]>path,svg[data-pinned]>path,.pin-state-glyph>svg[data-pinned]{transition:none}
+ .copy-success-mark>path,.dictation-trigger svg[data-recording=true]>rect{animation:none}
+}

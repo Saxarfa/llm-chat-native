@@ -1,0 +1,51 @@
+/* Sidebar additions; the drawer, coffee and new-chat icon keep their own animations. */
+/* Содержимое шторки проявляется одним общим движением, без каскада: главное движение — выезд самой шторки. */
+.sidebar-inner[data-revealed=true]>:is(.new-chat-button,.sidebar-search,.chat-list,.sidebar-footer){animation:sidebar-list-arrive .24s .06s var(--ease) backwards}
+@keyframes sidebar-list-arrive{from{opacity:0}to{opacity:1}}
+
+.sidebar-inner .new-chat-button{transition:background .18s,transform .18s,scale .18s var(--ease),border-color .2s,color .2s}
+.sidebar-inner .new-chat-button>span{transition:color .2s}
+.sidebar-inner .image-studio-link>svg{transition:translate .28s var(--ease),rotate .28s var(--ease)}
+.sidebar-inner .sidebar-search>svg{transition:color .22s,rotate .28s var(--ease),scale .28s var(--ease)}
+.sidebar-inner .sidebar-search:focus-within>svg{color:var(--theme-text-primary,#c9c3b3);}
+.sidebar-inner .sidebar-search>button{overflow:hidden}
+.sidebar-inner .chat-row>button:first-child{transition:color .2s,scale .18s var(--ease)}
+.chat-title-text{position:relative;height:20px}
+.chat-title-text>span{position:absolute;inset:0;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar-inner .chat-row.active::before{animation:sidebar-selection-arrive .24s var(--ease) both;transform-origin:center}
+@keyframes sidebar-selection-arrive{from{opacity:0;scale:1 .45}to{opacity:1;scale:1 1}}
+
+/* A fixed slot avoids changing title width when Shift replaces the menu with a bin. */
+.sidebar-inner .chat-action-slot{position:relative;flex:0 0 33px;width:33px;height:30px}
+.sidebar-inner .chat-action-layer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transition:opacity .16s var(--ease),scale .18s var(--ease)}
+.sidebar-inner .chat-delete-layer{opacity:0;scale:.88;pointer-events:none}
+.sidebar-inner .chat-action-slot[data-quick=true]>.chat-more-layer{opacity:0;scale:.88;pointer-events:none}
+.sidebar-inner .chat-action-slot[data-quick=true]>.chat-delete-layer{opacity:0;scale:.88;pointer-events:none;visibility:hidden}
+@media (hover:hover) and (pointer:fine){
+.sidebar-inner .chat-row:hover .chat-action-slot[data-quick=true]>.chat-delete-layer{opacity:1;scale:1;pointer-events:auto;visibility:visible}}
+.sidebar-inner .chat-action-slot .chat-quick-delete{width:30px;height:30px;flex-basis:30px;margin-right:3px;padding:0}
+.sidebar-inner :is(.chat-more,.chat-quick-delete)>svg:not(.spin){transition:translate .22s var(--ease)}
+
+.sidebar-inner .sidebar-profile-card{transition:border-color .22s,background-color .22s}
+.sidebar-inner .sidebar-profile-card:focus-within{border-color:var(--theme-line-soft,#ffffff13);background-color:var(--theme-fill-faint,#ffffff04)}
+.sidebar-inner .account-button>.avatar{transition:scale .28s var(--ease)}
+.sidebar-inner .sidebar-settings>svg{transition:rotate .3s var(--ease),translate .28s var(--ease)}
+@media(hover:hover) and (pointer:fine){
+ .sidebar-inner .sidebar-profile-card:hover{border-color:var(--theme-line-soft,#ffffff0d);background-color:var(--theme-fill-faint,#ffffff04)}
+ @media (hover:hover) and (pointer:fine){.sidebar-inner .account-button:hover>.avatar{scale:1.045}}
+}
+@media(max-width:800px){
+ .mobile-sidebar-modal .chat-action-slot{width:37px;flex-basis:37px;height:36px}
+ .mobile-sidebar-modal .chat-action-slot .chat-quick-delete{width:34px;height:36px;flex-basis:34px}
+}
+@media(prefers-reduced-motion:reduce){
+ .sidebar-inner[data-revealed=true]>:is(.new-chat-button,.sidebar-search,.chat-list,.sidebar-footer),.sidebar-inner .chat-row.active::before{animation:none!important;translate:none!important}
+ .sidebar-inner :is(.image-studio-link>svg,.sidebar-search>svg,.account-button>.avatar,.sidebar-settings>svg,.chat-action-layer){transition:none!important;translate:none!important;rotate:none!important;scale:1!important}
+}
+
+/* Fade the bin in and out without abruptly hiding it on pointer leave. */
+.sidebar-inner .chat-action-slot[data-quick=true]>.chat-delete-layer{transition:opacity .18s ease,scale .22s cubic-bezier(.23,1,.32,1),visibility 0s linear .18s}
+@media (hover:hover) and (pointer:fine){
+.sidebar-inner .chat-row:hover .chat-action-slot[data-quick=true]>.chat-delete-layer{transition-delay:0s}}
+.sidebar-inner .chat-quick-delete>svg:not(.spin){animation:none;transform-origin:50% 70%;transition:transform .2s var(--ease-in-out)}
+@media(prefers-reduced-motion:reduce){.sidebar-inner .chat-action-slot[data-quick=true]>.chat-delete-layer,.sidebar-inner .chat-quick-delete>svg:not(.spin){transition:none;transform:none}}

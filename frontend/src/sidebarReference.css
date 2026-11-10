@@ -1,0 +1,17 @@
+/* Desktop sidebar geometry measured from the reference: 45px header, 32px rows on a 34px pitch,
+   48px account footer. Phones keep their own 44px touch rows (mobileApp.css). */
+@media(min-width:801px){
+ :root .desktop-sidebar .sidebar-inner .sidebar-brand{height:45px;min-height:45px;padding:8px 8px 9px 8px;gap:6px}
+ /* Reference order: collapse on the left, brand next to it, search on the right. */
+ :root .desktop-sidebar .sidebar-inner .sidebar-brand-actions{display:contents}
+ :root .desktop-sidebar .sidebar-inner .sidebar-brand-actions>:last-child{order:-1}
+ :root .desktop-sidebar .sidebar-inner .sidebar-brand-actions>:first-child{order:2;margin-left:auto}
+ /* The leading ring before every chat is decoration; pinned rows keep their pin marker. */
+ :root .desktop-sidebar .sidebar-inner .chat-row .chat-dot{display:none}
+ :root .desktop-sidebar .sidebar-inner .chat-list :is(h2,.folder-group-toggle,.pinned-group-heading){font-size:12px;font-weight:500;letter-spacing:0;text-transform:none}
+ :root .desktop-sidebar .sidebar-inner .sidebar-section-button{min-height:32px;height:32px;padding:5px 10px;border-radius:8px;margin-bottom:2px}
+ :root .desktop-sidebar .sidebar-inner .chat-row{min-height:32px;margin:0 0 2px;border-radius:8px}
+ :root .desktop-sidebar .sidebar-inner .chat-row>button:first-child{min-height:32px;height:32px;padding:5px 10px}
+ :root .desktop-sidebar .sidebar-inner.sidebar-refined .new-chat-row>.new-chat-button{min-height:32px;height:32px;padding:5px 10px;border-radius:8px}
+ :root .desktop-sidebar .sidebar-inner .sidebar-account{min-height:32px;height:32px;padding:0 8px;border-radius:8px}
+}

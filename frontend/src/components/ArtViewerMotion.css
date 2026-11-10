@@ -1,0 +1,19 @@
+/* Viewer presence has one owner. Geometry is already fitted before showing;
+   reserve zoom/scaling exclusively for deliberate pinch/wheel gestures. */
+:root .art-viewer{animation:art-surface-in var(--motion-detail,220ms) var(--motion-ease) both}
+:root .art-viewer[data-state=closed]{animation:art-surface-out var(--motion-exit,180ms) var(--motion-ease) both;pointer-events:none}
+:root .art-viewer-backdrop{animation:art-surface-in var(--motion-detail,220ms) var(--motion-ease) both}
+:root .art-viewer-backdrop[data-state=closed]{animation:art-surface-out var(--motion-exit,180ms) var(--motion-ease) both}
+/* Полноэкранный арт: студия за ним темнеет и размывается во всех темах (09.11.2026).
+   Анимируется только opacity подложки — размытие появляется и гаснет вместе с ней, в том числе при смахивании вниз. */
+:root .art-viewer-backdrop{background:rgba(8,8,8,.72);-webkit-backdrop-filter:blur(24px) saturate(1.1);backdrop-filter:blur(24px) saturate(1.1)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){:root .art-viewer-backdrop{background:rgba(8,8,8,.9)}}
+:root .art-viewer .art-viewer-stage,
+:root .art-viewer[data-state=closed] .art-viewer-stage,
+:root .art-viewer[data-transition=fade] .art-viewer-stage,
+:root .art-viewer[data-transition=fade][data-state=closed] .art-viewer-stage{animation:none;transition:none;will-change:auto}
+@keyframes art-surface-in{from{opacity:0}to{opacity:1}}
+@keyframes art-surface-out{from{opacity:1}to{opacity:0}}
+@media(prefers-reduced-motion:reduce){
+ :root .art-viewer,:root .art-viewer[data-state=closed],:root .art-viewer-backdrop,:root .art-viewer-backdrop[data-state=closed]{animation:none;transition:none}
+}

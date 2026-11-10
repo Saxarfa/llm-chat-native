@@ -1,0 +1,50 @@
+/* Desktop navigation: a turn is one question and its replies. */
+.conversation-map{
+ position:absolute;right:10px;top:24px;bottom:calc(var(--composer-clearance,118px) + 28px);
+ width:36px;z-index:35;display:flex;align-items:center;pointer-events:none;
+ --map-muted:var(--theme-text-muted,var(--muted));--map-meta:var(--theme-text-subtle,var(--subtle));
+}
+.conversation-map-track{position:relative;display:flex;flex-direction:column;padding:8px 0;width:100%;max-height:100%;pointer-events:auto}
+.conversation-map-viewport{
+ position:absolute;top:0;right:1px;width:32px;border-radius:9px;pointer-events:none;
+ background:color-mix(in srgb,var(--map-muted) 10%,transparent);
+ box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--map-muted) 4%,transparent);
+ /* Position glides on the compositor. The selected range's height updates once,
+    preserving rounded corners without animating layout on every scroll frame. */
+ transition:transform var(--motion-detail) var(--motion-ease),opacity var(--motion-exit) var(--motion-ease);
+}
+.conversation-map-marker{
+ position:relative;display:flex;align-items:center;justify-content:flex-end;flex:1;min-height:0;width:36px;
+ padding:0 7px;border:0;background:transparent;color:var(--map-muted);outline-offset:1px;border-radius:7px;
+}
+.conversation-map-tick{
+ display:block;flex:none;height:2px;border-radius:2px;background:currentColor;opacity:.4;
+ transition:opacity .18s ease,color .18s ease,box-shadow .18s ease;
+}
+.conversation-map-marker.is-before .conversation-map-tick{opacity:.25}
+.conversation-map-marker.is-visible .conversation-map-tick{opacity:.8;color:var(--ink)}
+@media (hover:hover) and (pointer:fine){
+.conversation-map:hover .conversation-map-tick{opacity:.6}
+}
+.conversation-map:focus-within .conversation-map-tick,.conversation-map.is-moving .conversation-map-tick{opacity:.6}
+@media (hover:hover) and (pointer:fine){
+.conversation-map-marker:hover .conversation-map-tick{
+ opacity:1;color:var(--ink);box-shadow:0 0 7px color-mix(in srgb,var(--map-muted) 22%,transparent);
+}
+}
+.conversation-map-marker:focus-visible .conversation-map-tick,.conversation-map-marker.is-preview .conversation-map-tick{
+ opacity:1;color:var(--ink);box-shadow:0 0 7px color-mix(in srgb,var(--map-muted) 22%,transparent);
+}
+.conversation-map-preview{
+ position:absolute;right:44px;width:min(264px,calc(100cqw - 70px));padding:11px 13px;border-radius:11px;
+ border:1px solid var(--theme-line-soft,var(--line));background:var(--theme-surface-panel,var(--surface));
+ box-shadow:0 5px 24px var(--theme-shadow,#0003);pointer-events:none;color:var(--ink);
+ font-family:inherit;font-weight:400;line-height:1.5;text-align:left;
+}
+.conversation-map-preview-meta{display:flex;justify-content:space-between;gap:8px;margin-bottom:5px;font-size:var(--ui-meta,11px);color:var(--map-muted);font-variant-numeric:tabular-nums}
+.conversation-map-preview-meta>span>span{color:var(--map-meta)}
+.conversation-map-preview-error{color:var(--theme-text-red,#c99f91)}
+.conversation-map-preview-question{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere;font-size:var(--ui-small,13px)}
+.conversation-map-preview-model{margin-top:6px;font-size:var(--ui-meta,11px);color:var(--map-meta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:800px){.conversation-map{display:none}}
+@media(prefers-reduced-motion:reduce){.conversation-map :is(.conversation-map-viewport,.conversation-map-tick){transition:none}}

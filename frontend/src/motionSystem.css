@@ -1,0 +1,153 @@
+@import './motionTokens.css';
+
+/* Shared motion language. Only state changes move; reading, typing, dragging,
+   scrolling and streamed tokens keep their natural geometry. */
+:root{
+ --motion-ease:cubic-bezier(.23,1,.32,1);--ease:var(--motion-ease);
+}
+
+/* Cover plain controls as well as the shared primitives. Never transition all:
+   field dimensions, pointer tracking and scroll positions must stay immediate. */
+button,a,input,textarea,select,summary,[role=button]{
+ transition:color var(--motion-micro) var(--motion-ease),
+  background-color var(--motion-detail) var(--motion-ease),
+  border-color var(--motion-detail) var(--motion-ease),
+  box-shadow var(--motion-detail) var(--motion-ease),
+  opacity var(--motion-micro) var(--motion-ease);
+}
+:root :is(.icon-button,[data-slot=button],.send-button,.new-chat-button,.theme-choice,
+ .workspace-card,.settings-models>button,.studio-history-card,.search-result,.app-select-option,
+ .model-option,.chat-row,.prompt-preset-card,.interface-size-option){
+ transition-timing-function:var(--motion-ease);
+ transition-duration:var(--motion-detail);
+}
+/* Moving through a menu or list highlights the next row at once: a fading
+   background trails behind arrow keys and the pointer. Text colour may still ease. */
+:root :is([role=menuitem],[role=menuitemradio],[role=menuitemcheckbox],[role=option],.app-select-option,.model-option){
+ transition-property:color,opacity!important;
+}
+:root :is(.icon-button,[data-slot=button],.send-button,.new-chat-button){
+ transition-property:color,background-color,border-color,box-shadow,opacity,transform,scale;
+}
+:root [data-slot=button]:not(.studio-history-delete):not(.studio-history-favorite):active:not(:disabled){transform:none}
+:root .studio-history-gallery.is-list :is(.studio-history-delete,.studio-history-favorite):active:not(:disabled){transform:translateY(-50%)}
+:root .studio-history-gallery.is-grid :is(.studio-history-delete,.studio-history-favorite):active:not(:disabled){transform:none}
+
+/* Icon controls get their press from the delegated SVG engine (desktop/icon-motion.js),
+   which scales only the glyph parts. Buttons with text alone have no glyph to press, so
+   they dim instead: colour-only, nothing moves, reduced motion needs no special case. */
+:root :is([data-slot=button],.text-button,.modal-actions>button):not(:has(svg)):not(:disabled):not([aria-disabled=true]):active{
+ opacity:.82;transition-duration:var(--motion-micro);
+}
+
+:root .icon-button>svg:not(.spin),.number-input-actions button>svg{
+ transition:scale var(--motion-micro) var(--motion-ease),rotate var(--motion-detail) var(--motion-ease),translate var(--motion-detail) var(--motion-ease);
+}
+
+:root :is(button,a,input,textarea,select)[disabled]{transition-duration:var(--motion-micro)}
+
+/* Focus belongs to the field's outline; the content doesn't shift under a caret. */
+:root :is(.model-search,.sidebar-search,.workspace-search,.settings-model-search){
+ transition:border-color var(--motion-detail) var(--motion-ease),background-color var(--motion-detail) var(--motion-ease),box-shadow var(--motion-detail) var(--motion-ease),color var(--motion-detail) var(--motion-ease);
+}
+.model-search:focus-within{border-color:var(--theme-line-strong);box-shadow:0 0 0 2px var(--theme-highlight,#ffffff05)}
+:root :is(.model-trigger,.branch-switcher) > svg:last-child,
+:root .app-select-chevron svg{transition:rotate var(--motion-surface) var(--motion-ease)}
+.model-trigger[data-state=open]>svg:last-child{rotate:180deg}
+:root .switch-row input{transition:background-color var(--motion-detail) var(--motion-ease),box-shadow var(--motion-detail) var(--motion-ease),opacity var(--motion-micro) var(--motion-ease)}
+:root .switch-row input:before{transition:transform var(--motion-surface) var(--motion-ease),background-color var(--motion-detail) var(--motion-ease),scale var(--motion-micro) var(--motion-ease)}
+.switch-row input:active:before{scale:1.08 .94}
+:root input[type=range]::-webkit-slider-thumb{transition:box-shadow var(--motion-detail) var(--motion-ease),scale var(--motion-micro) var(--motion-ease)}
+:root input[type=range]:active::-webkit-slider-thumb{scale:1.12}
+:root input[type=range]::-moz-range-thumb{transition:box-shadow var(--motion-detail) var(--motion-ease),scale var(--motion-micro) var(--motion-ease)}
+:root input[type=range]:active::-moz-range-thumb{scale:1.12}
+
+/* A travelling selection pill replaces independent on/off flashes. */
+.segmented-tabs,.settings-nav{position:relative;isolation:isolate}
+.segmented-tabs>button,.settings-nav>button{z-index:1}
+.selection-highlight{position:absolute!important;inset:0 auto auto 0!important;pointer-events:none;z-index:0}
+:root .segmented-tabs .tab-indicator,:root .settings-nav .settings-tab-highlight{
+ opacity:1;pointer-events:none;transition:none;
+}
+:root .model-picker-category-indicator{transition:transform var(--motion-surface) var(--motion-ease);will-change:auto}
+:root .model-picker-updated.model-menu{transition:none;overflow:hidden;box-sizing:border-box}
+.model-picker-body{display:flex;flex-direction:column;flex:0 0 auto;min-width:0;min-height:0;max-height:calc(min(calc(var(--app-height,100dvh) - 24px),var(--radix-popover-content-available-height,100dvh)) - var(--model-picker-chrome,14px))}
+:root :is(.model-picker-check,.model-picker-current,.theme-choice-check,.studio-history-selected){animation:motion-mark-in var(--motion-detail) var(--motion-ease) both}
+.theme-choice-label,.theme-choice-label svg,.theme-preview,.image-resolution-preview{
+ transition:color var(--motion-detail) var(--motion-ease),border-color var(--motion-detail) var(--motion-ease),box-shadow var(--motion-detail) var(--motion-ease);
+}
+
+/* Radix keeps closing surfaces mounted for the CSS exit animation. */
+:root .floating-panel{animation:motion-menu-in var(--motion-detail) var(--motion-ease) both}
+:root .floating-panel[data-state=closed]{animation:motion-menu-out var(--motion-exit) var(--motion-ease) both;pointer-events:none}
+:root .model-menu{animation:motion-fade-in var(--motion-detail) var(--motion-ease) both}
+:root .model-menu[data-state=closed]{animation:motion-fade-out var(--motion-exit) var(--motion-ease) both}
+:root .app-select-menu{animation:motion-menu-in var(--motion-detail) var(--motion-ease) both;will-change:auto}
+:root .app-select-menu[data-state=closed]{animation:motion-menu-out var(--motion-exit) var(--motion-ease) both}
+:root [data-slot=dialog-overlay]{animation:motion-fade-in var(--motion-surface) var(--motion-ease) both}
+:root [data-slot=dialog-overlay][data-state=closed]{animation:motion-fade-out var(--motion-exit) var(--motion-ease) both}
+:root .premium-modal:not(.mobile-sidebar-modal){animation:motion-dialog-in var(--motion-surface) var(--motion-ease) both!important;transform-origin:center}
+:root .premium-modal:not(.mobile-sidebar-modal)[data-state=closed]{animation:motion-dialog-out var(--motion-exit) var(--motion-ease) both!important;pointer-events:none}
+:root .app-tooltip[data-slot=tooltip-content]{animation:motion-hint-in var(--motion-micro) var(--motion-ease) both}
+:root .app-tooltip[data-slot=tooltip-content][data-state=closed]{animation:motion-fade-out 120ms var(--motion-ease) both}
+/* Moving between neighbouring hints skips the delay; it skips the entrance too. */
+:root .app-tooltip[data-slot=tooltip-content][data-state=instant-open]{animation:none}
+
+/* Small arrivals; mounted content is never replayed on each streamed token. */
+:root :is(.settings-page,.profile-body){animation:motion-fade-in var(--motion-micro) var(--motion-ease) both}
+:root :is(.settings-save,.profile-modal>.modal-actions){animation:motion-content-in var(--motion-detail) var(--motion-ease) both}
+:root :is(.chat-more,.chat-quick-delete,.question-actions,.answer-model,.studio-history-delete){transition:opacity var(--motion-detail) var(--motion-ease),color var(--motion-detail) var(--motion-ease),background-color var(--motion-detail) var(--motion-ease)}
+.studio-history-thumbnail img{animation:motion-fade-in var(--motion-surface) var(--motion-ease) both}
+:root .studio-gallery-empty{animation:motion-content-in var(--motion-surface) var(--motion-ease) both}
+.animated-choice-group{position:relative;isolation:isolate}
+.animated-choice-group>button{position:relative;isolation:isolate}
+.animated-choice-group>button{z-index:1}
+.animated-choice-group .choice-highlight{border-radius:9px;background:var(--theme-fill-soft,#ffffff0d);pointer-events:none}
+.attachment-tray>.attachment-presence{min-width:0;flex-shrink:0;overflow:visible}
+.attachment-presence>.attachment{width:68px}
+.composer-send-glyph.state-transition.is-icon{width:19px;height:19px}
+.settings-main>.reveal-region,.profile-modal>.reveal-region{flex-shrink:0}
+.profile-modal>.reveal-region .modal-actions{border-top:1px solid var(--line);margin-top:0}
+:root .studio-history-filters.animated-choice-group>button[aria-pressed=true]{background:transparent}
+.interface-size-choice,.interface-size-check{transition:background-color var(--motion-detail) var(--motion-ease),border-color var(--motion-detail) var(--motion-ease),color var(--motion-detail) var(--motion-ease),opacity var(--motion-detail) var(--motion-ease),scale var(--motion-detail) var(--motion-ease)}
+.interface-size-choice:not(.is-selected) .interface-size-check{scale:.8}
+.interface-size-choice.is-selected .interface-size-check{scale:1}
+.art-favorite-button>svg:not(.spin){transition:fill var(--motion-detail) var(--motion-ease),color var(--motion-detail) var(--motion-ease),scale var(--motion-detail) var(--motion-ease)!important}
+
+/* Activities keep the user's established typography and stationary labels. */
+:root .assistant-message :is(.disclosure-trigger,.web-evidence-toggle){transition:color var(--motion-detail) var(--motion-ease),background-color var(--motion-micro) var(--motion-ease)!important}
+:root .assistant-message .disclosure-trigger>svg{transition:transform var(--motion-surface) var(--motion-ease),color var(--motion-detail) var(--motion-ease)}
+:root .assistant-message .disclosure-trigger:active{scale:1;transform:none}
+
+@keyframes motion-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes motion-fade-out{from{opacity:1}to{opacity:0}}
+@keyframes motion-content-in{from{opacity:0;translate:0 4px}to{opacity:1;translate:0 0}}
+@keyframes motion-row-in{from{opacity:0;translate:0 3px}to{opacity:1;translate:0 0}}
+@keyframes motion-mark-in{from{opacity:0;scale:.84}to{opacity:1;scale:1}}
+@keyframes motion-menu-in{from{opacity:0;translate:0 var(--menu-y,3px)}to{opacity:1;translate:0 0}}
+@keyframes motion-menu-out{from{opacity:1;translate:0 0}to{opacity:0;translate:0 var(--menu-y,3px)}}
+@keyframes motion-dialog-in{from{opacity:0;translate:0 6px}to{opacity:1;translate:0 0}}
+@keyframes motion-dialog-out{from{opacity:1;translate:0 0}to{opacity:0;translate:0 4px}}
+@keyframes motion-hint-in{from{opacity:0;translate:0 2px}to{opacity:1;translate:0 0}}
+
+@media(max-width:800px){
+ :root .premium-modal:is(.settings-modal,.parameter-modal){animation-name:motion-fade-in!important}
+ :root .premium-modal:is(.settings-modal,.parameter-modal)[data-state=closed]{animation-name:motion-fade-out!important}
+ :root .settings-detail .settings-main,:root .settings-index .settings-nav{animation:motion-content-in var(--motion-surface) var(--motion-ease) both}
+}
+@media(prefers-reduced-motion:reduce){
+ :root{--motion-micro:0ms;--motion-detail:0ms;--motion-surface:0ms;--motion-exit:0ms}
+ *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+ :root :is(.premium-modal,.floating-panel,.app-select-menu,.app-tooltip,.model-picker-results,.model-option){animation:none!important}
+ :root .model-picker-updated.model-menu{transition:none!important}
+ :root :is(.icon-button>svg,.number-input-actions button>svg,.switch-row input:before){scale:1!important}
+ :root :is([data-slot=button],.icon-button,.new-chat-button,.send-button):active:not(:disabled){scale:1!important}
+ :root input[type=range]::-webkit-slider-thumb,:root input[type=range]::-moz-range-thumb{scale:1!important}
+}
+
+/* Skill-aligned curves (Emil Kowalski): entering/exiting = ease-out, moving on screen = ease-in-out. */
+:root{
+ --ease-out:cubic-bezier(.23,1,.32,1);
+ --ease-in-out:cubic-bezier(.77,0,.175,1);
+ --ease-drawer:cubic-bezier(.32,.72,0,1);
+}

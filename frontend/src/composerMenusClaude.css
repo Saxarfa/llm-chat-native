@@ -1,0 +1,131 @@
+/* The three composer popovers share a matte surface and the settings palette.
+   Keep this scoped to their portals, independent of the chat/studio background. */
+:root[data-ui-size] .composer-menu.floating-panel{
+ --menu-bg:var(--oled-panel,#262625);--menu-hover:var(--oled-raised,#323230);--menu-selected:var(--oled-selected,#353533);--menu-input:var(--oled-inset,#20201f);
+ --ink:var(--oled-ink,#e8e6e1);--muted:var(--oled-muted,#a5a49c);--menu-line:var(--oled-line,#ffffff14);--menu-shadow:#0003;
+ --theme-text-primary:var(--ink);--theme-text-muted:var(--muted);
+ --theme-fill-faint:var(--menu-hover);--theme-fill-soft:var(--menu-selected);
+ --theme-line:var(--menu-line);--theme-line-soft:var(--menu-line);
+ padding:6px;border:1px solid var(--menu-line);border-radius:12px;
+ background:var(--menu-bg);background-image:none;color:var(--ink);
+ box-shadow:0 8px 24px var(--menu-shadow),0 2px 6px #00000014;
+ -webkit-backdrop-filter:none;backdrop-filter:none;will-change:auto;
+ font-family:var(--font-ui,Arial,Helvetica,sans-serif);font-size:var(--ui-text);font-weight:400;
+ scrollbar-width:thin;scrollbar-color:var(--menu-selected) transparent;overscroll-behavior:contain;
+}
+:root[data-theme=light] .composer-menu.floating-panel{
+ --menu-bg:#faf9f6;--menu-hover:#eeede8;--menu-selected:#e8e7e1;--menu-input:#f0efeb;
+ --ink:#30302c;--muted:#686256;--menu-line:#24241d20;--menu-shadow:#24241d14;
+}
+.composer-menu svg.app-icon{stroke-width:var(--icon-stroke)}
+:root[data-ui-size] .composer-menu :is([role=menuitem],[role=menuitemradio],[role=menuitemcheckbox]){
+ min-height:38px;padding:9px 10px;border-radius:7px;gap:10px;
+ font-size:var(--ui-text);line-height:20px;font-weight:400;color:var(--ink);cursor:pointer;
+ transition:background-color var(--motion-micro,160ms) var(--motion-ease),color var(--motion-micro,160ms) var(--motion-ease);
+}
+:root[data-ui-size] .composer-menu [role^=menuitem]:is(:focus,[data-highlighted]){background:var(--menu-hover);color:var(--ink);outline:none}
+:root[data-ui-size] .composer-menu [role=menuitemradio][data-state=checked]{background:var(--menu-selected)}
+:root[data-ui-size] .composer-menu [role^=menuitem][data-disabled]{opacity:.45;cursor:default}
+:root[data-ui-size] .composer-menu [data-slot=dropdown-menu-label]{padding:9px 10px 5px;font-size:var(--ui-small);line-height:18px;font-weight:400;color:var(--muted)}
+.composer-menu [data-slot=dropdown-menu-separator]{margin:6px -6px;background:var(--menu-line)}
+:root[data-ui-size] .composer-menu strong{font-size:var(--ui-text);line-height:20px;font-weight:400}
+:root[data-ui-size] .composer-menu small{margin-top:3px;font-size:var(--ui-small);line-height:18px;font-weight:400;color:var(--muted);white-space:normal}
+:root[data-ui-size] .composer-menu [role=menuitemradio]{position:relative;padding:9px 34px 9px 10px}
+:root[data-ui-size] .composer-menu [role=menuitemradio]>span:first-child{left:auto;right:10px;width:16px;height:16px;display:flex;align-items:center}
+:root[data-ui-size] .composer-menu [role=menuitemradio] svg{width:16px;height:16px;fill:none;color:var(--ink)}
+
+/* Attachment actions and chat-scoped settings. */
+:root[data-ui-size] .composer-tools-menu.floating-panel{width:304px;max-height:min(540px,var(--radix-dropdown-menu-content-available-height));overflow-y:auto}
+.composer-tools-menu .composer-attach-item>svg,.composer-tools-menu .composer-tool-section>svg:first-child,.composer-tools-menu .composer-memory-toggle>svg{width:18px;height:18px;flex:none;color:var(--muted)}
+:root[data-ui-size] .composer-tools-menu .composer-tool-value{font-size:var(--ui-small);font-weight:400;max-width:100px;color:var(--muted)}
+.composer-tools-menu .composer-tool-section>strong{flex:1;min-width:0}
+.composer-tools-menu .composer-tool-section>svg:last-child{width:var(--icon-size-sm,14px);height:var(--icon-size-sm,14px);color:var(--muted)}
+.composer-tools-menu .composer-tool-choices [role=group]{padding:2px 0 4px 28px}
+:root[data-ui-size] .composer-tools-menu .composer-tool-choices [role=menuitemradio]{margin-top:2px;padding-block:7px}
+:root[data-ui-size] .composer-tools-menu .composer-memory-toggle{align-items:flex-start}
+.composer-tools-menu .composer-memory-toggle>span:first-child{display:none}
+.composer-tools-menu .composer-memory-toggle>svg{margin-top:1px}
+.composer-tools-menu .composer-memory-description{flex:1;min-width:0}
+.composer-tools-menu .composer-memory-switch{
+ display:flex;align-items:center;justify-content:flex-start;flex:none;width:30px;height:18px;margin-top:1px;padding:3px;
+ background:var(--oled-selected,#53534e);border-radius:12px;transition:background-color var(--motion-micro,160ms) var(--motion-ease);
+}
+.composer-tools-menu .composer-memory-switch>span{width:12px;height:12px;background:#fff;border-radius:50%;transition:transform var(--motion-micro,160ms) var(--motion-ease)}
+.composer-tools-menu .composer-memory-switch[data-checked=true]{background:#c6613f}
+.composer-tools-menu .composer-memory-switch[data-checked=true]>span{transform:translateX(12px)}
+.composer-tools-menu .composer-memory-switch:has(svg){justify-content:center;color:#fff}
+:root[data-ui-size] .composer-tools-menu .composer-memory-note{margin:4px 10px 6px;font-size:var(--ui-meta);line-height:1.5;color:var(--muted)}
+
+/* A quiet, full-width selection row with its checkmark on the right. */
+:root[data-ui-size] .composer-reasoning-menu.floating-panel{width:208px;min-width:0;max-width:calc(100vw - 24px)}
+.composer-reasoning-menu [role=group]{display:grid;gap:2px}
+
+/* Model sources stay above a searchable list; controls keep their real actions. */
+:root[data-ui-size] .model-picker-updated.composer-menu{width:min(320px,calc(100vw - 24px));padding:6px}
+:root[data-ui-size] .model-picker-updated.composer-menu .model-picker-body>header{gap:4px;margin:0 0 4px}
+:root[data-ui-size] .composer-menu .model-picker-categories{padding:0;border:0;border-radius:0;background:none}
+:root[data-ui-size] .composer-menu .model-picker-categories>button{min-height:30px;padding:4px 6px;font-size:var(--ui-small);font-weight:400;line-height:20px;color:var(--muted);border-radius:5px}
+:root[data-ui-size] .composer-menu .model-picker-categories>button[aria-pressed=true]{color:var(--ink)}
+.composer-menu .model-picker-category-indicator{top:auto;bottom:0;left:0;width:calc(100% / 3);height:2px;background:var(--muted);border:0;border-radius:1px;box-shadow:none;transition-duration:var(--motion-detail,220ms);transition-timing-function:var(--motion-ease);will-change:auto}
+:root[data-ui-size] .composer-menu.model-menu .icon-button{width:32px;height:32px;min-height:32px;padding:6px;border-radius:6px;color:var(--muted)}
+@media (hover:hover) and (pointer:fine){
+:root[data-ui-size] .composer-menu.model-menu .icon-button:hover{background:var(--menu-hover);color:var(--ink)}
+}
+:root[data-ui-size] .composer-menu.model-menu .model-search{margin:0 0 4px;padding:0 4px 0 8px;gap:7px;border:1px solid transparent;border-radius:6px;background:var(--menu-input)}
+:root[data-ui-size] .composer-menu .model-search input{flex:1;min-height:30px;padding:4px 0;font-size:var(--ui-small);line-height:20px;box-shadow:none;outline:none}
+:root[data-ui-size] .composer-menu.model-menu .model-search .model-search-clear{width:24px;height:24px;min-height:24px;padding:4px;border-radius:5px}
+:root[data-ui-size] .composer-menu.model-menu .model-search:focus-within{border-color:color-mix(in srgb,var(--ink) 32%,transparent);box-shadow:0 0 0 2px var(--menu-hover)}
+:root[data-ui-size] .composer-menu.model-menu .model-search:has(input:focus-visible){outline:2px solid var(--focus-ring,var(--ink));outline-offset:2px}
+.composer-menu .model-search>svg{width:16px;height:16px;flex:none}
+:root[data-ui-size] .composer-menu.model-menu .model-options{height:auto;max-height:min(280px,max(44px,calc(min(var(--radix-popover-content-available-height,500px),var(--model-picker-preferred-height,100dvh)) - 124px)));flex:0 1 auto}
+/* Keep scrolling available without a scrollbar flashing during list resizing. */
+:root[data-ui-size] .composer-menu.model-menu,
+:root[data-ui-size] .composer-menu.model-menu .model-options{scrollbar-width:none}
+.composer-menu.model-menu::-webkit-scrollbar,
+.composer-menu.model-menu .model-options::-webkit-scrollbar{display:none;width:0;height:0}
+:root[data-ui-size] .composer-menu .model-option{min-height:36px;padding:0 2px;border-radius:6px;margin-bottom:1px;animation:none;transition:background-color var(--motion-micro,160ms) var(--motion-ease)}
+:root[data-ui-size] .composer-menu .model-option.selected{background:var(--menu-selected)}
+@media (hover:hover) and (pointer:fine){
+:root[data-ui-size] .composer-menu .model-option:hover{background:var(--menu-hover)}
+}
+:root[data-ui-size] .composer-menu .model-option:has(:focus-visible){background:var(--menu-hover)}
+:root[data-ui-size] .composer-menu.model-menu .model-option>button:first-child{min-height:36px;padding:6px 4px;gap:6px;border-radius:5px;transform:none}
+:root[data-ui-size] .composer-menu .model-option strong{min-width:0;font-size:var(--ui-small);line-height:20px;font-weight:400}
+.composer-menu .model-picker-name{display:flex;align-items:center;gap:6px;min-width:0}
+:root[data-ui-size] .composer-menu .model-picker-default{display:inline-flex;flex:none;align-items:center;margin:0;padding:0;border:0;border-radius:0;background:none;color:var(--muted);line-height:16px}
+.composer-menu .model-picker-check{margin-left:2px;color:var(--ink);width:16px;height:16px}
+@media (hover:hover) and (pointer:fine){
+ .composer-menu .model-option>.icon-button:not(.model-picker-power){margin-left:2px}
+}
+.composer-menu .model-picker-drag-grip{width:10px;opacity:0}
+@media (hover:hover) and (pointer:fine){
+ .composer-menu .model-option:hover .model-picker-drag-grip{opacity:.5}
+}
+.composer-menu .model-option:has(:focus-visible) .model-picker-drag-grip{opacity:.5}
+:root[data-ui-size] .composer-menu .model-picker-section{padding:10px 8px 5px;margin:4px 0 0;border:0;font-size:var(--ui-small);font-weight:400;color:var(--muted)}
+.composer-menu .model-picker-results>.model-picker-section:first-child{padding-top:3px;margin-top:0}
+:root[data-ui-size] .composer-menu.model-menu .model-picker-body>footer{margin:4px 0 0;padding:4px 0 0;border-top:1px solid var(--menu-line)}
+:root[data-ui-size] .composer-menu.model-menu .model-picker-body>footer .default-model-button{min-height:30px;padding:4px 8px;font-size:var(--ui-small);line-height:20px;gap:7px;color:var(--ink);border-radius:5px}
+:root[data-ui-size] .composer-menu.model-menu .default-model-button:disabled{color:var(--muted)}
+.composer-menu :is(button,input):focus-visible{outline:2px solid var(--muted);outline-offset:-2px}
+.composer-menu .model-empty{padding:14px 10px;color:var(--muted);font-size:var(--ui-small);line-height:1.5}
+.composer-menu .model-empty p{margin:0 0 8px}
+
+@media(max-width:800px){
+ :root[data-ui-size] .composer-menu :is([role=menuitem],[role=menuitemradio],[role=menuitemcheckbox]){min-height:44px}
+ :root[data-ui-size] .composer-menu.model-menu .icon-button{width:44px;height:44px;min-height:44px}
+ :root[data-ui-size] .composer-menu.model-menu .model-search .model-search-clear{width:34px;height:34px;min-height:34px}
+ :root[data-ui-size] .composer-menu.model-menu .model-option>button:first-child{min-height:44px}
+ :root[data-ui-size] .composer-menu .model-picker-categories>button{min-height:44px;padding-inline:3px;font-size:12px}
+ :root[data-ui-size] .composer-menu .model-search input{min-height:42px;font-size:16px}
+ :root[data-ui-size] .composer-menu.model-menu .model-picker-body>footer .default-model-button{min-height:44px}
+ :root[data-ui-size] .composer-menu.model-menu .model-options{max-height:min(300px,42dvh,max(44px,calc(min(var(--radix-popover-content-available-height,500px),var(--model-picker-preferred-height,100dvh)) - 164px)))}
+ .composer-menu .model-picker-drag-grip{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+ .composer-menu :is([role^=menuitem],.model-option,.composer-memory-switch,.composer-memory-switch>span,.model-picker-category-indicator){transition:none!important}
+}
+
+/* Tools menu scrolls without a visible scrollbar. */
+:root[data-ui-size] .floating-panel.composer-menu.composer-tools-menu{scrollbar-width:none;-ms-overflow-style:none}
+:root[data-ui-size] .floating-panel.composer-menu.composer-tools-menu::-webkit-scrollbar{display:none;width:0;height:0}

@@ -1,0 +1,3 @@
+.prose .katex{font-size:1.08em;white-space:nowrap;overflow-wrap:normal;word-break:normal}
+.prose .katex-display{overflow-x:auto;overflow-y:hidden;padding:3px 0;margin:1.1em 0;max-width:100%}
+.prose .katex-error{color:inherit;font:inherit;white-space:pre-wrap}

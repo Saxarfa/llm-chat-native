@@ -1,0 +1,12 @@
+.model-tools-master{margin-top:6px}
+.model-tools-actions{display:flex;align-items:center;gap:10px;padding:12px 0;color:var(--muted);font-size:12px}
+.model-tools-actions button{padding:4px 0;color:inherit;background:none;border:0;cursor:pointer;transition:color 160ms ease}
+@media (hover:hover) and (pointer:fine){
+.model-tools-actions button:hover{color:var(--ink)}}
+.model-tools-actions button:disabled{opacity:.5;cursor:default}
+.model-tools-list{transition:opacity 160ms ease}
+.model-tools-list[data-enabled=false]{opacity:.45}
+.model-tools-list .switch-row{gap:20px}
+.model-tools-list .switch-row>span{min-width:0}
+.model-tools-footnote{font-size:12px;line-height:1.6;color:var(--muted);margin-top:18px}
+@media(prefers-reduced-motion:reduce){.model-tools-list,.model-tools-actions button{transition:none}}

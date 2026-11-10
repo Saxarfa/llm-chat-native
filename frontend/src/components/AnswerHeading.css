@@ -1,0 +1,29 @@
+/* A compact identity row; the answer keeps its full reading width. */
+.assistant-message.answer-refined{--answer-indent:38px}
+.assistant-message.answer-refined .answer-heading{
+ position:relative;display:flex;align-items:center;gap:10px;
+ width:fit-content;max-width:100%;min-height:28px;
+ margin:0 0 4px;padding:0 0 0 var(--answer-indent);
+ border:0;border-radius:4px;background:transparent;box-shadow:none;
+ font-size:14px;font-weight:500;line-height:1.4;text-align:left;
+ color:var(--theme-text-primary,#d5d2c9);transition:color .2s ease;
+}
+.assistant-message.answer-refined .answer-heading>.avatar{
+ position:absolute;left:0;top:0;width:28px;height:28px;
+}
+.assistant-message.answer-refined .answer-heading>span:last-child{
+ min-width:0;overflow-wrap:anywhere;
+}
+.assistant-message.answer-refined .answer-heading:disabled{opacity:1;cursor:default}
+.assistant-message.answer-refined .answer-heading:focus-visible{
+ outline:1px solid var(--theme-line-strong,#c9bf9f70);outline-offset:5px;
+}
+.assistant-message.answer-refined:has(.response-activity .activity-phase) .answer-heading{
+ margin-bottom:0;
+}
+@media(hover:hover){
+ .assistant-message.answer-refined .answer-heading:not(:disabled):hover{color:var(--theme-text-primary,#f0ece1)}
+}
+@media(prefers-reduced-motion:reduce){
+ .assistant-message.answer-refined .answer-heading{transition:none}
+}

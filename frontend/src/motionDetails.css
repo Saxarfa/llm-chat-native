@@ -1,0 +1,35 @@
+/* Additions for surfaces that previously had no motion. Existing effects live in index.css. */
+.page-stage{position:relative;flex:1;min-width:0;min-height:0;height:100%;isolation:isolate}
+.page-surface{position:absolute;inset:0;display:flex;min-width:0;min-height:0}
+.page-surface[hidden]{display:none}
+.page-surface>.main-panel,.page-surface>.workspace-shell{width:100%;height:100%;min-height:0}
+.reveal-region{overflow:hidden;min-width:0}
+.workspace-grid-item{min-width:0;display:flex;flex-direction:column}
+.workspace-grid-item>.workspace-card{flex:1}
+.copy-feedback{display:inline-flex;position:relative;width:15px;height:15px;flex:none}
+.copy-feedback>span{position:absolute;inset:0;display:grid;place-items:center}
+
+/* No transforms on inputs, scroll containers, art windows or the composer. */
+.account-button,.hint-button,.parameter-source button,.pasted-text-remove,.sources-close,.sidebar-search>button,.text-button,
+.compact-form :is(input,textarea,:is(select,.app-select)),.auth-screen input,.parameter-header input:not([type=range]){
+ transition:background-color .2s var(--ease),border-color .2s var(--ease),color .2s var(--ease),box-shadow .2s var(--ease),opacity .2s var(--ease);
+}
+.branch-switcher>svg:last-child{transition:rotate .24s var(--ease)}
+.branch-switcher[data-state=open]>svg:last-child{rotate:180deg}
+@media (hover:hover) and (pointer:fine){
+.hint-button:hover,.parameter-source button:hover,.text-button:hover{color:var(--ink)}}
+.hint-button>svg,.parameter-source button>svg,.pasted-text-remove>svg,.sources-close>svg,.sidebar-search>button>svg{
+ transition:translate .24s var(--ease),scale .18s var(--ease);
+}
+@media(hover:hover) and (pointer:fine){
+}
+
+.chat-quick-delete>svg:not(.spin){animation:detail-icon-arrive .18s var(--ease) both}
+.sidebar-empty,.workspace-empty,.workspace-no-results{animation:detail-empty-arrive .24s var(--ease) both}
+@keyframes detail-icon-arrive{from{opacity:0;scale:.85}to{opacity:1;scale:1}}
+@keyframes detail-empty-arrive{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){
+ .page-surface,.reveal-region,.copy-feedback>span{animation:none!important;transition:none!important}
+ .hint-button>svg,.parameter-source button>svg,.pasted-text-remove>svg,.sources-close>svg,.sidebar-search>button>svg{translate:none!important;scale:1!important}
+ .chat-quick-delete>svg:not(.spin),.sidebar-empty,.workspace-empty,.workspace-no-results{animation:none!important}
+}

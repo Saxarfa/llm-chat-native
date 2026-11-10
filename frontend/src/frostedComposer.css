@@ -1,0 +1,45 @@
+/* Keep the glass on one surface. A separate filtered pseudo-element produces
+   a visible tonal seam where the model popover overlaps the composer. */
+:root .page-surface[data-page=chat] .main-panel .composer-section .composer{
+ background:color-mix(in srgb,var(--theme-surface-panel,var(--surface,#20201f)) 55%,transparent);
+ -webkit-backdrop-filter:blur(18px);
+ backdrop-filter:blur(18px);
+}
+@media(max-width:800px){
+ :root .page-surface[data-page=chat] .main-panel .composer-section .composer{
+  background:var(--theme-surface-panel,var(--surface,#20201f));
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+ }
+}
+:root .page-surface[data-page=chat] .main-panel .composer-section .composer::before{content:none}
+
+/* The picker shares the composer's glass; filtering it again leaves a dark
+   capsule. Keep hover, pointer press and popover-open on the same surface. */
+:root .page-surface[data-page=chat] .main-panel .composer-section .composer .model-trigger{
+ background:transparent!important;
+ box-shadow:none!important;
+ filter:none!important;
+ -webkit-backdrop-filter:none!important;
+ backdrop-filter:none!important;
+}
+
+:root .page-surface[data-page=chat] .main-panel .composer-section .composer textarea{
+ font-family:var(--font-ui,Arial,Helvetica,sans-serif);font-weight:400;letter-spacing:normal;line-height:1.5;
+ /* Height is managed once per frame; native content sizing must not compete. */
+ field-sizing:fixed;
+}
+:root .page-surface[data-page=chat] .main-panel .composer-section .composer textarea::placeholder{color:var(--muted);opacity:1}
+:root .page-surface[data-page=chat] .main-panel.empty-chat .composer-section .composer textarea{min-height:36px;padding:6px 8px}
+:root .page-surface[data-page=chat] .main-panel .composer-section .composer .attachment-trigger{
+ transition:background-color .16s ease,color .16s ease;
+}
+:root .page-surface[data-page=chat] .main-panel .composer-section .composer .attachment-trigger:active{background:var(--theme-fill-active,#ffffff15)}
+.composer-plus-glyph{display:flex;align-items:center;justify-content:center;width:19px;height:19px;flex:none;rotate:0deg;scale:1;transition:rotate .28s cubic-bezier(.23,1,.32,1),scale .16s ease}
+.attachment-trigger[data-state=open]>.composer-plus-glyph{rotate:45deg}
+.attachment-trigger:active>.composer-plus-glyph{scale:.88}
+@media(prefers-reduced-motion:reduce){
+ :root .page-surface[data-page=chat] .main-panel .composer-section .composer .attachment-trigger{transition:none}
+ .composer-plus-glyph{transition:none}
+ .attachment-trigger:active>.composer-plus-glyph{scale:1}
+}

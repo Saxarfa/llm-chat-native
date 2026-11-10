@@ -1,0 +1,19 @@
+.assistant-message .answer-footer{font-family:inherit;margin-top:6px}
+/* A final list, table or code block must not add another gap above actions. */
+.assistant-message .answer-content>:last-child{margin-bottom:0}
+.assistant-message .answer-footer .answer-actions{gap:3px}
+.assistant-message .answer-footer .stats-trigger{
+ font-size:var(--activity-meta-size,11px);font-weight:400;color:var(--activity-secondary,var(--theme-text-subtle,#7d7c76));
+}
+@media (hover:hover) and (pointer:fine){
+.assistant-message .answer-footer .stats-trigger:hover{color:var(--theme-text-primary,#cbc6b8)}}
+@media(max-width:800px){
+ .page-surface[data-page=chat] .assistant-message .answer-footer-row{flex-wrap:nowrap;align-items:flex-start;gap:8px}
+ .page-surface[data-page=chat] .assistant-message .answer-footer .answer-actions{flex:1;flex-wrap:wrap;min-width:0;gap:3px}
+ .page-surface[data-page=chat] .assistant-message .answer-actions .icon-button{height:36px;min-height:36px}
+ /* The outer 36px belong to the drawer swipe gesture; the column has a 16px gutter. */
+ .page-surface[data-page=chat] .assistant-message .stats-trigger{justify-content:center;flex:none;width:34px;height:36px;min-height:36px;margin-right:20px;padding:0;gap:0}
+ .page-surface[data-page=chat] .assistant-message .stats-trigger :is(.stats-full,.stats-compact),
+ .page-surface[data-page=chat] .assistant-message .stats-trigger>svg:last-child{display:none}
+ .page-surface[data-page=chat] .assistant-message .stats-trigger[aria-expanded=true]{color:var(--ink);background:var(--theme-fill-soft,#ffffff08)}
+}

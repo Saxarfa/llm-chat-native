@@ -1,0 +1,237 @@
+/* Settings: compact rows, quiet groups and an explicit mobile hierarchy. */
+.premium-modal.settings-modal{width:860px!important;height:680px;max-height:calc(var(--app-height,100dvh) - 64px)}
+.settings-modal .settings-nav{width:184px;padding:10px 10px}
+.settings-modal .settings-nav>button{min-height:42px;font-size:14px;gap:10px}
+.settings-modal .settings-nav-arrow{display:none}
+.settings-modal .settings-page{padding:18px 22px}
+.settings-modal .settings-section{max-width:600px}
+.settings-modal .settings-section>p{margin-bottom:12px}
+.settings-scope{font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 8px}
+.settings-modal .settings-section h3{font-size:20px;letter-spacing:-.5px}
+.settings-group-title{font-size:12px;font-weight:600;margin:16px 0 4px;padding-top:12px;border-top:1px solid var(--line)}
+.settings-group-title:first-child{padding-top:0;border:0;margin-top:8px}
+.settings-modal .settings-field{margin:10px 0;gap:5px}
+.settings-modal .settings-row,.parameter-scroll .settings-row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(0,220px);align-items:center;gap:5px 16px;min-height:42px}
+.settings-modal .settings-row>small{grid-column:1/-1}
+.settings-modal .settings-row>span{font-size:14px}
+.settings-modal .settings-row>input[type=number]{width:92px;justify-self:end}
+.settings-modal .settings-field input,.settings-modal .settings-field :is(select,.app-select){min-height:38px}
+.settings-modal .settings-field>small{font-size:12px;max-width:52ch}
+.settings-modal .theme-selector{margin-bottom:14px}
+.settings-modal .theme-preview{height:52px}
+.settings-modal .theme-choice{border-radius:9px;gap:8px;padding:7px 7px 9px}
+.settings-modal .theme-choice.is-selected{box-shadow:none}
+.settings-modal .theme-selector-hint{font-size:12px;margin-top:9px}
+.settings-modal .switch-row{padding:10px 0}
+.settings-modal .switch-row strong{font-size:14px}
+.settings-modal .switch-row small{max-width:43ch}
+.settings-modal .connection-card{padding:0;border:0;background:none;gap:8px;margin:0 0 16px}
+.settings-modal .connection-card strong{font-size:12px}
+.settings-modal .settings-models{margin-top:8px;gap:0}
+.settings-modal .settings-models>button{padding:8px 8px;min-height:52px;border-bottom:1px solid var(--line);border-radius:0}
+.settings-modal .settings-models strong{font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.settings-modal .settings-models small{margin-top:3px}
+.settings-default-badge{font-style:normal;font-size:12px;font-weight:400;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:2px 5px}
+.settings-model-search{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:4px 0;color:var(--muted)}
+.settings-model-search input{border:0;background:none;box-shadow:none;min-width:0;flex:1;font-size:14px;padding:9px 0}
+.settings-modal .explanation-card{background:none;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:4px 0 14px;margin:14px 0}
+.settings-modal .explanation-card p,.search-explanation{font-size:12px;color:var(--muted);line-height:1.6}
+.settings-modal .settings-save{padding:8px 16px;min-height:56px;flex-shrink:0}
+.settings-save>div{display:flex;gap:8px;align-items:center}
+.settings-save button{min-height:36px}
+.settings-modal .image-settings-pair{gap:16px}
+.settings-modal .image-settings-pair .settings-field{display:flex;flex-direction:row;align-items:center;justify-content:space-between}
+.settings-modal .image-settings-pair input{width:85px}
+.settings-modal .disclosure-trigger{min-height:44px;width:100%;justify-content:space-between;font-size:12px}
+.settings-modal .disclosure{border-top:1px solid var(--line);margin-top:10px}
+.settings-modal .disclosure-body{padding:2px 0 8px}
+.settings-modal .image-settings-sync{font-size:12px;margin-top:12px}
+.settings-modal .memory-fact{border-radius:8px}
+.parameter-scroll .profile-link{margin-bottom:10px}
+.parameter-scroll .settings-scope{padding-bottom:10px;border-bottom:1px solid var(--line)}
+.parameter-scroll .parameter,.profile-body .parameter{padding:10px 0;margin:0;border-bottom:1px solid var(--line)}
+.parameter-header{gap:7px}
+.parameter-header .hint-button{display:grid;place-items:center;min-width:30px;min-height:30px;border-radius:6px}
+.parameter-header .hint-button[aria-expanded=true]{background:var(--theme-fill-faint);color:var(--ink)}
+.parameter-header input{width:80px!important;height:34px;border-radius:8px}
+.parameter-header input:disabled{width:104px!important}
+.parameter-explanation{font-size:12px;line-height:1.6;padding:9px 11px;margin:8px 0;background:var(--theme-surface-inset);border-radius:7px}
+.parameter .range{margin:7px 0 0}
+input.range:focus{outline:none;box-shadow:none}
+input.range:focus-visible::-webkit-slider-thumb{outline:2px solid var(--theme-line-strong,#b1afa3);outline-offset:3px}
+input.range:focus-visible::-moz-range-thumb{outline:2px solid var(--theme-line-strong,#b1afa3);outline-offset:3px}
+.range-endpoints{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);margin-top:-2px}
+.parameter-source{min-height:16px;font-size:12px;margin-top:7px}
+.parameter-source button{min-height:28px}
+.parameter-scroll .model-runtime,.profile-body .model-runtime{border:0;padding:0;margin:0;background:none;border-radius:0}
+.parameter-scroll .model-runtime>header>strong,.profile-body .model-runtime>header>strong{display:none}
+.parameter-scroll .model-runtime>header,.profile-body .model-runtime>header{justify-content:flex-end}
+.parameter-scroll .switch-row{padding:10px 0}
+.parameter-scroll .reset-profile{margin-top:12px}
+.parameter-scroll .disclosure{padding:4px 0}
+.parameter-scroll .disclosure-trigger{min-height:44px}
+.maximum-output{margin:10px 0 2px;font-size:12px}
+
+/* A filled rail and a defined handle make the current value easier to read. */
+input.range{--range-fill:color-mix(in srgb,var(--ink) 75%,var(--canvas));--range-rail:color-mix(in srgb,var(--ink) 17%,var(--canvas));height:28px;padding:0;background:transparent;border:0;box-shadow:none}
+input.range::-webkit-slider-runnable-track{height:4px;border-radius:4px;background:linear-gradient(to right,var(--range-fill) 0 var(--range-progress,0%),var(--range-rail) var(--range-progress,0%) 100%)}
+input.range::-webkit-slider-thumb{width:14px;height:14px;margin-top:-5px;border:2px solid var(--canvas);border-radius:50%;background:var(--ink);box-shadow:0 0 0 1px color-mix(in srgb,var(--ink) 26%,transparent),0 2px 4px var(--theme-shadow,#0002);transform:none}
+@media (hover:hover) and (pointer:fine){
+input.range:hover::-webkit-slider-thumb{transform:none;box-shadow:0 0 0 4px color-mix(in srgb,var(--ink) 10%,transparent)}}
+input.range::-moz-range-track{height:4px;border-radius:4px;background:linear-gradient(to right,var(--range-fill) 0 var(--range-progress,0%),var(--range-rail) var(--range-progress,0%) 100%)}
+input.range::-moz-range-thumb{box-sizing:border-box;width:14px;height:14px;border:2px solid var(--canvas);border-radius:50%;background:var(--ink);box-shadow:0 0 0 1px color-mix(in srgb,var(--ink) 26%,transparent)}
+input.range:disabled{opacity:.4;cursor:default}
+.switch-row input[type=checkbox]{box-sizing:border-box;appearance:none;width:38px;height:23px;margin:0;border:1px solid color-mix(in srgb,var(--ink) 20%,transparent);border-radius:20px;background:color-mix(in srgb,var(--ink) 10%,var(--canvas));box-shadow:inset 0 1px 2px var(--theme-shadow,#0001);transition:background-color var(--motion-detail) var(--motion-ease),border-color var(--motion-detail) var(--motion-ease)}
+.switch-row input[type=checkbox]:before{width:15px;height:15px;top:3px;left:3px;background:var(--muted);box-shadow:0 1px 3px var(--theme-shadow,#0002);transition:transform var(--motion-detail) var(--motion-ease),background-color var(--motion-detail) var(--motion-ease)}
+.switch-row input[type=checkbox]:checked{background:var(--ink);border-color:var(--ink)}
+.switch-row input[type=checkbox]:checked:before{background:var(--canvas);transform:translateX(15px)}
+.switch-row input[type=checkbox]:disabled{opacity:.4;cursor:default}
+.maximum-output{min-height:32px;gap:8px;cursor:pointer;line-height:1.45}
+.maximum-output input[type=checkbox]{appearance:none;position:relative;box-sizing:border-box;flex:none;width:18px;height:18px;margin:0;padding:0;border:1px solid color-mix(in srgb,var(--ink) 30%,transparent);border-radius:5px;background:var(--theme-surface-inset,var(--canvas));transition:background-color var(--motion-micro) var(--motion-ease),border-color var(--motion-micro) var(--motion-ease);cursor:pointer}
+.maximum-output input[type=checkbox]:checked{background:var(--ink);border-color:var(--ink)}
+.maximum-output input[type=checkbox]:after{content:'';position:absolute;left:5px;top:2px;width:5px;height:9px;border:solid var(--canvas);border-width:0 2px 2px 0;transform:rotate(45deg);opacity:0;transition:opacity var(--motion-micro) var(--motion-ease)}
+.maximum-output input[type=checkbox]:checked:after{opacity:1}
+:is(.switch-row,.maximum-output) input[type=checkbox]:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.reading-font-choice{display:flex;flex-direction:column;gap:4px;min-width:0}
+.app-select-option.reading-font-option{padding-block:9px}
+.reading-font-choice>span:first-child{font-size:12px;color:var(--muted)}
+.reading-font-sample{font-size:16px;line-height:1.4;font-weight:400;color:var(--ink)}
+@media(max-width:800px){input.range{height:32px}.maximum-output{min-height:38px}}
+@media(prefers-reduced-motion:reduce){.switch-row input[type=checkbox],.switch-row input[type=checkbox]:before,.maximum-output input[type=checkbox],.maximum-output input[type=checkbox]:after{transition:none}}
+.profile-modal .modal-actions{min-height:58px;align-items:center}
+@media(max-width:360px){.profile-modal .segmented-tabs{gap:2px}.profile-modal .segmented-tabs>button{min-width:0;padding:7px 3px;font-size:12px}}
+.profile-modal .modal-actions .settings-scope{margin:0}
+.settings-back{display:none}
+@media(max-width:800px){
+ .premium-modal.settings-modal{width:100vw!important;height:var(--app-height,100dvh);max-height:var(--app-height,100dvh);border-radius:0!important}
+ .settings-modal .settings-nav{width:100%;flex:1;flex-direction:column;gap:3px;overflow:auto;padding:10px 14px max(14px,env(safe-area-inset-bottom));background:none;border:0}
+ .settings-modal .settings-nav>button{width:100%;min-height:48px;font-size:16px;gap:12px;padding:9px 10px;border-bottom:1px solid var(--line);border-radius:0}
+ .settings-modal .settings-nav>button>svg{width:18px;height:18px}
+ .settings-modal .settings-nav-arrow{display:block;margin-left:auto;color:var(--muted)}
+ .settings-modal .settings-tab-highlight{display:none}
+ .settings-index .settings-main,.settings-detail .settings-nav{display:none}
+ .settings-detail .settings-main{min-height:0;flex:1}
+ .settings-modal .settings-page{padding:8px 16px 16px}
+ .settings-back{display:flex;align-items:center;gap:9px;min-height:48px;flex-shrink:0;padding:8px 16px;color:var(--muted);font-size:14px;text-align:left}
+ .settings-modal .settings-section h3{font-size:24px}
+ .settings-modal .settings-row,.parameter-scroll .settings-row{grid-template-columns:minmax(95px,1fr) minmax(0,53%);gap:8px 12px}
+ .settings-modal .settings-row input,.settings-modal .settings-row :is(select,.app-select){font-size:16px;min-height:44px}
+ .settings-modal .settings-save{padding:10px 16px max(12px,env(safe-area-inset-bottom));gap:6px}
+ .settings-modal .settings-save button{min-height:44px;padding:0 12px}
+ .settings-modal .settings-model-search input{font-size:16px}
+ .settings-modal .theme-choice-label{font-size:12px;white-space:normal;min-height:28px}
+ .settings-modal .image-settings-pair{gap:14px}
+ .settings-modal .image-settings-pair .settings-field{flex-direction:column;align-items:stretch}
+ .settings-modal .image-settings-pair input{width:100%}
+ .parameter-header input{min-height:40px;font-size:16px}
+ .parameter-header .hint-button{min-width:38px;min-height:40px}
+}
+@media(max-width:380px){
+ .settings-modal .settings-row:has(:is(select,.app-select)){grid-template-columns:1fr;gap:8px}
+ .settings-modal .settings-row:has(:is(select,.app-select))>:is(select,.app-select){width:100%}
+}
+
+.settings-modal>.modal-heading{padding:15px 22px 13px}
+.settings-modal .reading-preview{margin:12px 0 8px;padding:12px 14px}
+.settings-modal .settings-divider{margin:20px 0}
+.parameter-scroll{padding:14px 16px}
+@media(max-width:800px){.settings-modal>.modal-heading{padding:16px 16px 12px;padding-top:max(16px,env(safe-area-inset-top))}}
+
+/* Image controls use one grid, with every label directly above its field. */
+.settings-modal .image-generation-settings .image-settings-grid,
+.settings-modal .image-generation-settings .image-settings-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.settings-modal .image-generation-settings .settings-field,
+.settings-modal .image-generation-settings .image-settings-pair .settings-field{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;min-width:0;gap:6px;margin:8px 0}
+.settings-modal .image-generation-settings .settings-field>span{font-size:12px;font-weight:400}
+.settings-modal .image-generation-settings .settings-field input,
+.settings-modal .image-generation-settings .settings-field :is(select,.app-select){width:100%;min-width:0;min-height:38px}
+.settings-modal .image-generation-settings .disclosure{margin-top:10px}
+.settings-modal .image-generation-settings .image-settings-sync{margin:14px 0 0;font-size:12px}
+@media(max-width:800px){
+ .settings-modal .image-generation-settings .image-settings-grid{grid-template-columns:1fr;gap:0}
+ .settings-modal .image-generation-settings .settings-field input,
+ .settings-modal .image-generation-settings .settings-field :is(select,.app-select){min-height:44px}
+}
+
+/* Fade content in place: translating the scroll surface made tabs jump. */
+.settings-modal .settings-page,.profile-modal .profile-body{animation:settings-content-in .24s cubic-bezier(.23,1,.32,1) both;scrollbar-gutter:stable;overflow-anchor:none}
+.settings-tab-highlight,.profile-modal .tab-indicator{opacity:0;pointer-events:none;transition:opacity .2s ease}
+.settings-tab-highlight[data-active=true],.profile-modal .tab-indicator[data-active=true]{opacity:1}
+.settings-nav>button,.profile-modal .segmented-tabs>button{transition:color .18s ease}
+@keyframes settings-content-in{from{opacity:.35;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.settings-modal .settings-page,.profile-modal .profile-body{animation:none}.settings-tab-highlight,.profile-modal .tab-indicator,.settings-nav>button,.profile-modal .segmented-tabs>button{transition:none}}
+
+/* Keep the logo row and its storage note together. */
+.connection-check{margin-top:14px}
+.connection-check>button{min-width:min(100%,280px);justify-content:center;gap:8px;transition:background-color .2s,border-color .2s,color .2s}
+.connection-check>button[aria-busy=true]{opacity:1;color:var(--muted);cursor:wait}
+.connection-check-result{min-height:32px;padding-top:8px;font-size:12px;line-height:1.5;color:var(--muted)}
+.connection-check-result>span{display:block;animation:settings-content-in .2s ease both}
+.connection-check[data-result=reachable]>button>svg,.connection-check[data-result=loading]>button>svg{color:var(--theme-text-green,#a8b795)}
+.connection-check[data-result=offline] .connection-check-result,.connection-check[data-result=offline]>button>svg{color:var(--theme-text-red,#c99f91)}
+@media(prefers-reduced-motion:reduce){.connection-check-result>span{animation:none}.connection-check>button{transition:none}}
+.settings-modal .branding-setting{margin:10px 0 4px;min-height:38px}
+.settings-modal .branding-setting+.settings-intro{margin:4px 0 0!important}
+
+
+/* Compact disclosure rows without reducing mobile touch targets. */
+.settings-modal .settings-section .disclosure{margin:0;padding:0}
+.settings-modal .settings-section .disclosure-trigger{min-height:38px;padding:6px 0}
+.settings-modal .settings-section .disclosure-body{padding:0 0 8px}
+.settings-modal .image-settings-fields>.disclosure:first-of-type{margin-top:6px}
+@media(max-width:800px){.settings-modal .settings-section .disclosure-trigger{min-height:44px}}
+
+/* One stable frame keeps the title, tabs and close button in place. */
+.premium-modal.profile-modal:is(.profile-identity,.profile-instructions,.profile-generation,.profile-tools){height:min(680px,calc(var(--app-height,100dvh) - 48px));max-height:calc(var(--app-height,100dvh) - 48px)}
+.profile-modal .profile-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 5px 0}
+.profile-modal.profile-identity .avatar-editor{margin:14px 0 18px;gap:16px}
+.profile-modal.profile-identity .settings-field{margin:14px 0}
+.profile-modal.profile-identity .model-preview{margin:16px 0 0;padding:13px 16px}
+@media(max-width:800px){.premium-modal.profile-modal:is(.profile-identity,.profile-instructions,.profile-generation,.profile-tools){height:min(720px,calc(var(--visible-height,var(--app-height,100dvh)) - 24px - env(safe-area-inset-top)));max-height:calc(var(--visible-height,var(--app-height,100dvh)) - 24px - env(safe-area-inset-top))}}
+
+/* Height is animated between measured tab sizes, without scaling the controls. */
+.profile-modal{transition:none}
+.profile-modal .profile-body{animation:profile-tab-enter .2s ease-out both}
+@keyframes profile-tab-enter{from{opacity:0;translate:0 4px}to{opacity:1;translate:0 0}}
+@media(prefers-reduced-motion:reduce){.profile-modal .profile-body{animation:none}}
+
+/* Compact chat controls without shrinking their labels or touch targets. */
+.parameter-scroll{padding:14px 16px}
+.parameter-scroll .profile-link{margin-bottom:6px}
+.parameter-scroll .settings-scope{margin:6px 0 0;padding-bottom:10px}
+.parameter-scroll>.disclosure{margin:0;padding:0}
+.parameter-scroll>.disclosure>.disclosure-trigger{min-height:44px;padding:6px 0}
+.parameter-scroll .disclosure-body{padding:4px 0 8px}
+.parameter-scroll .switch-row{margin:0;padding:10px 0}
+.parameter-scroll .parameter{padding:8px 0}
+.parameter-scroll .parameter-header{margin-bottom:4px}
+.parameter-scroll .parameter .range{margin:2px 0 0}
+.parameter-scroll .parameter-source{margin-top:3px;min-height:16px}
+.parameter-scroll .maximum-output{margin:6px 0 2px}
+.parameter-scroll .reset-profile{margin-top:12px}
+@media(max-width:800px){.parameter-modal .parameter-scroll{padding:12px 16px max(14px,env(safe-area-inset-bottom))}}
+
+.chat-scope-hint{display:flex;align-items:flex-start;gap:8px;margin:8px 0 6px;padding:9px 10px;border-radius:8px;background:var(--theme-fill-faint,#ffffff06);color:var(--muted);font-size:12px;line-height:1.5}
+.chat-scope-hint>svg{flex-shrink:0;margin-top:1px;opacity:.8}
+
+.parameter-explanation-clip{overflow:hidden;display:flow-root}
+
+/* Filter labels must not inherit section field margins or row layouts. */
+.settings-modal .memory-filters{align-items:end;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.settings-modal .memory-filters>.settings-field{display:flex;flex-direction:column;align-items:stretch;gap:7px;margin:0;padding:0;min-width:0}
+.settings-modal .memory-filters>.settings-field>span{margin:0}
+.settings-modal .memory-filters .app-select,.settings-modal .memory-filters .memory-search{height:40px;min-height:40px;box-sizing:border-box;margin:0}
+.settings-modal .memory-filters .memory-search input{height:auto;min-height:0;margin:0;padding:0}
+@media(max-width:767px){.settings-modal .memory-filters{grid-template-columns:minmax(0,1fr)}.settings-modal .memory-filters .app-select,.settings-modal .memory-filters .memory-search{height:44px;min-height:44px}}
+
+/* UX audit 2026-11-05 (profile): hints and the preview caption had a floor of 11px (--ui-meta); on 375px the four tabs did not fit (the last one was clipped and the whole dialog slid sideways when it was chosen), tabs and two text buttons were below 44px on touch. */
+:root .profile-modal :is(.settings-field>small,.settings-row>small,.switch-row small,.parameter-source,.range-endpoints,.model-preview small){font-size:max(12px,var(--ui-meta))}
+@media(max-width:800px){
+ :root .profile-modal .segmented-tabs>button{min-height:44px}
+ :root .profile-modal :is(.model-tools-actions button,.avatar-editor .text-button){position:relative}
+ :root .profile-modal :is(.model-tools-actions button,.avatar-editor .text-button)::after{content:'';position:absolute;inset:-9px -6px}
+}
+@media(max-width:480px){
+ :root .profile-modal .segmented-tabs{flex-wrap:wrap}
+ :root .profile-modal .segmented-tabs>button{flex:1 1 calc(50% - 2px);min-width:0;padding:0 8px;font-size:14px}
+}

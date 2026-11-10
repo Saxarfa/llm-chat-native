@@ -1,0 +1,10 @@
+.model-image-generator{border:0;margin:20px 0 0;padding:0;min-width:0}
+.model-image-generator .settings-subheading{margin-top:0}
+.generator-cloud-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.generator-cloud-pair .settings-field{min-width:0}
+.generator-cloud-preferences{min-width:0}
+.generator-auto-4k{display:flex;align-items:center;gap:10px;min-height:44px;font-size:14px;cursor:pointer}
+.generator-auto-4k input{width:18px;height:18px;flex:none;accent-color:var(--text-primary)}
+.generator-cloud-pair .app-select{min-height:44px;font-size:14px}
+.workspace-editor .generator-cloud-preferences .settings-field{gap:8px}
+.workspace-editor .generator-cloud-preferences .settings-intro{margin:0 0 12px}

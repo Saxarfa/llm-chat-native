@@ -1,0 +1,14 @@
+/* Quiet reserved geometry for a first lazy section load. No status-text flash. */
+.section-loading-shell{display:flex;flex-direction:column;gap:16px;width:min(720px,100%);margin:0 auto;padding:32px 24px;min-height:380px}
+.section-loading-shell>span{display:block;height:24px;border-radius:8px;background:var(--theme-fill-faint,#ffffff07)}
+.section-loading-shell>span:first-child{width:48%;height:34px}
+.section-loading-shell>span:nth-child(2){width:72%}
+.section-loading-shell>span:last-child{height:200px;margin-top:16px}
+.page-navigation-error{position:fixed;z-index:120;inset:auto 16px calc(18px + env(safe-area-inset-bottom)) auto;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);box-shadow:0 8px 24px #0002;font-size:14px}
+.page-navigation-error>span{min-width:0;overflow-wrap:anywhere}
+.page-navigation-error>button{flex:none}
+.page-navigation-error>button:not(.icon-button),.sidebar-navigation-error>button{text-decoration:underline;text-underline-offset:3px}
+.sidebar-navigation-error{display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:12px;color:var(--muted)}
+.sidebar-navigation-error>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.sidebar-pending{flex:none;margin-right:8px;color:var(--muted)}
+.sidebar-inner .chat-row.is-navigation-target{background:var(--theme-fill-faint,#ffffff07)}

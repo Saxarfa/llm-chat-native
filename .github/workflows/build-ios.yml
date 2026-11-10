@@ -1,0 +1,69 @@
+name: Build unsigned iOS app
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install and verify frontend
+        run: |
+          npm --prefix frontend ci
+          npm --prefix frontend run test:types
+          npm --prefix frontend test
+      - name: Build bundled interface
+        env:
+          VITE_IOS_SERVER_URL: ${{ vars.LLM_IOS_SERVER_URL }}
+        run: npm --prefix frontend run build:ios
+      - name: Sync native plugins
+        working-directory: frontend
+        run: npx cap sync ios
+      - name: Verify free-account compatibility
+        run: python3 tools/check_ios_bundle.py --source ios
+      - name: Compile unsigned Release
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          if [ -d ios/App/App.xcworkspace ]; then
+            project=(-workspace ios/App/App.xcworkspace)
+          elif [ -d ios/App/App.xcodeproj ]; then
+            project=(-project ios/App/App.xcodeproj)
+          else
+            echo 'No Xcode project/workspace found'; exit 1
+          fi
+          xcodebuild "${project[@]}" -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build/ios CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            build | tee build-ios.log
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          mkdir -p build/package/Payload
+          ditto build/ios/Build/Products/Release-iphoneos/App.app build/package/Payload/App.app
+          python3 tools/check_ios_bundle.py --app build/package/Payload/App.app
+          cd build/package
+          zip -qry ../LLM-Chat-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LLM-Chat-unsigned
+          path: build/LLM-Chat-unsigned.ipa
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ios-build-log
+          path: build-ios.log

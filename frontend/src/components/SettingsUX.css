@@ -1,0 +1,117 @@
+.settings-ux .settings-page{padding-top:32px}
+.settings-ux .settings-save{min-height:68px}
+.settings-ux :is(button,.app-select,input:not([type=checkbox]),textarea){font-size:14px}
+.settings-ux :is(.icon-button,.settings-theme-segments>button){width:44px;min-width:44px;height:44px;min-height:44px}
+.settings-ux :is(.app-select,.disclosure-trigger,.text-button,[data-slot=button]){min-height:44px!important}
+.settings-ux .settings-page .settings-row>.app-select{min-height:44px!important}
+.settings-ux .settings-page-appearance .settings-row>.app-select{min-height:44px!important}
+.settings-ux .settings-field :is(input:not([type=checkbox]),textarea){min-height:44px}
+.settings-ux :is(.switch-row,.project-switch){min-height:56px;cursor:pointer}
+.settings-ux :is(.settings-models,.memory-list,.backup-list,.system-services){border:1px solid var(--line);border-radius:8px;background:var(--theme-surface-inset);overflow:hidden}
+.settings-ux :is(.settings-models,.memory-list,.backup-list):empty{display:none}
+.settings-ux :is(.settings-models>button,.memory-fact,.backup-item){border-bottom:1px solid var(--line)}
+.settings-ux .settings-section>p,.settings-ux .pwa-settings>p{max-width:70ch}
+.settings-ux .field-error{display:block;min-height:20px;font-size:12px;line-height:1.5;color:var(--theme-text-red,#e7a08a)}
+.settings-ux .draft-note{font-size:12px;color:var(--muted);line-height:1.5}
+.settings-ux .settings-search-results>[data-slot=button]{width:auto}
+.settings-ux .inline-editor{padding-block:24px}
+.settings-ux .inline-editor textarea{width:100%;min-height:140px}
+.settings-ux :is(.library-error,.inline-error,.error-text){overflow-wrap:anywhere}
+.settings-ux .memory-filters{align-items:end}
+.settings-ux .memory-search-field{display:flex;flex-direction:column;gap:8px;min-width:0;font-size:14px}
+.settings-ux .memory-search{min-height:44px}
+.settings-ux .lora-search-label{width:100%;font-size:14px}
+.settings-ux .lora-search{min-height:44px}
+.settings-ux :is(.lora-catalog>button,.lora-control-toggle){min-height:44px}
+.settings-ux :is(small,.muted,.settings-intro,.image-settings-sync){font-size:max(12px,var(--ui-meta,12px))}
+.settings-ux .settings-intro{font-size:14px!important}
+.settings-ux :is(h3,h4){line-height:1.25}
+.settings-ux :is(p,label){line-height:1.5}
+.settings-ux [aria-invalid=true]{border-color:var(--theme-text-red,#e7a08a)!important}
+@media(max-width:800px){.settings-ux input:not([type=checkbox]),.settings-ux textarea{font-size:16px}.settings-ux .settings-save{flex-wrap:wrap}.settings-ux .settings-save>span{max-width:none}.settings-ux .settings-segments{max-width:100%}}
+@media(prefers-reduced-motion:reduce){.settings-ux *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.settings-ux [hidden]{display:none!important}
+.settings-confirm .confirm-actions button,.settings-confirm [data-slot=dialog-close]{min-height:44px;min-width:44px}
+.settings-confirm [data-variant=destructive]{background:#b8442d;color:white}
+:root[data-theme=light] body:has(.settings-ux) .app-select-menu{box-shadow:0 8px 24px #0000000f}
+.settings-ux .settings-page{animation:settings-ux-in 200ms ease-out both}
+@keyframes settings-ux-in{from{opacity:0}to{opacity:1}}
+
+.settings-loading{min-height:32px;font-size:14px;color:var(--muted);line-height:1.5}
+.settings-skeleton{display:grid;gap:16px;padding-block:16px}
+.settings-skeleton i{display:block;height:44px;background:var(--theme-fill-soft);border:1px solid var(--line);border-radius:8px}
+.settings-error{margin-block:16px;padding:16px;border:1px solid var(--line);border-radius:8px;background:var(--theme-surface-inset);font-size:14px}
+.settings-error p{margin:0 0 8px;line-height:1.5}
+.settings-error>div{display:flex;flex-wrap:wrap;gap:8px}
+.settings-error button{white-space:normal;height:auto}
+.settings-ux .settings-field>.field-error{grid-column:1/-1}
+.settings-ux .settings-save .draft-note{display:block}
+.settings-ux .confirm-actions{flex-wrap:wrap}
+.settings-ux .confirm-actions>button{white-space:normal;height:auto}
+.settings-ux.profile-modal .segmented-tabs>button{min-height:44px}
+
+.settings-ux .number-input{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px}
+.settings-ux .number-input input[type=number]{padding-right:8px!important;min-width:0}
+.settings-ux .number-input-actions{position:static;transform:none;gap:0}
+.settings-ux .number-input .number-input-actions button{width:44px;height:44px}
+@media(max-width:420px){.settings-ux .image-settings-pair{grid-template-columns:1fr}}
+
+.settings-ux :is(.library-input-label,.knowledge-query-label){display:grid;gap:8px;min-width:0;flex:1;font-size:14px}
+.settings-ux :is(.knowledge-documents,.library-rows,.knowledge-library-tabs){border:1px solid var(--line);border-radius:8px;background:var(--theme-surface-inset);padding:8px}
+.settings-ux :is(.knowledge-doc-open,.library-tabs button,.lora-library-open,.lora-library-card footer button,.knowledge-library-tabs button,.knowledge-error button,.knowledge-undo button){min-height:44px;min-width:44px}
+.settings-ux .lora-set-save{align-items:start;flex-wrap:wrap}
+.settings-ux .knowledge-search{align-items:end}
+.settings-ux .parameter-header .hint-button{min-width:44px;min-height:44px}
+.settings-ux .parameter-source button{min-height:44px}
+.settings-ux .parameter-header input{min-height:44px}
+
+.settings-ux .prompt-preset-copy strong{font-size:14px;line-height:1.5}
+.settings-ux.profile-modal .modal-actions{flex-wrap:wrap;gap:8px}
+.settings-ux.profile-modal .modal-actions .draft-note{width:100%;text-align:right}
+.settings-ux .model-tools-actions button{min-height:44px}
+
+:root .settings-ux .settings-field>span:first-child,:root .settings-ux strong,:root .settings-ux .avatar-editor .text-button{font-size:14px}
+.settings-ux input[type=range]{min-height:44px}
+.settings-ux .prompt-undo{min-height:44px}
+
+.settings-ux .lora-note-editor>label{font-size:14px;line-height:1.5}
+.settings-ux .lora-preview-upload{min-height:44px}
+
+:root .settings-ux .connection-check strong,:root .settings-ux .lora-selected-item>label>span,:root .settings-ux .lora-library-card footer button{font-size:14px}
+.settings-ux .app-select>span:first-child{white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+.settings-ux *{transition-property:opacity,transform,translate,scale,rotate,color,background-color,border-color,box-shadow!important}
+body:has(.settings-ux) .app-select-option{min-height:44px}
+@media(max-width:600px){:root .settings-ux .settings-row{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding-block:16px}:root .settings-ux .settings-row>*{grid-column:1!important;width:100%;max-width:none!important}:root .settings-ux .settings-row>span{padding:0}}
+
+:root .premium-modal.settings-confirm{z-index:240!important}
+:root .premium-modal.settings-confirm button{min-height:44px!important;min-width:44px!important}
+:root .settings-ux .connection-check strong,:root .settings-ux .connection-card strong,:root .settings-ux .settings-search input{font-size:14px!important}
+:root[data-theme=light] .settings-ux .backup-schedule .app-select{color:var(--ink);background:var(--settings-fill,var(--theme-surface-inset))}
+:root[data-theme=light] .settings-ux :is(.library-tabs button,.lora-library-card strong,.lora-library-card p){color:var(--ink);background:transparent}
+:root[data-theme=light] .settings-ux .library-tabs button[aria-pressed=true]{background:var(--theme-fill-soft)}
+.settings-ux{--theme-surface-input:var(--theme-surface-inset)}
+
+:root .premium-modal.settings-ux .segmented-tabs>button,:root .premium-modal.settings-ux .lora-search input{font-size:14px!important}
+:root .premium-modal.settings-ux textarea.prompt-textarea{font-size:16px!important;line-height:1.5}
+:root .premium-modal.settings-confirm{animation:settings-confirm-in 200ms ease-out both!important}
+:root .premium-modal.settings-confirm[data-state=closed]{animation:settings-confirm-out 150ms ease-out both!important}
+@keyframes settings-confirm-in{from{opacity:0}to{opacity:1}}
+@keyframes settings-confirm-out{from{opacity:1}to{opacity:0}}
+@media(prefers-reduced-motion:reduce){:root .premium-modal.settings-confirm,:root .premium-modal.settings-confirm[data-state=closed]{animation:none!important}}
+
+@media(max-width:600px){:root .premium-modal.settings-ux .settings-row{display:grid!important;grid-template-columns:minmax(0,1fr)!important}:root .premium-modal.settings-ux .settings-row>*{width:100%!important;justify-self:stretch!important}}
+
+:root .premium-modal.settings-confirm{box-shadow:none!important}
+:root[data-theme=light] body:has(.settings-ux) .app-select-menu{box-shadow:0 8px 24px #0000000f!important}
+.settings-ux :is(.prompt-language,.settings-default-badge){background:none;border:0;border-radius:0;box-shadow:none}
+/* Keep the original centered window and mobile dialog geometry. */
+:root .premium-modal.settings-ux{z-index:170!important}
+:root .premium-modal.settings-ux.profile-modal{z-index:180!important}
+:root .premium-modal.settings-ux.lora-library-modal{z-index:220!important}
+:root .premium-modal.settings-ux.lora-note-modal,:root .premium-modal.settings-ux.memory-editor{z-index:230!important}
+[data-slot=dialog-overlay]:has(+.settings-ux){z-index:169}
+[data-slot=dialog-overlay]:has(+.settings-ux.profile-modal){z-index:179}
+[data-slot=dialog-overlay]:has(+.settings-ux.lora-library-modal){z-index:219}
+[data-slot=dialog-overlay]:has(+.settings-ux.lora-note-modal),[data-slot=dialog-overlay]:has(+.settings-ux.memory-editor){z-index:229}
+[data-slot=dialog-overlay]:has(+.settings-confirm){z-index:239!important}

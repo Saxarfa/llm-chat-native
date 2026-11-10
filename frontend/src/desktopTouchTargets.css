@@ -1,0 +1,7 @@
+/* UX audit 2026-11-05: icon-only controls that stand apart from their neighbours get a 44x44 hit zone
+   with no visual change. Clusters (answer actions, rows, composer tools) keep their size: overlapping zones
+   would make precise mouse clicks less accurate. */
+@media(min-width:801px){
+ :is(.sidebar-header-search,.sidebar-manage,.chat-composer-send,[aria-label="Свернуть меню"],.chat-header .header-actions button){position:relative}
+ :is(.sidebar-header-search,.sidebar-manage,.chat-composer-send,[aria-label="Свернуть меню"],.chat-header .header-actions button)::after{content:'';position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+}

@@ -1,0 +1,12 @@
+/* The focused element stays usable after a pointer interaction, without a
+   keyboard-style outline reappearing when a dialog restores focus to it. */
+html:not([data-keyboard-focus]) :focus-visible{outline:none!important}
+html:not([data-keyboard-focus]) :is(button,a,input,textarea,select,[role="button"],[role="tab"]):focus-visible{box-shadow:none!important}
+html:not([data-keyboard-focus]) input.range:focus-visible::-webkit-slider-thumb{outline:none}
+html:not([data-keyboard-focus]) input.range:focus-visible::-moz-range-thumb{outline:none}
+html:not([data-keyboard-focus]) .desktop-sidebar:not([data-resizing=true]) .sidebar-resizer:focus-visible::after{opacity:0}
+
+/* The first keyboard stop bypasses the persistent navigation without scrolling
+   the chat or changing its URL/state. It takes no space in the page layout. */
+.skip-to-content{position:fixed;z-index:300;top:max(12px,env(safe-area-inset-top));left:max(16px,env(safe-area-inset-left));max-width:calc(100vw - 32px);padding:12px 16px;border:1px solid var(--muted);border-radius:8px;background:var(--surface);color:var(--ink);font-size:14px;line-height:1.5;transform:translateY(calc(-100% - max(12px,env(safe-area-inset-top)) - 4px))}
+.skip-to-content:focus-visible{transform:none;outline:2px solid var(--focus-ring,var(--ink));outline-offset:2px}

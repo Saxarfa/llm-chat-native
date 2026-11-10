@@ -1,0 +1,15 @@
+/* Keep one stable compositor layer for the control. Switching visibility or
+   starting a transform animation can rebuild the composer's backdrop layer
+   and briefly change the way the conversation's text is rasterized. */
+.scroll-bottom-position.scroll-bottom-visibility{
+ opacity:0;transform:translate3d(0,0,0);pointer-events:none;
+ isolation:isolate;contain:layout style;will-change:opacity;
+ transition:opacity .16s ease;
+}
+.scroll-bottom-visibility[data-visible=true]{
+ opacity:1;pointer-events:auto;
+ transition:opacity .18s ease;
+}
+@media(prefers-reduced-motion:reduce){.scroll-bottom-position.scroll-bottom-visibility{transition:none}}
+/* This control owns its tap even when the adjacent scroll view has momentum. */
+.scroll-bottom-position .scroll-bottom{touch-action:none}

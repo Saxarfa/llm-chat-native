@@ -1,0 +1,29 @@
+/* Phone drawer (variant G, 2026-11-08): narrow icon rail on the left, chat list on the right.
+   Desktop keeps the column layout: .sidebar-main is display:contents there. */
+.sidebar-refined .sidebar-main{display:contents}
+.sidebar-inner.sidebar-refined.sidebar-rail-mode{flex-direction:row}
+.sidebar-inner.sidebar-refined.sidebar-rail-mode>.sidebar-main{display:flex;flex-direction:column;flex:1 1 auto;min-width:0;min-height:0}
+
+.sidebar-rail-mode .sidebar-rail{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;width:60px;min-height:0;padding:7px 0 10px;border-right:1px solid color-mix(in srgb,var(--sidebar-caption) 14%,transparent)}
+.sidebar-rail-mode .sidebar-rail-button{position:relative;isolation:isolate;display:grid;place-items:center;flex:none;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border:0;border-radius:12px;background:transparent;color:var(--sidebar-icon);transition:background-color .15s,color .15s}
+.sidebar-rail-mode .sidebar-rail-button.is-active{color:var(--sidebar-text)}
+.sidebar-rail-mode .sidebar-rail-button[aria-expanded=true]{background:var(--sidebar-active)}
+.sidebar-rail-mode .sidebar-rail-highlight{position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--sidebar-active)}
+.sidebar-rail-mode .sidebar-rail-button.sidebar-rail-new{margin-bottom:10px;background:var(--sidebar-text);color:var(--sidebar-bg)}
+.sidebar-rail-mode .sidebar-rail-spacer{flex:1 1 auto}
+.sidebar-rail-mode .sidebar-rail-account{display:grid;place-items:center;flex:none;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--sidebar-text)}
+.sidebar-rail-mode .sidebar-rail-account>.sidebar-account-avatar{width:32px;height:32px;font-size:13px}
+.sidebar-rail-mode :is(.sidebar-rail-button,.sidebar-rail-account):active{background:var(--sidebar-active);transition-duration:0s}
+.sidebar-rail-mode .sidebar-rail-button.sidebar-rail-new:active{background:color-mix(in srgb,var(--sidebar-text) 82%,var(--sidebar-bg))}
+.sidebar-rail-mode :is(.sidebar-rail-button,.sidebar-rail-account):focus-visible{outline:2px solid var(--sidebar-caption);outline-offset:-2px}
+@media(hover:hover){.sidebar-rail-mode .sidebar-rail-button:not(.is-active):not(.sidebar-rail-new):hover{background:var(--sidebar-hover);color:var(--sidebar-text)}}
+
+.sidebar-rail-mode .sidebar-rail-header{display:flex;align-items:center;gap:0;flex:none;height:58px;min-height:58px;padding:7px 4px 7px 14px}
+.sidebar-rail-mode .sidebar-rail-header>h2{flex:1;min-width:0;margin:0;font-size:17px;font-weight:600;line-height:22px;color:var(--sidebar-text);letter-spacing:-.2px}
+.sidebar-rail-mode .sidebar-rail-header>.icon-button{flex:none;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border:0;background:transparent;color:var(--sidebar-icon);border-radius:8px}
+.sidebar-rail-mode .sidebar-rail-header>.sidebar-manage{width:44px;min-width:44px;height:44px;min-height:44px}
+.sidebar-inner.sidebar-refined.sidebar-rail-mode .sidebar-search{margin:0 8px 8px 10px}
+.sidebar-inner.sidebar-refined.sidebar-rail-mode .chat-list{padding:0 4px 12px 6px}
+.sidebar-inner.sidebar-refined.sidebar-rail-mode .chat-list section:first-child h2{margin-top:2px}
+
+@media(prefers-reduced-motion:reduce){.sidebar-rail-mode :is(.sidebar-rail-button,.sidebar-rail-account){transition:none}}

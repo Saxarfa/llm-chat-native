@@ -1,0 +1,63 @@
+/* Mobile audit 2026-11-01: touch areas of at least 44px without moving the visible controls,
+   readable code captions, and a fade that shows wide code/tables continue to the right. */
+@media(max-width:800px),(pointer:coarse){
+ .code-panel .code-heading :is(button,.icon-button),.code-menu-trigger{position:relative}
+ .code-menu-trigger{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px}
+ .code-panel .code-heading :is(button,.icon-button)::after{content:'';position:absolute;inset:-6px}
+ /* UX audit 2026-11-05: question actions were 32x32; the row is absolutely positioned, so width grows without moving text and the hit zone reaches 44px high. */
+ :root .user-message .question-actions .icon-button{position:relative;width:44px;min-width:44px}
+ :root .user-message .question-actions .icon-button::after{content:'';position:absolute;inset:-6px 0}
+ .assistant-message .answer-heading{position:relative}
+ .assistant-message button.answer-heading::after{content:'';position:absolute;inset:-8px 0}
+ .workspace-shell>.chat-header .icon-button,.image-studio>.chat-header .icon-button{width:44px;height:44px;min-width:44px;min-height:44px}
+ /* UX audit 2026-11-05: the remove button of a capsule attachment is 21px; an invisible zone brings it to 44px (the tray clips the top edge a little). */
+ :root .chat-composer .attachment>.icon-button::after{content:'';position:absolute;inset:-12px}
+ .sidebar-navigation-error>button{position:relative}
+ .sidebar-navigation-error>button::after{content:'';position:absolute;inset:-14px -10px}
+ .code-caption>span:first-child,.code-file-format{font-size:12px}
+ .code-caption small{font-size:12px}
+.settings-claude .settings-search{height:44px}
+ /* UX audit 2026-11-08 (image studio): history filters were 30px, search and number fields 42px, the settings import button 36px. */
+ :root .mobile-studio-sheet.is-history .studio-history-filters button{min-height:44px}
+ :root .mobile-studio-sheet .studio-history-browser .studio-history-search input{min-height:44px;padding:0}
+ .mobile-studio-sheet .mobile-studio-fields input[type=number],.mobile-studio-sheet .mobile-studio-settings>label>input[type=number],.mobile-studio-sheet .mobile-studio-settings input[type=number]{min-height:44px}
+ :root .mobile-studio-sheet-import .icon-button{width:44px;height:44px;min-width:44px}
+}
+/* Wider touch viewports keep the desktop arrangement, but need the same usable
+   controls as portrait. In particular, rotation must not shrink them to 30px. */
+@media(min-width:801px) and (pointer:coarse){
+ :root[data-ui-size] :is(.sidebar-inner.sidebar-refined .new-chat-button,.sidebar-inner.sidebar-refined .sidebar-section-button,.sidebar-inner.sidebar-refined .chat-list-toggle,.sidebar-inner.sidebar-refined .chat-row>button:first-child,.sidebar-inner.sidebar-refined .chat-more,.sidebar-inner.sidebar-refined .chat-quick-delete,.sidebar-inner.sidebar-refined .chat-action-slot,.sidebar-inner.sidebar-refined .sidebar-account){min-height:44px;height:auto}
+ :root[data-ui-size] :is(.model-trigger,.context-trigger,.model-picker-categories>button,.model-detail-action,.workspace-sections>button,.generation-studio-tabs>button,.app-select,.disclosure-trigger,[data-slot=button]){min-height:44px}
+ :root .sidebar-inner.sidebar-refined .chat-row{min-height:44px}
+ :root .sidebar-inner.sidebar-refined .chat-row .chat-action-slot{width:48px}
+ :root .sidebar-inner.sidebar-refined :is(.chat-more,.chat-quick-delete,.folder-delete){width:44px;min-width:44px;min-height:44px}
+ :root .sidebar-inner.sidebar-refined .chat-row>button:first-child{padding-right:48px}
+ :root[data-ui-size] .premium-modal>[data-slot=dialog-close]{min-width:44px;min-height:44px;display:grid;place-items:center}
+ :root[data-ui-size] .code-menu-trigger{width:44px;height:44px}
+ :root[data-ui-size] .conversation-map-marker{min-width:44px;min-height:44px}
+}
+@media(min-width:801px) and (pointer:coarse) and (max-height:500px){
+ /* Keep the optional desktop map and settings shortcut off a short touch
+    edge. Settings remains available in the main menu. */
+ .conversation-map,.collapsed-settings{display:none}
+ .page-surface[data-page=chat] .message-column{padding-right:64px}
+ :root .page-surface[data-page=chat] .chat-header .icon-button{width:44px;min-width:44px;height:44px;min-height:44px}
+}
+@property --scroll-fade{syntax:'<length>';inherits:false;initial-value:0px}
+@keyframes scroll-fade-end{0%,92%{--scroll-fade:28px}100%{--scroll-fade:0px}}
+@supports(animation-timeline:scroll(self inline)){
+ @media(max-width:800px){
+  .prose :is(.code-body>code,.table-scroll){
+   animation:scroll-fade-end linear both;animation-timeline:scroll(self inline);
+   -webkit-mask-image:linear-gradient(to right,#000 calc(100% - var(--scroll-fade)),transparent);
+   mask-image:linear-gradient(to right,#000 calc(100% - var(--scroll-fade)),transparent);
+  }
+ }
+}
+
+/* Icon audit 2026-11-08 (Touch Target Minimum): every icon button gets an invisible hit zone of at least 44x44 without moving or resizing the visible control.
+   :where() keeps specificity at zero so buttons that are absolutely positioned keep their own placement; the specific ::after zones above win over this one. */
+@media(max-width:800px),(hover:none) and (pointer:coarse){
+ :where(.icon-button){position:relative}
+ .icon-button::after{content:'';position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+}

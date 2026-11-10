@@ -1,0 +1,16 @@
+/* Keep DOM, selection, search and message state intact. The browser skips the
+   expensive layout/paint of distant messages and remembers their actual size. */
+@supports (content-visibility:auto) and (contain-intrinsic-block-size:auto 1px){
+ .message-column>.message[data-render-measured=true]{contain:layout style}
+ .message-column>.message[data-render-cached=true]{
+  content-visibility:auto;
+  contain-intrinsic-block-size:auto var(--message-render-height);
+ }
+ /* Always lay out live replies, interaction targets and the newest two rows. */
+ .message-column>.message[data-render-cached=true]:is(.live-message,:focus-within,[data-search-target=true],:nth-last-child(-n+3),:has(.message-editor-presence)){
+  content-visibility:visible;
+ }
+}
+
+/* Native mutation locks leave the action row and its icon geometry intact. */
+.message-mutation-controls{display:contents;border:0;margin:0;padding:0;min-width:0}

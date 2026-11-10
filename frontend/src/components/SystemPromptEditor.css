@@ -1,0 +1,41 @@
+.system-prompt-editor{--prompt-edge:color-mix(in srgb,var(--muted) 17%,transparent);display:flex;flex-direction:column;gap:12px;padding:4px 0 8px}
+.prompt-library-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.prompt-eyebrow{color:var(--ink);font-size:14px;font-weight:500}
+.prompt-library-heading p{margin:4px 0 0;color:var(--muted);font-size:12px;line-height:1.45}
+.prompt-language{font-size:12px;letter-spacing:.08em;color:var(--muted);padding:4px 7px;border:1px solid var(--prompt-edge);border-radius:6px}
+.prompt-preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.prompt-preset-card{display:flex;align-items:center;gap:9px;min-width:0;text-align:left;padding:12px 10px;border:1px solid var(--prompt-edge);border-radius:12px;background:color-mix(in srgb,var(--muted) 3%,transparent);color:var(--ink);font:inherit;cursor:pointer;transition:background .18s,border-color .18s,box-shadow .18s}
+@media (hover:hover) and (pointer:fine){
+.prompt-preset-card:hover{background:color-mix(in srgb,var(--muted) 8%,transparent);border-color:color-mix(in srgb,var(--muted) 35%,transparent)}}
+.prompt-preset-card[aria-pressed=true]{background:color-mix(in srgb,var(--muted) 12%,transparent);border-color:color-mix(in srgb,var(--muted) 55%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--muted) 8%,transparent)}
+.prompt-preset-card:focus-visible,.prompt-undo:focus-visible,.prompt-preview-text:focus-visible{outline:2px solid var(--muted);outline-offset:2px}
+.prompt-preset-icon{display:grid;place-items:center;flex:0 0 28px;height:30px;color:var(--muted)}
+.prompt-preset-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}
+.prompt-preset-copy strong{font-weight:500;font-size:14px;line-height:1.35}
+.prompt-preset-copy small{font-size:12px;color:var(--muted);line-height:1.45}
+.prompt-preset-check{display:grid;place-items:center;flex:0 0 13px;color:var(--muted)}
+.prompt-preview-clip{overflow:hidden;flex-shrink:0}
+.prompt-preset-preview{padding:13px 14px;border:1px solid var(--prompt-edge);border-radius:12px;background:color-mix(in srgb,var(--muted) 4%,transparent)}
+.prompt-preview-summary{display:flex;gap:16px;align-items:center;justify-content:space-between}
+.prompt-preview-summary>button{flex-shrink:0;font-size:12px;min-height:34px}
+.prompt-preview-description strong{font-size:14px;font-weight:500}
+.prompt-preview-description p{font-size:12px;line-height:1.5;color:var(--muted);margin:5px 0 0}
+.prompt-preview-description{animation:prompt-detail-enter .16s ease-out both}
+.prompt-preview-disclosure{margin-top:8px;border:0!important}
+.prompt-preview-disclosure .disclosure-trigger{font-size:12px;min-height:34px;padding:5px 0}
+.prompt-preview-disclosure .disclosure-body{padding:0}
+.prompt-preview-tools{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px}
+.prompt-preview-text{max-height:190px;overflow:auto;overscroll-behavior:contain;white-space:pre-wrap;line-height:1.6;font-size:12px;padding:8px 10px;background:color-mix(in srgb,var(--muted) 4%,transparent);border:1px solid var(--prompt-edge);border-radius:8px;color:var(--ink)}
+.prompt-apply-hint{display:block;color:var(--muted);font-size:12px;line-height:1.5;margin-top:7px}
+.prompt-current-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:5px}
+.prompt-current-heading label{font-size:14px;color:var(--ink)}
+.prompt-current-kind{font-size:12px;color:var(--muted);text-align:right}
+.system-prompt-editor .prompt-current-text{margin:0;min-height:160px!important;max-height:240px;line-height:1.6;font-size:14px}
+.prompt-editor-footnote{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.prompt-editor-footnote>small{font-size:12px;line-height:1.5;color:var(--muted)}
+.prompt-undo{display:flex;align-items:center;gap:5px;border:0;background:transparent;font:inherit;font-size:12px;color:var(--muted);padding:0;flex-shrink:0;cursor:pointer;transition:color .18s}
+@media (hover:hover) and (pointer:fine){
+.prompt-undo:hover{color:var(--ink)}}
+@keyframes prompt-detail-enter{from{opacity:.3}to{opacity:1}}
+@media(max-width:600px){.prompt-preset-card{gap:5px;padding:10px 7px}.prompt-preset-icon{flex-basis:22px}.prompt-preset-copy strong{font-size:12px}.prompt-preset-check{flex-basis:10px}.prompt-preset-copy small{font-size:12px}.prompt-preview-summary{align-items:flex-start;gap:10px}.prompt-preset-preview{padding:11px}.prompt-editor-footnote{flex-direction:column;gap:8px}}
+@media(prefers-reduced-motion:reduce){.system-prompt-editor *{animation:none!important;transition:none!important}}

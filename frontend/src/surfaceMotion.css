@@ -1,0 +1,175 @@
+/* Native transitions reverse from the current rendered position. Radix still
+   needs an animationend to retain an exiting portal; this empty animation is
+   only a lifetime signal, never a second visual animation. Older browsers keep
+   the existing keyframe fallback in motionSystem.css. */
+@supports (transition-behavior: allow-discrete){
+ :root :is(.floating-panel,.model-menu,.app-select-menu,.answer-sources-popover,
+  .tts-panel,.chat-title-preview,.app-tooltip[data-slot=tooltip-content],
+  .premium-modal:not(.mobile-sidebar-modal),
+  .art-viewer,.art-viewer-backdrop,.art-compare,.art-compare-backdrop,
+  .art-animator:not(.art-animator-inline),.art-animator-backdrop,.art-upscaler,.art-upscale-backdrop,
+  .mobile-studio-sheet,.mobile-studio-sheet-backdrop,
+  [data-slot=dialog-overlay]:not(.mobile-sidebar-overlay)){
+  --surface-shift-x:0px;--surface-shift-y:4px;--surface-scale:1;
+  --surface-duration:var(--motion-detail,200ms);
+  opacity:1;translate:0 0;scale:1;
+  animation:none!important;
+  transition:opacity var(--surface-duration) var(--motion-ease),
+   translate var(--surface-duration) var(--motion-ease),
+   scale var(--surface-duration) var(--motion-ease);
+  will-change:auto;
+ }
+ :root :is(.floating-panel,.app-select-menu,.answer-sources-popover,.tts-panel,
+  .chat-title-preview,.app-tooltip[data-slot=tooltip-content])[data-side=bottom]{--surface-shift-y:-4px}
+ :root :is(.floating-panel,.app-select-menu,.answer-sources-popover,.tts-panel,
+  .chat-title-preview,.app-tooltip[data-slot=tooltip-content])[data-side=left]{--surface-shift-x:4px;--surface-shift-y:0px}
+ :root :is(.floating-panel,.app-select-menu,.answer-sources-popover,.tts-panel,
+  .chat-title-preview,.app-tooltip[data-slot=tooltip-content])[data-side=right]{--surface-shift-x:-4px;--surface-shift-y:0px}
+ :root .model-menu.floating-panel[data-side],
+ :root [data-slot=dialog-overlay]:not(.mobile-sidebar-overlay){
+  --surface-shift-x:0px;--surface-shift-y:0px;
+ }
+ :root .premium-modal:not(.mobile-sidebar-modal){
+  --surface-duration:var(--motion-surface,280ms);
+  --surface-shift-y:6px;--surface-scale:1;
+ }
+ :root :is([data-slot=dialog-overlay]:not(.mobile-sidebar-overlay),
+  .art-compare,.art-compare-backdrop,.art-animator:not(.art-animator-inline),.art-animator-backdrop,
+  .art-upscaler,.art-upscale-backdrop,.mobile-studio-sheet,.mobile-studio-sheet-backdrop){--surface-duration:var(--motion-surface,280ms)}
+ :root :is(.art-viewer,.art-viewer-backdrop,.art-compare-backdrop,.art-animator-backdrop,.art-upscale-backdrop,.mobile-studio-sheet-backdrop){--surface-shift-y:0px}
+ :root .mobile-studio-sheet{--surface-shift-y:105%}
+ :root :is(.app-tooltip[data-slot=tooltip-content],.chat-title-preview){--surface-duration:var(--motion-micro,160ms)}
+ :root :is(.floating-panel,.model-menu,.app-select-menu,.answer-sources-popover,
+  .tts-panel,.chat-title-preview,.app-tooltip[data-slot=tooltip-content],
+  .premium-modal:not(.mobile-sidebar-modal),
+  .art-viewer,.art-viewer-backdrop,.art-compare,.art-compare-backdrop,
+  .art-animator:not(.art-animator-inline),.art-animator-backdrop,.art-upscaler,.art-upscale-backdrop,
+  .mobile-studio-sheet,.mobile-studio-sheet-backdrop,
+  [data-slot=dialog-overlay]:not(.mobile-sidebar-overlay))[data-state=closed]{
+  opacity:0;translate:var(--surface-shift-x) var(--surface-shift-y);scale:var(--surface-scale);
+  transition-duration:var(--motion-exit,180ms);
+  animation:surface-presence-exit var(--motion-exit,180ms) linear both!important;
+  pointer-events:none;
+ }
+ @starting-style{
+  :root :is(.floating-panel,.model-menu,.app-select-menu,.answer-sources-popover,
+   .tts-panel,.chat-title-preview,.app-tooltip[data-slot=tooltip-content],
+   .premium-modal:not(.mobile-sidebar-modal),
+  .art-viewer,.art-viewer-backdrop,.art-compare,.art-compare-backdrop,
+  .art-animator:not(.art-animator-inline),.art-animator-backdrop,.art-upscaler,.art-upscale-backdrop,
+  .mobile-studio-sheet,.mobile-studio-sheet-backdrop,
+   [data-slot=dialog-overlay]:not(.mobile-sidebar-overlay)){
+   opacity:0;translate:var(--surface-shift-x) var(--surface-shift-y);scale:var(--surface-scale);
+  }
+ }
+ /* A neighbouring title preview opens without the entrance (see ChatTitleButton.tsx). */
+ @starting-style{
+  :root:root .chat-title-preview[data-instant]{opacity:1;translate:0 0;scale:1}
+ }
+ /* Full-screen mobile sheets fade without moving their viewport edges. Touch
+    menus use the same timing with a smaller travel distance. */
+ @media(max-width:800px){
+  :root .premium-modal:is(.settings-modal,.parameter-modal){--surface-shift-y:0px;--surface-scale:1}
+ }
+ /* Spring profile (motionProfile.ts): phone sheets and windows rise from below
+    the screen fully opaque, like the drawer, and leave the same way instead of
+    fading in place. A centred window travels half the visible height plus half
+    its own; the studio sheet is anchored to the bottom. Swipe dismissal keeps
+    its own finger-speed animation (mobileApp.css). */
+ @media(max-width:800px){
+  html[data-motion=fluid] :is(.premium-modal:not(.mobile-sidebar-modal):not(.composer-input-check),.mobile-studio-sheet){
+   --surface-shift-y:calc(var(--visible-height,100dvh)/2 + 50% + 24px);--surface-scale:1;
+   --surface-duration:var(--sheet-in-duration,280ms);
+   transition-timing-function:var(--sheet-in-ease,var(--motion-ease));
+  }
+  html[data-motion=fluid] .mobile-studio-sheet{--surface-shift-y:calc(100% + 40px)}
+  html[data-motion=fluid] :is(.premium-modal:not(.mobile-sidebar-modal):not(.composer-input-check),.mobile-studio-sheet)[data-state=closed]:not([data-surface-dragging=true]){
+   opacity:1;
+   transition-duration:var(--sheet-out-duration,180ms);
+   transition-timing-function:var(--sheet-out-ease,var(--motion-ease));
+   animation-duration:var(--sheet-out-duration,180ms)!important;
+  }
+  html[data-motion=fluid] :is([data-slot=dialog-overlay]:not(.mobile-sidebar-overlay),.mobile-studio-sheet-backdrop){--surface-duration:var(--sheet-in-duration,280ms)}
+  html[data-motion=fluid] :is([data-slot=dialog-overlay]:not(.mobile-sidebar-overlay),.mobile-studio-sheet-backdrop)[data-state=closed]{
+   transition-duration:var(--sheet-out-duration,180ms);animation-duration:var(--sheet-out-duration,180ms)!important;
+  }
+  @starting-style{
+   html[data-motion=fluid] :is(.premium-modal:not(.mobile-sidebar-modal):not(.composer-input-check),.mobile-studio-sheet){opacity:1}
+  }
+ }
+ /* Spring profile on desktop: windows rise 14px and menus 8px along a
+    critically damped curve (motionProfile.ts), then leave on the ordinary
+    exit timing. Only the entry changes; opacity follows the same curve. */
+ @media(min-width:801px){
+  html[data-motion=fluid] :is(.premium-modal:not(.mobile-sidebar-modal):not(.composer-input-check)){
+   --surface-shift-y:14px;--surface-duration:var(--pop-in-duration,280ms);
+   transition-timing-function:var(--pop-in-ease,var(--motion-ease));
+  }
+  html[data-motion=fluid] .premium-modal:not(.mobile-sidebar-modal):not(.composer-input-check)[data-state=closed]{
+   transition-timing-function:var(--motion-ease);
+  }
+ }
+ /* Menus use the same spring on every width, phones included. */
+ html[data-motion=fluid] :is(.floating-panel,.app-select-menu,.answer-sources-popover,.tts-panel):not(.model-menu){
+  --surface-duration:var(--menu-in-duration,220ms);
+  transition-timing-function:var(--menu-in-ease,var(--motion-ease));
+ }
+ html[data-motion=fluid] :is(.floating-panel,.app-select-menu,.answer-sources-popover,.tts-panel)[data-state=closed]{
+  transition-timing-function:var(--motion-ease);
+ }
+ @media(hover:none),(pointer:coarse){
+  :root :is(.floating-panel,.app-select-menu,.answer-sources-popover,.tts-panel){--surface-shift-y:6px}
+  :root :is(.floating-panel,.app-select-menu,.answer-sources-popover,.tts-panel)[data-side=bottom]{--surface-shift-y:-6px}
+  :root :is(.floating-panel,.app-select-menu,.answer-sources-popover,.tts-panel)[data-side=left]{--surface-shift-x:6px;--surface-shift-y:0px}
+  :root :is(.floating-panel,.app-select-menu,.answer-sources-popover,.tts-panel)[data-side=right]{--surface-shift-x:-6px;--surface-shift-y:0px}
+  :root .model-menu.floating-panel[data-side]{--surface-shift-x:0px;--surface-shift-y:0px}
+ }
+ /* Composer menus grow out of their trigger (transform-origin comes from Radix,
+    composerMotion.css) instead of travelling; specificity beats the side and
+    touch shift rules above. */
+ :root:root .composer-menu.floating-panel:not(.model-picker-sheet),
+ :root:root .composer-menu.floating-panel:not(.model-picker-sheet)[data-side]{--surface-shift-x:0px;--surface-shift-y:0px;--surface-scale:.95}
+}
+@keyframes surface-presence-exit{from{--surface-presence:1}to{--surface-presence:0}}
+/* Reduced motion removes travel and scale but keeps a short fade, so a surface
+   still arrives and leaves instead of cutting. The empty exit animation stays:
+   Radix keeps the portal mounted until it ends. Literal 160ms and !important:
+   motionSystem.css and index.css zero the duration tokens and force
+   `*{transition:none!important}` under reduced motion; a surface's own rules
+   here have higher specificity and so win over that blanket. */
+@media(prefers-reduced-motion:reduce){
+ :root :is(.floating-panel,.model-menu,.app-select-menu,.answer-sources-popover,
+  .tts-panel,.chat-title-preview,.app-tooltip[data-slot=tooltip-content],
+  .premium-modal:not(.mobile-sidebar-modal),
+  .art-viewer,.art-viewer-backdrop,.art-compare,.art-compare-backdrop,
+  .art-animator:not(.art-animator-inline),.art-animator-backdrop,.art-upscaler,.art-upscale-backdrop,
+  .mobile-studio-sheet,.mobile-studio-sheet-backdrop,
+  [data-slot=dialog-overlay]:not(.mobile-sidebar-overlay)){
+  animation:none!important;
+  transition:opacity 160ms var(--motion-ease)!important;
+  translate:none;scale:1;
+ }
+ :root :is(.floating-panel,.model-menu,.app-select-menu,.answer-sources-popover,
+  .tts-panel,.chat-title-preview,.app-tooltip[data-slot=tooltip-content],
+  .premium-modal:not(.mobile-sidebar-modal),
+  .art-viewer,.art-viewer-backdrop,.art-compare,.art-compare-backdrop,
+  .art-animator:not(.art-animator-inline),.art-animator-backdrop,.art-upscaler,.art-upscale-backdrop,
+  .mobile-studio-sheet,.mobile-studio-sheet-backdrop,
+  [data-slot=dialog-overlay]:not(.mobile-sidebar-overlay))[data-state=closed]{
+  opacity:0;translate:none;scale:1;
+  transition-duration:160ms!important;
+  animation:surface-presence-exit 160ms linear both!important;
+  pointer-events:none;
+ }
+ @starting-style{
+  :root :is(.floating-panel,.model-menu,.app-select-menu,.answer-sources-popover,
+   .tts-panel,.chat-title-preview,.app-tooltip[data-slot=tooltip-content],
+   .premium-modal:not(.mobile-sidebar-modal),
+   .art-viewer,.art-viewer-backdrop,.art-compare,.art-compare-backdrop,
+   .art-animator:not(.art-animator-inline),.art-animator-backdrop,.art-upscaler,.art-upscale-backdrop,
+   .mobile-studio-sheet,.mobile-studio-sheet-backdrop,
+   [data-slot=dialog-overlay]:not(.mobile-sidebar-overlay)){
+   opacity:0;translate:none;scale:1;
+  }
+ }
+}

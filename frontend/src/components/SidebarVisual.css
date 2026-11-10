@@ -1,0 +1,152 @@
+/* Navigation and search above, scrollable history, account below. */
+.app .desktop-sidebar{background:var(--oled-canvas,#111110);border-right:0}
+.mobile-sidebar-modal:has(.sidebar-refined){background:var(--oled-canvas,#111110)!important;border-right:1px solid var(--oled-line-soft,#ffffff0a)!important}
+.sidebar-inner.sidebar-refined{--sidebar-bg:var(--oled-canvas,#111110);--sidebar-text:var(--oled-ink,#e8e6df);--sidebar-icon:var(--oled-muted,#c1bfb5);--sidebar-muted:var(--oled-muted,#b8b6ac);--sidebar-caption:var(--oled-subtle,#85837b);--sidebar-hover:var(--oled-hover,#ffffff0a);--sidebar-active:var(--oled-active,#ffffff10);background:var(--sidebar-bg);color:var(--sidebar-text);color-scheme:dark;border-right:1px solid var(--oled-line-soft,#ffffff08)}
+html[data-theme=light] .sidebar-inner.sidebar-refined{--sidebar-bg:#eeede8;--sidebar-text:#292824;--sidebar-icon:#615f57;--sidebar-muted:#625f57;--sidebar-caption:#6b675e;--sidebar-hover:#00000006;--sidebar-active:#0000000c;color-scheme:light;border-right-color:#00000008}
+html[data-theme=light] .app .desktop-sidebar,html[data-theme=light] .mobile-sidebar-modal:has(.sidebar-refined){background:#eeede8!important}
+.sidebar-refined svg.app-icon,.sidebar-menu svg.app-icon{stroke-width:var(--icon-stroke)}
+.sidebar-inner.sidebar-refined .sidebar-brand{height:66px;min-height:66px;flex-shrink:0;justify-content:flex-start;padding:12px 14px;gap:10px}
+.sidebar-inner.sidebar-refined .sidebar-brand-actions>.icon-button{flex:none;width:30px;height:34px;min-width:30px;min-height:34px;padding:0;color:var(--sidebar-icon);border-radius:7px;background:transparent;border:0;box-shadow:none}
+.sidebar-inner.sidebar-refined .brand-wordmark{flex:0 1 auto;min-width:0;gap:7px;font-family:var(--font-display);font-size:24px;font-weight:400;line-height:1;letter-spacing:-.8px;color:var(--sidebar-text)}
+.sidebar-inner.sidebar-refined .brand-icon{width:22px;height:22px;object-fit:contain}
+.sidebar-inner.sidebar-refined>.new-chat-row{display:flex;flex-shrink:0;margin:0 8px 3px;padding:0}
+.sidebar-inner.sidebar-refined .new-chat-row>.new-chat-button{display:flex;align-items:center;flex:1;min-width:0;height:38px;min-height:38px;margin:0;padding:8px 12px;gap:12px;border:0!important;border-radius:8px;box-shadow:none!important;background:var(--oled-raised,#30302e);color:var(--sidebar-text);text-align:left}
+html[data-theme=light] .sidebar-inner.sidebar-refined .new-chat-row>.new-chat-button{background:#deddd6}
+.sidebar-inner.sidebar-refined .new-chat-button>span{font-size:var(--ui-text,14px);font-weight:400}
+.sidebar-inner.sidebar-refined .sidebar-sections{display:flex;flex-direction:column;gap:2px;flex-shrink:0;padding:0 8px}
+.sidebar-inner.sidebar-refined .sidebar-section-button{position:relative;isolation:isolate;display:flex;align-items:center;gap:12px;min-width:0;height:38px;min-height:38px;padding:8px 12px;border:0;border-radius:8px;background:transparent;color:var(--sidebar-muted);font-size:var(--ui-text,14px);font-weight:400;text-align:left}
+.sidebar-inner.sidebar-refined :is(.new-chat-button,.sidebar-section-button)>svg{width:18px;height:18px;flex:none;color:var(--sidebar-icon)}
+.sidebar-inner.sidebar-refined .sidebar-section-button>span:not(.sidebar-section-highlight){position:relative;min-width:0;font-size:inherit;line-height:22px}
+.sidebar-inner.sidebar-refined .sidebar-section-button.is-active{color:var(--sidebar-text)}
+.sidebar-inner.sidebar-refined .sidebar-section-highlight{position:absolute;inset:0;z-index:-1;border:0;border-radius:inherit;background:var(--sidebar-active);box-shadow:none}
+.sidebar-inner.sidebar-refined .sidebar-section-highlight::before{content:none}
+.sidebar-inner.sidebar-refined :is(.new-chat-button,.sidebar-section-button):active{transform:none;scale:1}
+.sidebar-history-heading{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:22px 12px 6px;flex:none}
+.sidebar-inner.sidebar-refined .chat-list-toggle{display:flex;align-items:center;gap:8px;flex:1;min-width:0;min-height:32px;margin:0;padding:0 8px;text-align:left;color:var(--sidebar-caption);background:transparent;border:0;border-radius:7px}
+.sidebar-inner.sidebar-refined .chat-list-toggle>span{font-size:14px;font-weight:400;line-height:20px;flex:none}
+.sidebar-inner.sidebar-refined .chat-list-toggle>svg{opacity:0;transition:transform .2s var(--motion-ease),opacity .15s}
+.sidebar-inner.sidebar-refined .chat-list-toggle:focus-visible>svg,.sidebar-inner.sidebar-refined .chat-list-toggle[aria-expanded=false]>svg{opacity:1}
+.sidebar-inner.sidebar-refined .rotated{transform:rotate(180deg)}
+.sidebar-inner.sidebar-refined .sidebar-manage{flex:none;width:30px;height:32px;min-width:30px;min-height:32px;padding:0;border-radius:7px;color:var(--sidebar-icon)}
+:is(.sidebar-inner.sidebar-refined,.sidebar-refined .sidebar-main)>.reveal-region{flex-shrink:0}
+.sidebar-inner.sidebar-refined .sidebar-search{display:flex;align-items:center;gap:8px;height:38px;min-height:38px;margin:0 12px 8px;padding:0 8px 0 10px;background:var(--sidebar-hover);border:1px solid color-mix(in srgb,var(--sidebar-icon) 20%,transparent);border-radius:9px;color:var(--sidebar-icon)}
+.sidebar-inner.sidebar-refined .sidebar-search>svg{flex:none}
+.sidebar-inner.sidebar-refined .sidebar-search input{flex:1;min-width:0;width:0;height:100%;padding:0;border:0;outline:none;background:transparent;color:var(--sidebar-text);font-size:14px;box-shadow:none}
+.sidebar-inner.sidebar-refined .sidebar-search input::placeholder{color:var(--sidebar-caption);opacity:1}
+.sidebar-inner.sidebar-refined .sidebar-search input::-webkit-search-cancel-button{display:none}
+.sidebar-inner.sidebar-refined .sidebar-search>.icon-button{flex:none;width:28px;height:28px;min-width:28px;min-height:28px;padding:0;color:var(--sidebar-icon)}
+.sidebar-inner.sidebar-refined .sidebar-search:focus-within{border-color:color-mix(in srgb,var(--sidebar-icon) 40%,transparent)}
+:is(.sidebar-inner.sidebar-refined,.sidebar-refined .sidebar-main)>.chat-list-collapse{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;overflow:hidden}
+.sidebar-inner.sidebar-refined .chat-list{flex:1;min-height:0;padding:0 7px 12px;overflow-x:hidden;overflow-y:auto;overflow-anchor:none;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#5a595255 transparent;scrollbar-gutter:stable}
+.sidebar-inner.sidebar-refined .chat-list section{margin:0}
+.sidebar-inner.sidebar-refined .chat-list h2{margin:15px 0 5px;padding:0 13px;font-size:12px;font-weight:400;line-height:18px;color:var(--sidebar-caption);text-transform:none;letter-spacing:0}
+.sidebar-inner.sidebar-refined .chat-list section:first-child h2{margin-top:4px}
+.sidebar-inner.sidebar-refined .chat-row{--chat-action-background:var(--sidebar-bg);position:relative;min-height:36px;margin:1px 0;border:0;border-radius:8px;box-shadow:none;background:transparent}
+.sidebar-inner.sidebar-refined .chat-row>button:first-child{display:flex;align-items:center;gap:10px;flex:1 1 auto;min-width:0;width:100%;min-height:36px;height:36px;padding:8px 12px;border:0;border-radius:8px;background:transparent;color:var(--sidebar-muted);font-size:var(--ui-text,14px);font-weight:400;line-height:20px;text-align:left;box-shadow:none}
+.sidebar-inner.sidebar-refined .chat-dot{flex:none;width:5px;height:5px;border:1px solid var(--sidebar-caption);border-radius:50%;opacity:.48;margin:0 3px}
+.sidebar-inner.sidebar-refined .chat-pin-marker{flex:none;width:12px;height:12px;margin:0;color:var(--sidebar-caption)}
+.sidebar-inner.sidebar-refined .chat-row.active{background:var(--sidebar-active);--chat-action-background:color-mix(in srgb,var(--sidebar-bg) 92%,var(--sidebar-text))}
+.sidebar-inner.sidebar-refined .chat-row.active>button:first-child{color:var(--sidebar-text);font-weight:400}
+.sidebar-inner.sidebar-refined .chat-row.active::before{content:none}
+.sidebar-inner.sidebar-refined .chat-title-text{flex:1;min-width:0;overflow:hidden;white-space:nowrap}
+.sidebar-inner.sidebar-refined .chat-title-text>span{overflow:hidden;text-overflow:clip;white-space:nowrap;mask-image:linear-gradient(to right,#000 calc(100% - 20px),transparent);-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 20px),transparent)}
+.sidebar-inner.sidebar-refined .chat-row .chat-action-slot{position:absolute;right:2px;top:50%;transform:translateY(-50%);z-index:1;flex:none;width:40px;height:32px;opacity:0;pointer-events:none;background:linear-gradient(to right,transparent,var(--chat-action-background) 10px);border-radius:7px;transition:opacity .15s}
+.sidebar-inner.sidebar-refined .chat-row .chat-action-layer{left:8px}
+@media (hover:hover) and (pointer:fine){
+.sidebar-inner.sidebar-refined .chat-row:is(:hover,:focus-within,:has(.chat-more[data-state=open])) .chat-action-slot{opacity:1;pointer-events:auto}}
+.sidebar-inner.sidebar-refined .chat-row:is(:focus-within,:has(.chat-more[data-state=open])) .chat-action-slot{opacity:1;pointer-events:auto}
+.sidebar-inner.sidebar-refined .chat-row:focus-within .chat-more,.sidebar-inner.sidebar-refined .chat-more[data-state=open]{opacity:1}
+.sidebar-inner.sidebar-refined :is(.chat-more,.chat-quick-delete){color:var(--sidebar-icon);border:0;border-radius:7px}
+.sidebar-inner.sidebar-refined .chat-row:has(>button:first-child:focus-visible){background:var(--sidebar-active)}
+.sidebar-inner.sidebar-refined .chat-list .folder-group-heading{display:flex;align-items:center;gap:3px;padding:0 4px 0 13px}
+.sidebar-inner.sidebar-refined .folder-group-toggle{display:flex;align-items:center;gap:7px;width:100%;min-height:26px;border-radius:8px;font-size:12px;font-weight:400;color:var(--sidebar-caption);text-align:left}
+.sidebar-inner.sidebar-refined .folder-group-toggle>span:not(.folder-count){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar-inner.sidebar-refined .folder-group-toggle>svg{flex:none;transition:transform .2s var(--motion-ease)}
+.sidebar-inner.sidebar-refined .folder-count{font-size:12px;color:var(--sidebar-caption);background:transparent}
+.sidebar-inner.sidebar-refined .folder-delete{opacity:0;pointer-events:none;color:var(--sidebar-caption)}
+@media (hover:hover) and (pointer:fine){
+.sidebar-inner.sidebar-refined .folder-group-heading:hover>.folder-delete{opacity:1;pointer-events:auto}}
+.sidebar-inner.sidebar-refined .folder-group-heading:focus-within>.folder-delete{opacity:1;pointer-events:auto}
+.sidebar-inner.sidebar-refined .search-result strong{color:var(--sidebar-text);font-size:14px;font-weight:400}
+.sidebar-inner.sidebar-refined .search-result p{color:var(--sidebar-muted);font-size:14px}
+.sidebar-inner.sidebar-refined :is(.search-result small,.sidebar-search-status,.sidebar-empty){color:var(--sidebar-caption);font-size:12px}
+.sidebar-inner.sidebar-refined>.sidebar-footer{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-top:auto;min-height:58px;padding:7px 10px;border-top:1px solid color-mix(in srgb,var(--sidebar-caption) 14%,transparent);background:var(--sidebar-bg)}
+.sidebar-inner.sidebar-refined .sidebar-account{display:flex;align-items:center;gap:10px;flex:1;min-width:0;min-height:40px;padding:4px 7px;border-radius:8px;color:var(--sidebar-text);text-align:left}
+.sidebar-account-avatar{display:grid;place-items:center;flex:none;width:29px;height:29px;border-radius:50%;background:color-mix(in srgb,var(--sidebar-caption) 22%,transparent);font-size:12px}
+.sidebar-account-avatar>.avatar{width:100%;height:100%;border:0;border-radius:inherit;background:transparent}
+.sidebar-account-avatar>.avatar>span{font:inherit}
+.sidebar-account-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.sidebar-account>svg{color:var(--sidebar-caption);flex:none}
+.sidebar-inner.sidebar-refined .sidebar-header-search{flex:none;width:36px;height:36px;min-width:36px;min-height:36px;padding:0;color:var(--sidebar-icon);border-radius:8px}
+.sidebar-inner.sidebar-refined :is(button,.sidebar-search){transition:background-color .15s,color .15s,border-color .2s}
+.sidebar-inner.sidebar-refined button:focus-visible{outline:1px solid var(--sidebar-caption);outline-offset:-2px}
+.sidebar-inner.sidebar-refined .chat-row>button:first-child:focus-visible{outline:none}
+@media(hover:hover){
+ .sidebar-inner.sidebar-refined :is(.sidebar-section-button,.sidebar-brand-actions>.icon-button,.sidebar-account,.sidebar-header-search,.sidebar-manage,.chat-list-toggle):hover{background:var(--sidebar-hover);color:var(--sidebar-text)}
+ .sidebar-inner.sidebar-refined .new-chat-row>.new-chat-button:hover{background:color-mix(in srgb,var(--sidebar-bg) 80%,var(--sidebar-text))}
+ .sidebar-inner.sidebar-refined .chat-list-toggle:hover>svg{opacity:1}
+ .sidebar-inner.sidebar-refined .chat-row:not(.active):hover{background:var(--sidebar-hover);--chat-action-background:color-mix(in srgb,var(--sidebar-bg) 96%,var(--sidebar-text))}
+ .sidebar-inner.sidebar-refined .chat-row:hover>button:first-child{color:var(--sidebar-text)}
+}
+@media(hover:none),(pointer:coarse){
+ .sidebar-inner.sidebar-refined .chat-row .chat-action-slot,.sidebar-inner.sidebar-refined .chat-row .chat-more,.sidebar-inner.sidebar-refined .folder-delete{opacity:1;pointer-events:auto}
+ .sidebar-inner.sidebar-refined .chat-row>button:first-child{padding-right:44px}
+ /* The title already stops short of the button, so no fade is needed; the fade's solid colour never matched the translucent selected-row fill and showed as a seam. */
+ .sidebar-inner.sidebar-refined .chat-row .chat-action-slot{background:none}
+}
+@media(max-width:800px){
+ .mobile-sidebar-modal.premium-modal{width:100vw!important;max-width:100vw!important;height:var(--visible-height,100dvh)!important;max-height:var(--visible-height,100dvh)!important;border-radius:0!important;box-shadow:none!important}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined{font-size:var(--ui-text,14px)}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined .chat-list :is(h2,.folder-group-toggle,.pinned-group-heading){font-size:12px;font-weight:500}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined .sidebar-brand{height:58px;min-height:58px;padding:5px 10px;gap:8px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined .sidebar-brand-actions>.icon-button{width:44px;height:44px;min-width:44px;min-height:44px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined :is(.new-chat-row>.new-chat-button,.sidebar-section-button){height:44px;min-height:44px;padding:10px 12px;font-size:14px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined .sidebar-history-heading{margin-top:14px;margin-bottom:4px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined :is(.chat-list-toggle,.sidebar-manage){height:44px;min-height:44px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined .sidebar-manage{width:44px;min-width:44px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined .sidebar-search{height:46px;min-height:46px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined .sidebar-search input{font-size:16px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined .sidebar-search>.icon-button{width:44px;height:44px;min-width:44px;min-height:44px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined :is(.chat-row,.chat-row>button:first-child){height:44px;min-height:44px;font-size:14px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined .chat-row>button:first-child{padding:12px 48px 12px 12px;font-weight:400}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined .chat-row .chat-action-slot{width:48px;height:44px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined .chat-row .chat-action-layer{left:4px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined :is(.chat-more,.chat-quick-delete,.folder-delete){width:44px;height:44px;min-width:44px;min-height:44px;margin:0;padding:0}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined .folder-group-toggle{min-height:44px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined>.sidebar-footer{min-height:58px;padding:7px 10px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined :is(.sidebar-account,.sidebar-header-search){height:44px;min-height:44px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined .sidebar-header-search{width:44px;min-width:44px}
+ .mobile-sidebar-modal .sidebar-inner.sidebar-refined[data-search-open=true] :is(.new-chat-row,.sidebar-sections){display:none}
+ .sidebar-menu [role=menuitem]{min-height:44px}
+}
+@media(prefers-reduced-motion:reduce){
+ .sidebar-inner.sidebar-refined :is(button,.sidebar-search,.chat-action-slot,.chat-list-toggle>svg,.folder-group-toggle>svg){transition:none}
+ .sidebar-inner.sidebar-refined>.sidebar-footer{animation:none!important}
+}
+
+
+@media(max-width:800px){.sidebar-inner.sidebar-refined .brand-wordmark{font-size:24px;line-height:1;letter-spacing:-.8px}}
+
+.sidebar-inner.sidebar-refined .sidebar-brand-actions{display:flex;align-items:center;flex:none;margin-left:auto;gap:2px}
+.sidebar-inner.sidebar-refined .sidebar-brand{gap:6px;padding-left:18px;padding-right:8px}
+.sidebar-inner.sidebar-refined .sidebar-brand-actions>.icon-button{width:30px;min-width:30px;height:34px;min-height:34px}
+@media(max-width:800px){.mobile-sidebar-modal .sidebar-inner.sidebar-refined .sidebar-brand-actions>.icon-button{width:44px;min-width:44px;height:44px;min-height:44px}}
+
+/* "Новый диалог" is an action, so it has no fill: a filled tile means "you are here" and belongs to the current section. Only its heavier text sets it apart. */
+:root .sidebar-inner.sidebar-refined .new-chat-row>.new-chat-button:not(.is-active){background:transparent;box-shadow:none!important}
+:root .sidebar-inner.sidebar-refined .new-chat-row>.new-chat-button>span{font-weight:600}
+:root .sidebar-inner.sidebar-refined .new-chat-row>.new-chat-button.is-active{background:var(--sidebar-active)}
+:root .sidebar-inner.sidebar-refined .new-chat-row>.new-chat-button>svg{color:var(--sidebar-text)}
+@media(hover:hover){:root .sidebar-inner.sidebar-refined .new-chat-row>.new-chat-button:not(.is-active):hover{background:var(--sidebar-hover)}}
+
+/* Аудит по ui-ux-pro-max (08.11.2026): геометрия референса не меняется. */
+/* Нажатие видно и мышью: заливка без сдвига границ (на телефоне — touchPress.css). */
+@media(hover:hover) and (pointer:fine){
+ :root .sidebar-inner.sidebar-refined :is(.new-chat-button,.sidebar-section-button,.chat-row>button:first-child,.sidebar-account,.chat-list-toggle,.sidebar-brand-actions>.icon-button,.sidebar-manage,.folder-group-toggle):active{background:var(--sidebar-active);transition-duration:0s}
+}
+/* Фокус с клавиатуры — 2px, различим в обеих темах. */
+:root .sidebar-inner.sidebar-refined button:focus-visible{outline:2px solid var(--sidebar-caption);outline-offset:-2px}
+:root .sidebar-inner.sidebar-refined .chat-row:has(>button:first-child:focus-visible){box-shadow:inset 0 0 0 2px var(--sidebar-caption)}
+/* Без наведения стрелка «Диалоги» не должна прятаться: иначе сворачивание не обнаружить. */
+@media(hover:none),(pointer:coarse){:root .sidebar-inner.sidebar-refined .chat-list-toggle>svg{opacity:.7}}
+:root .sidebar-inner.sidebar-refined :is(.folder-count,.sidebar-search-status){font-variant-numeric:tabular-nums}

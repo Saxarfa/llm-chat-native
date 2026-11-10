@@ -1,0 +1,42 @@
+/* Soft Streaming — премиальная анимация потоковых ответов LLM Chat */
+
+.stream-block {
+  display: block;
+}
+
+/* Мягкое появление нового самостоятельного блока Markdown во время стриминга */
+.stream-block-enter {
+  animation: stream-block-reveal 150ms cubic-bezier(.23,1,.32,1) both;
+  will-change: opacity, transform;
+}
+
+@keyframes stream-block-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Сохранение нативных вертикальных отступов Markdown-блоков внутри .prose */
+.prose .stream-block:not(:last-child) > p:last-child {
+  margin-bottom: 1.15em;
+}
+
+.prose > .stream-block:first-child > :first-child {
+  margin-top: 0;
+}
+
+.assistant-message .answer-content > .stream-block:last-child > :last-child {
+  margin-bottom: 0;
+}
+
+/* Режим уменьшения движения (prefers-reduced-motion) */
+@media (prefers-reduced-motion: reduce) {
+  .stream-block-enter {
+    animation: none !important;
+  }
+}

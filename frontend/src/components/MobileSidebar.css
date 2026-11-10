@@ -1,0 +1,55 @@
+.sidebar-swipe-edge{z-index:120!important}
+.sidebar-swipe-edge[data-drawer-open=true]{pointer-events:none}
+
+.mobile-sidebar-host{
+ position:fixed;
+ inset:0;
+ z-index:110;
+ visibility:hidden;
+ pointer-events:none;
+}
+.mobile-sidebar-host[data-active=true]{visibility:visible}
+
+/* Keep the menu behind the full-width screen, as in the phone reference. */
+:root .mobile-sidebar-host .mobile-sidebar-modal{
+ position:fixed;
+ contain:layout paint style;
+ animation:none!important;
+ transition:none!important;
+ transform:none!important;
+ translate:none!important;
+ scale:1!important;
+ opacity:1!important;
+ border:0!important;
+ pointer-events:none!important;
+ touch-action:pan-y pinch-zoom;
+}
+:root .mobile-sidebar-host[data-active=true] .mobile-sidebar-modal{pointer-events:auto!important}
+:root .mobile-sidebar-host .mobile-sidebar-modal .chat-list{contain:layout paint style}
+
+/* Shade over the menu while the screen covers it; JS sets its opacity from the screen's position. */
+.mobile-sidebar-dim{position:fixed;inset:0;opacity:0;pointer-events:none;background:rgb(0 0 0/var(--drawer-dim,.4))}
+.mobile-sidebar-host[data-active=true] .mobile-sidebar-dim{will-change:opacity}
+.mobile-sidebar-host[data-active=true] .sidebar-swipe-content{will-change:translate}
+html[data-theme=light] .mobile-sidebar-dim{--drawer-dim:.1}
+
+.app[data-mobile-sidebar=true]{
+ z-index:111;
+ will-change:translate;
+ border-radius:18px 0 0 18px;
+ pointer-events:none;
+}
+:root .mobile-sidebar-overlay{
+ position:fixed;
+ inset:0;
+ z-index:112;
+ visibility:hidden;
+ background:transparent!important;
+ -webkit-backdrop-filter:none!important;
+ backdrop-filter:none!important;
+ animation:none!important;
+ transition:none!important;
+ touch-action:pan-y pinch-zoom;
+ pointer-events:none!important;
+}
+:root .mobile-sidebar-overlay[data-active=true]{visibility:visible;pointer-events:auto!important;will-change:translate}

@@ -1,0 +1,10 @@
+.app-tooltip[data-slot=tooltip-content]{z-index:300;width:max-content;max-width:min(260px,calc(100vw - 24px));padding:7px 10px;border:1px solid var(--theme-line-soft,#ffffff12);border-radius:8px;background:var(--theme-surface-raised,#353530);color:var(--ink);font:12px/1.45 var(--font-ui);font-weight:400;text-align:left;overflow-wrap:anywhere;box-shadow:0 4px 18px var(--theme-shadow,#0003);pointer-events:none;animation:hint-appear .14s ease-out both}
+.app-tooltip[data-slot=tooltip-content][data-state=closed]{animation:hint-disappear .1s ease-out both}
+@keyframes hint-appear{from{opacity:0}to{opacity:1}}
+@keyframes hint-disappear{from{opacity:1}to{opacity:0}}
+@media(prefers-reduced-motion:reduce){.app-tooltip[data-slot=tooltip-content]{animation:none}}
+
+/* Wrapper that keeps a tooltip alive on disabled controls. */
+.hint-anchor{display:inline-flex}
+.hint-anchor>button:disabled{pointer-events:none}
+.hint-anchor-block{display:flex;width:100%}

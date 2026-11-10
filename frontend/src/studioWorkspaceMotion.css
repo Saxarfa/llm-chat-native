@@ -1,0 +1,63 @@
+/* Small state changes share the existing capsule/disclosure easing. Geometry stays immediate. */
+.state-transition{display:inline-flex;position:relative;align-items:center;min-width:0;vertical-align:middle}
+.state-transition>.state-transition-layer{display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:100%;inset:0 auto auto 0}
+.state-transition.is-icon{width:16px;height:16px;flex:none}
+.state-transition.is-icon>.state-transition-layer{width:100%;height:100%;justify-content:center;gap:0}
+.studio-art-header .studio-status-transition{display:inline-flex;min-height:16px;max-width:100%}
+.studio-art-header .studio-status-transition>.state-transition-layer{font-variant-numeric:tabular-nums}
+.studio-generation-progress{position:absolute;inset:0 0 auto;z-index:3;pointer-events:none}
+.studio-progress-track{height:3px;overflow:hidden;background:rgba(0,0,0,.38);box-shadow:0 1px 6px rgba(0,0,0,.35)}
+.studio-progress-fill{height:100%;width:100%;background:var(--theme-text-primary,#dbd8ce);transform-origin:left center;box-shadow:0 0 8px rgba(255,255,255,.35)}
+.studio-progress-indeterminate{height:100%;width:24%;background:linear-gradient(90deg,transparent,var(--theme-text-primary,#dbd8ce),transparent);animation:studio-progress-travel 1.8s ease-in-out infinite}
+.studio-progress-label{position:absolute;top:9px;right:10px;padding:2px 8px;border-radius:999px;font-size:12px;line-height:16px;font-variant-numeric:tabular-nums;color:var(--theme-text-primary,#dbd8ce);background:rgba(0,0,0,.45);opacity:.85}
+@keyframes studio-progress-travel{from{translate:-120% 0}to{translate:520% 0}}
+.image-studio .studio-cycle-icon{transform-origin:center}
+.image-studio .studio-loop[aria-pressed=true] .studio-cycle-icon{animation:studio-cycle-turn 4.8s linear infinite}
+@keyframes studio-cycle-turn{to{rotate:360deg}}
+.image-studio .studio-loop:not([aria-pressed=true]) .studio-cycle-icon{transition:rotate .3s var(--ease)}
+.image-studio .studio-panel-reset>svg,.image-studio .studio-download>svg,.image-studio .studio-history-open>svg{transition:rotate .28s var(--ease),translate .28s var(--ease)}
+.image-studio .studio-history-list>.studio-history-row{overflow:hidden}
+.image-studio .studio-history-item{display:flow-root;min-width:0}
+.image-studio .studio-loop-note{overflow:hidden}
+.image-studio .studio-form,.image-studio .studio-art{transition:box-shadow .24s var(--ease),border-color .24s}
+.image-studio .active-form .studio-form,.image-studio .active-art .studio-art{box-shadow:0 8px 30px var(--theme-shadow,#00000014)}
+
+/* Promote only the element being moved, and release it after the gesture. */
+@media(min-width:801px){
+ .studio-scroll.is-panning>.studio-content,.studio-content[data-camera-moving=true],.studio-content[data-camera-command=true]{will-change:transform}
+ .studio-content.is-moving-form>.studio-controls-window,.studio-content.is-moving-art>.studio-art-window{will-change:transform}
+ .studio-content[data-camera-command=true],
+ .studio-content[data-camera-command=true]>:is(.studio-controls-window,.studio-art-window,.studio-translator-window){
+  transition:transform var(--motion-surface,280ms) var(--ease-out,cubic-bezier(.23,1,.32,1));
+ }
+}
+.studio-empty .studio-empty-glyph{width:34px;height:34px;margin-bottom:8px;color:var(--theme-text-muted,#a9a18a)}
+.mobile-studio-empty .mobile-studio-empty-glyph{width:27px;height:27px}
+.studio-empty.is-generating .studio-empty-glyph,.mobile-studio-empty.is-generating .mobile-studio-empty-icon{color:var(--theme-text-primary,#dbd8ce);border-color:var(--theme-line-strong,#b6af8e3d)}
+
+.workspace-editor-tabs>button{position:relative}
+.workspace-editor-tabs .workspace-tab-mark{position:absolute;bottom:2px;left:34%;right:34%;height:2px;border-radius:3px;background:var(--theme-fill-accent,#bdb3988c);pointer-events:none}
+.workspace-cover-editor .workspace-cover-placeholder,.workspace-card-cover .workspace-cover-placeholder{position:absolute;inset:0}
+.workspace-editor-tab-exit{min-width:0}
+.workspace-editor>.reveal-region{flex-shrink:0}
+.workspace-heading>button>svg,.workspace-empty>button>svg,.workspace-start>svg:not(.spin),.workspace-card-menu>svg,
+.workspace-cover-editor-actions button>svg:not(.spin),.workspace-section-heading button>svg,.workspace-editor-tabs button>svg,
+.workspace-search>svg{transition:translate .28s var(--ease),rotate .28s var(--ease),color .2s}
+.workspace-search:focus-within>svg{color:var(--theme-text-primary,#c5bba4)}
+.workspace-empty-symbol{transition:scale .3s var(--ease),border-color .25s}
+.workspace-start .state-transition.is-icon,.workspace-editor-footer .state-transition.is-icon,.workspace-cover-editor-actions .state-transition.is-icon{width:14px;height:14px}
+.workspace-start .state-transition-layer>svg:not(.spin),.workspace-cover-editor-actions .state-transition-layer>svg:not(.spin){transition:translate .28s var(--ease)}
+@media(hover:hover) and (pointer:fine){
+ .workspace-empty:has(>button:hover)>.workspace-empty-symbol{border-color:var(--theme-line,#ffffff18)}
+}
+@media(prefers-reduced-motion:reduce){
+ .state-transition-layer,.studio-progress-fill,.workspace-tab-mark,.workspace-editor-tab-exit{transition:none!important;animation:none!important}
+ .studio-progress-indeterminate{animation:none!important;translate:160% 0}
+ .image-studio .studio-cycle-icon{animation:none!important;rotate:none!important}
+ .image-studio :is(.studio-panel-reset>svg,.studio-download>svg,.studio-history-open>svg),
+ .workspace-heading>button>svg,.workspace-empty>button>svg,.workspace-start>svg:not(.spin),.workspace-card-menu>svg,.workspace-empty-symbol,
+ .workspace-cover-editor-actions button>svg:not(.spin),.workspace-section-heading button>svg,.workspace-editor-tabs button>svg,.workspace-search>svg{translate:none!important;rotate:none!important;scale:1!important}
+ .workspace-start .state-transition-layer>svg:not(.spin),.workspace-cover-editor-actions .state-transition-layer>svg:not(.spin){translate:none!important}
+}
+
+.studio-empty.is-generating :is(p,small){display:none}
