@@ -76,7 +76,7 @@ export class ReadAloudController{
  };
  async start(owner:string,text:string,voice:string,rate:number){
   this.stop();const revision=this.revision,request=new AbortController();this.request=request;
-  const audio=new Audio();this.audio=audio;audio.preload='auto';audio.playbackRate=rate;
+  const audio=new Audio();this.audio=audio;audio.setAttribute('playsinline','');audio.setAttribute('webkit-playsinline','');audio.preload='auto';audio.playbackRate=rate;
   // Unlock this same element during the tap on iOS. If Safari still requires
   // another gesture after fetching, leave the prepared audio ready to play.
   audio.src='data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQIAAAAAAA==';

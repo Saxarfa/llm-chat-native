@@ -1,9 +1,18 @@
 /* Native-only platform fixes; all colors, typography and layouts are shared. */
 html[data-capacitor=ios],html[data-capacitor=ios] body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
 html[data-capacitor=ios] :is(button,[role=button],[role=tab],[role=switch],nav a){-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation}
-html[data-capacitor=ios] .auth-screen{min-height:100dvh;padding-top:max(24px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom))}
+html[data-capacitor=ios] .auth-screen{height:var(--visible-height,100dvh);min-height:0;padding-top:max(24px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom));scroll-padding-block:24px}
 html[data-capacitor=ios] .native-connection{width:min(100%,460px)}
 html[data-capacitor=ios] .native-connection header img{margin-bottom:16px}
 html[data-capacitor=ios] :is(.premium-modal,.mobile-studio-sheet){max-height:var(--visible-height,100dvh)}
 /* Reserve the left edge for WKWebView history only when there is a back entry. */
 html[data-native-can-back=true] .sidebar-swipe-edge{pointer-events:none}
+.native-connection-back{min-height:44px;color:var(--muted);border:1px solid var(--line);border-radius:10px;background:transparent}
+.native-connection header p{font-size:14px;line-height:1.6}
+.pwa-settings p{overflow-wrap:anywhere}
+/* In landscape the website uses its existing wide layout. Keep its native
+   keyboard inset without forcing mobile DOM into desktop CSS breakpoints. */
+@media(min-width:801px){
+ html[data-capacitor=ios] .page-surface[data-page=chat] .main-panel .composer-dock{bottom:var(--keyboard-inset,0px);transition:bottom var(--keyboard-motion-duration,400ms) var(--keyboard-ease)}
+}
+@media(prefers-reduced-motion:reduce){html[data-capacitor=ios] .composer-dock{transition:none!important}}

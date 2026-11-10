@@ -1,4 +1,3 @@
-import {isNativeIOS} from './native/platform';
 import {useNativeNavigation} from './native/navigation';
 import {triggerHaptic} from './haptics';
 import {usePreparedPage} from './usePreparedPage';
@@ -66,7 +65,7 @@ import {WelcomeHeading} from './components/ChatWelcome';
 import {useRegenerationScroll} from './useRegenerationScroll';
 import type {Attachment,Chat,Message,State} from './types';
 import SettingsPanel from './components/Settings';
-export function useMobile(){const[small,setSmall]=useState(isNativeIOS()||matchMedia('(max-width: 800px)').matches);useEffect(()=>{const media=matchMedia('(max-width: 800px)'),change=()=>setSmall(isNativeIOS()||media.matches);media.addEventListener('change',change);return()=>media.removeEventListener('change',change)},[]);return small}
+export function useMobile(){const[small,setSmall]=useState(matchMedia('(max-width: 800px)').matches);useEffect(()=>{const media=matchMedia('(max-width: 800px)'),change=()=>setSmall(media.matches);media.addEventListener('change',change);return()=>media.removeEventListener('change',change)},[]);return small}
 function usePickerFocus(){
  const pointer=useRef(false);
  return {onPointerDown:()=>{pointer.current=true},onKeyDown:()=>{pointer.current=false},onCloseAutoFocus:(event:Event)=>{if(pointer.current)event.preventDefault()}};
@@ -84,7 +83,7 @@ function Application(){
  const downwardUntil=useRef(0),panelScrollCleanup=useRef<(()=>void)|null>(null);
  useNativeNavigation({page,chatId:state.active,settings,profile,parameters},state.ready&&!!state.user,async target=>{
   setMobileMenu(false);setSettings(target.settings);setProfile(target.profile);setParameters(target.parameters);
-  if(target.chatId!==state.active)await chat.selectChat(target.chatId);
+  if(target.chatId!==state.active){if(target.chatId==='new'||!state.chats.some(c=>c.id===target.chatId))chat.newChat();else await chat.selectChat(target.chatId)}
   await setPage(target.page);
  });
  const following=useRef(true),lastScrollTop=useRef(0),touchY=useRef<number|undefined>(undefined),scrollingToBottom=useRef(false),manualScrolling=useRef(false),container=useRef<HTMLDivElement>(null),end=useRef<HTMLDivElement>(null),active=state.chats.find(c=>c.id===state.active),live=state.lives[state.active],model=chat.activeModel(),presentation=useMemo(()=>presetPresentation(state.settings,chat.overrides()),[state.settings,state.active,active?.overrides,state.draftOverrides]),name=modelName(model,presentation),messages=displayedMessages(active,live),empty=messages.length===0&&!live;

@@ -50,6 +50,11 @@ export async function initializeNativeRuntime(){
   inset=height;root.dataset.keyboard=String(height>0);root.dataset.viewportResizing='true';
   root.style.setProperty('--keyboard-inset',height+'px');root.style.setProperty('--keyboard-motion-duration','400ms');
   layout();window.dispatchEvent(new Event('mobile-viewport-changing'));
+  if(height)requestAnimationFrame(()=>{
+   // Auth/connection forms scroll inside their own shortened container.
+   const field=document.activeElement;
+   if(field instanceof HTMLElement&&field.closest('.auth-screen'))field.scrollIntoView({block:'nearest',behavior:'instant'});
+  });
   clearTimeout(timer);timer=setTimeout(()=>{delete root.dataset.viewportResizing;window.dispatchEvent(new Event('mobile-viewport-settled'))},450);
  };
  layout();window.addEventListener('resize',layout);

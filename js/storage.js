@@ -37,7 +37,7 @@ const KNOWN_MODEL_CONTEXTS = {
 };
 
 const DEFAULT_SETTINGS = {
-  endpoint: (typeof window !== 'undefined' && window.location.origin) ? `${window.location.origin}/v1` : 'http://127.0.0.1:8000/v1',
+  endpoint: (typeof window !== 'undefined' && window.location.origin) ? `${window.__LLM_SERVER_ORIGIN__ || window.location.origin}/v1` : 'http://127.0.0.1:8000/v1',
   apiKey: '',
   model: 'muse-glimmer-30b',
   availableModels: [],

@@ -18,6 +18,7 @@ export async function initializeNativeNetwork(){
  const saved=(await Preferences.get({key:SERVER_KEY})).value;
  server=saved||import.meta.env.VITE_IOS_SERVER_URL||'';
  if(server)server=normalizeServer(server);
+ (window as Window&{__LLM_SERVER_ORIGIN__?:string}).__LLM_SERVER_ORIGIN__=server;
  const original=window.fetch.bind(window);
  window.fetch=async(input,init)=>{
   const raw=input instanceof Request?input.url:String(input),target=serverRequestURL(raw);
@@ -35,8 +36,11 @@ export async function initializeNativeNetwork(){
 export async function saveNativeServer(value:string){
  const next=normalizeServer(value);
  // This request deliberately has no credentials from the previous server.
- const response=await fetch(next+'/health',{signal:AbortSignal.timeout(8000),credentials:'omit'});
- if(!response.ok)throw Error('Сервер не ответил. Проверьте адрес и запустите LLM Chat на ПК.');
+ const response=await fetch(next+'/api/auth/me',{signal:AbortSignal.timeout(8000),credentials:'omit'});
+ // The existing health endpoint probes models and requires a signed-in user.
+ // An unauthenticated 401 from auth/me confirms the API is reachable without
+ // starting a model or sending credentials to the new server.
+ if(!(response.ok||response.status===401)||!response.headers.get('content-type')?.includes('application/json'))throw Error('Сервер не ответил. Проверьте адрес и запустите LLM Chat на ПК.');
  await flushNativeStorage();
  await Preferences.set({key:SERVER_KEY,value:next});
  // Each server has its own native storage namespace. Clear only the WebKit

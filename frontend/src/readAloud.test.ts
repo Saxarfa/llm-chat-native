@@ -5,7 +5,7 @@ class AudioMock{
  static instances:AudioMock[]=[];
  src='';preload='';playbackRate=1;currentTime=0;duration=25;ended=false;
  onended:(()=>void)|null=null;ontimeupdate:(()=>void)|null=null;onloadedmetadata:(()=>void)|null=null;onerror:(()=>void)|null=null;
- play=vi.fn(async()=>{});pause=vi.fn();load=vi.fn();removeAttribute=vi.fn();
+ play=vi.fn(async()=>{});pause=vi.fn();load=vi.fn();removeAttribute=vi.fn();setAttribute=vi.fn();
  constructor(){AudioMock.instances.push(this)}
 }
 function setup(){
