@@ -61,6 +61,8 @@ final class AppModel {
     /// Последний текст потока; в `lives` переносится не чаще нескольких раз в секунду.
     @ObservationIgnored var liveRaw: [String: (text: String, reasoning: String)] = [:]
     @ObservationIgnored var liveFlushScheduled = false
+    /// Ответ закончен на сервере, но лента ещё дописывает его последний кусок.
+    @ObservationIgnored var pendingFinish: [String: (chat: [String: Any]?, notify: Bool)] = [:]
     @ObservationIgnored var lastEventAt: [String: Date] = [:]
     @ObservationIgnored var watching: Set<String> = []
 
@@ -152,6 +154,7 @@ final class AppModel {
         await api?.logout()
         lives = [:]
         liveRaw = [:]
+        pendingFinish = [:]
         lastEventAt = [:]
         watching = []
         chatMeta = [:]

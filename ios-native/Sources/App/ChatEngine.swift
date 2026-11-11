@@ -135,7 +135,7 @@ extension AppModel {
             }
             guard activeChatID == id else { return }
             if (status["is_generating"] as? Bool) == true {
-                applyLive(id, event: ChatConfig.dict(status["snapshot"]))
+                applyLive(id, event: ChatConfig.dict(status["snapshot"]), instant: true)
                 watch(id)
             } else if lives[id]?.sending != true {
                 lives[id] = nil
@@ -254,6 +254,7 @@ extension AppModel {
         do {
             // Сервер отвечает, когда уже сохранил написанную часть ответа.
             _ = try await api.json("/api/chat/stop", method: "POST", body: ["chat_id": id], timeout: 60)
+            pendingFinish[id] = nil
             lives[id] = nil
             liveRaw[id] = nil
             if activeChatID == id { await loadThread() }
@@ -276,7 +277,7 @@ extension AppModel {
                 guard let api,
                       let status = try? await api.json("/api/chat/status/\(APIClient.pathSafe(id))") else { continue }
                 if (status["is_generating"] as? Bool) == true {
-                    applyLive(id, event: ChatConfig.dict(status["snapshot"]))
+                    applyLive(id, event: ChatConfig.dict(status["snapshot"]), instant: true)
                 } else {
                     finish(id, chat: status["chat"] as? [String: Any], error: nil, notify: false)
                     return
@@ -389,6 +390,14 @@ extension AppModel {
 
     /// Ответ закончен или остановлен: убрать живую строку и показать сохранённые сообщения.
     private func finish(_ id: String, chat: [String: Any]?, error: String?, notify: Bool) {
+        // Последний кусок текста ещё не допоказан — сначала плавно дописать его, потом закончить.
+        if error == nil, id == activeChatID, let live = lives[id], !live.stopping,
+           let raw = liveRaw[id], raw.text != live.text {
+            pendingFinish[id] = (chat: chat, notify: notify)
+            startReveal()
+            return
+        }
+        pendingFinish[id] = nil
         let wasLive = lives[id] != nil
         lives[id] = nil
         liveRaw[id] = nil
@@ -412,7 +421,7 @@ extension AppModel {
         }
     }
 
-    private func applyLive(_ id: String, event: [String: Any]) {
+    private func applyLive(_ id: String, event: [String: Any], instant: Bool = false) {
         var raw = liveRaw[id] ?? (text: lives[id]?.text ?? "", reasoning: lives[id]?.reasoning ?? "")
         if let text = event["text"] as? String { raw.text = text }
         if let reasoning = event["reasoning"] as? String { raw.reasoning = reasoning }
@@ -421,32 +430,67 @@ extension AppModel {
         var live = lives[id] ?? LiveState()
         if let phase = ChatConfig.text(event["phase"]) { live.phase = phase }
         if let thinking = event["is_thinking"] as? Bool { live.isThinking = thinking }
-        if live != lives[id] { lives[id] = live }
-
-        // Текст приходит часто; лента перерисовывается не чаще ~12 раз в секунду.
-        guard !liveFlushScheduled else { return }
-        liveFlushScheduled = true
-        Task {
-            try? await Task.sleep(nanoseconds: 80_000_000)
-            liveFlushScheduled = false
-            flushLive()
-        }
-    }
-
-    private func flushLive() {
-        for (id, raw) in liveRaw {
-            guard var live = lives[id] else { continue }
-            guard live.text != raw.text || live.reasoning != raw.reasoning else { continue }
-            let firstText = live.text.isEmpty && !raw.text.isEmpty
+        if instant {
+            // Снимок уже идущего ответа показываем целиком, а не печатаем заново.
             live.reasoning = raw.reasoning
             if live.text != raw.text {
                 live.text = raw.text
-                // Разметку разбираем только для чата на экране.
                 live.blocks = id == activeChatID ? MarkdownParser.parse(raw.text) : []
             }
-            lives[id] = live
+        }
+        if live != lives[id] { lives[id] = live }
+        startReveal()
+    }
+
+    /// Текст приходит рывками (AI Studio — крупными кусками), а в ленту выводится плавно:
+    /// ~30 раз в секунду показывается ещё часть накопленного.
+    private func startReveal() {
+        guard !liveFlushScheduled else { return }
+        liveFlushScheduled = true
+        Task {
+            while revealStep() {
+                try? await Task.sleep(nanoseconds: 33_000_000)
+            }
+            liveFlushScheduled = false
+        }
+    }
+
+    /// Один шаг вывода. `true` — на экране ещё не весь полученный текст.
+    private func revealStep() -> Bool {
+        var more = false
+        for (id, raw) in liveRaw {
+            guard var live = lives[id] else { continue }
+            let firstText = live.text.isEmpty && !raw.text.isEmpty
+            live.reasoning = raw.reasoning
+            if live.text != raw.text {
+                if id == activeChatID {
+                    let total = raw.text.count
+                    let shown = min(live.text.count, total)
+                    // Чем больше накопилось, тем быстрее догоняем; после конца ответа — ещё быстрее.
+                    let closing = pendingFinish[id] != nil
+                    let share = Double(total - shown) * (closing ? 0.25 : 0.1)
+                    let next = min(total, shown + max(closing ? 6 : 2, Int(share.rounded(.up))))
+                    live.text = next == total ? raw.text : String(raw.text.prefix(next))
+                    live.blocks = MarkdownParser.parse(live.text)
+                    if next < total { more = true }
+                } else {
+                    // Разметку разбираем только для чата на экране.
+                    live.text = raw.text
+                    live.blocks = []
+                }
+            }
+            if live != lives[id] { lives[id] = live }
             if firstText, id == activeChatID { Haptics.tap() }
         }
+        // Ответы, которые сервер уже закончил, а лента только что допоказала.
+        let ready = pendingFinish.keys.filter { id in
+            lives[id] == nil || liveRaw[id] == nil || lives[id]?.text == liveRaw[id]?.text
+        }
+        for id in ready {
+            guard let done = pendingFinish.removeValue(forKey: id), lives[id] != nil else { continue }
+            finish(id, chat: done.chat, error: nil, notify: done.notify)
+        }
+        return more
     }
 
     /// Открыли чат с идущим ответом, разметка которого не разбиралась в фоне.

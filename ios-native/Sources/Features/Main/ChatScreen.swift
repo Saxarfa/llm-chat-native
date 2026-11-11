@@ -24,6 +24,9 @@ struct ChatScreen: View {
                     .id(model.activeChatID)
             }
         }
+        // Нажатие на пустое место или на текст ленты убирает клавиатуру.
+        .contentShape(Rectangle())
+        .onTapGesture { Keyboard.hide() }
         .safeAreaInset(edge: .top, spacing: 0) {
             header
         }
