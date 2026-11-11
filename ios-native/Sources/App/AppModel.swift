@@ -17,8 +17,20 @@ final class AppModel {
     var chatsError: String?
     var activeChatID: String?
 
+    enum ThreadState: Equatable {
+        case idle, loading, loaded, failed(String)
+    }
+
+    /// Лента открытого чата.
+    var thread: [FeedMessage] = []
+    var threadState: ThreadState = .idle
+    /// Чей это `thread`: пока не совпал с `activeChatID`, лента показывает загрузку.
+    var threadChatID: String?
+
     let preview: PreviewScene?
     @ObservationIgnored private var api: APIClient?
+    /// Уже открывавшиеся чаты показываются сразу, пока идёт обновление с сервера.
+    @ObservationIgnored private var threadCache: [String: [FeedMessage]] = [:]
 
     private static let serverKey = "server_url"
     private static let tokenKey = "token"
@@ -104,6 +116,10 @@ final class AppModel {
         user = nil
         chats = []
         activeChatID = nil
+        thread = []
+        threadState = .idle
+        threadChatID = nil
+        threadCache = [:]
         phase = .needsLogin
     }
 
@@ -128,6 +144,47 @@ final class AppModel {
         }
     }
 
+    /// Загружает ленту активного чата. Вызывается экраном при смене `activeChatID`.
+    func loadThread() async {
+        guard let id = activeChatID else {
+            thread = []
+            threadState = .idle
+            threadChatID = nil
+            return
+        }
+        if preview != nil {
+            thread = PreviewScene.thread
+            threadState = .loaded
+            threadChatID = id
+            return
+        }
+        guard let api else { return }
+        threadChatID = id
+        if let cached = threadCache[id] {
+            thread = cached
+            threadState = .loaded
+        } else {
+            thread = []
+            threadState = .loading
+        }
+        do {
+            let messages = try await api.messages(chatID: id)
+            // Разбор Markdown длинного чата — вне главного потока.
+            let items = await Task.detached(priority: .userInitiated) { FeedMessage.build(from: messages) }.value
+            guard activeChatID == id else { return }
+            threadCache[id] = items
+            if items != thread { thread = items }
+            threadState = .loaded
+        } catch is CancellationError {
+            return
+        } catch let error as APIError where error.status == 401 {
+            await logout()
+        } catch {
+            guard activeChatID == id, thread.isEmpty else { return }
+            threadState = .failed((error as? APIError)?.message ?? "Не удалось загрузить чат.")
+        }
+    }
+
     private func accept(_ auth: AuthResponse) {
         api?.token = auth.token
         Keychain.set(auth.token, for: Self.tokenKey)
@@ -144,9 +201,15 @@ final class AppModel {
             phase = .needsLogin
         case .offline:
             phase = .offline
-        case .chat, .sidebar:
+        case .chat, .sidebar, .thread, .threadTop:
             user = PreviewScene.user
             chats = PreviewScene.chats
+            if scene == .thread || scene == .threadTop {
+                activeChatID = "7"
+                thread = PreviewScene.thread
+                threadState = .loaded
+                threadChatID = "7"
+            }
             phase = .ready
         }
     }

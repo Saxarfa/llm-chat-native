@@ -63,7 +63,10 @@ struct MainView: View {
         DragGesture(minimumDistance: 14)
             .onChanged { value in
                 if axis == nil {
-                    let horizontal = abs(value.translation.width) > abs(value.translation.height) * 1.3
+                    // Палец листает код или таблицу — закрытое меню не трогаем.
+                    let scrollingBlock = !isOpen && HorizontalScrollGuard.isActive
+                    let horizontal = !scrollingBlock
+                        && abs(value.translation.width) > abs(value.translation.height) * 1.3
                     axis = horizontal ? .horizontal : .vertical
                     if horizontal { Keyboard.hide() }
                 }

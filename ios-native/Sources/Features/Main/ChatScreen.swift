@@ -1,37 +1,54 @@
 import SwiftUI
 
-/// Экран чата. На этом этапе — шапка, приветствие и поле ввода у клавиатуры;
-/// лента сообщений и отправка появляются на следующих этапах.
+/// Экран чата: шапка, лента сообщений (или приветствие нового чата) и поле ввода у клавиатуры.
+/// Отправка появляется на следующем этапе.
 struct ChatScreen: View {
     @Environment(AppModel.self) private var model
     let onMenu: () -> Void
     @State private var draft = ""
 
     var body: some View {
-        ScrollView {
-            content
-                .padding(.horizontal, 24)
-                .frame(maxWidth: .infinity)
-                .containerRelativeFrame(.vertical, alignment: .center)
+        Group {
+            if model.activeChatID == nil {
+                ScrollView {
+                    welcome
+                        .padding(.horizontal, 24)
+                        .frame(maxWidth: .infinity)
+                        .containerRelativeFrame(.vertical, alignment: .center)
+                }
+                .scrollDismissesKeyboard(.interactively)
+                .scrollBounceBehavior(.basedOnSize)
+            } else {
+                MessageFeed()
+                    // Свой экземпляр ленты на каждый чат: позиция прокрутки не переносится.
+                    .id(model.activeChatID)
+            }
         }
-        .scrollDismissesKeyboard(.interactively)
-        .scrollBounceBehavior(.basedOnSize)
         .safeAreaInset(edge: .top, spacing: 0) {
             header
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ComposerBar(text: $draft)
         }
+        .task(id: model.activeChatID) {
+            await model.loadThread()
+        }
     }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 8) {
             CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: onMenu)
-            Spacer()
-            if model.activeChatID != nil {
+            if let chat = model.activeChat {
+                Text(chat.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
                 CircleIconButton(symbol: "square.and.pencil", label: "Новый чат") {
                     model.activeChatID = nil
                 }
+            } else {
+                Spacer()
             }
         }
         .padding(.horizontal, 12)
@@ -39,27 +56,13 @@ struct ChatScreen: View {
         .background(Theme.canvas)
     }
 
-    @ViewBuilder
-    private var content: some View {
-        if let chat = model.activeChat {
-            VStack(spacing: 10) {
-                Text(chat.title)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
-                    .multilineTextAlignment(.center)
-                Text("Лента сообщений появится на следующем этапе.")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.muted)
-                    .multilineTextAlignment(.center)
-            }
-        } else {
-            VStack(spacing: 14) {
-                Wordmark(size: 34)
-                Text(greeting)
-                    .font(Theme.display(24))
-                    .foregroundStyle(Theme.muted)
-                    .multilineTextAlignment(.center)
-            }
+    private var welcome: some View {
+        VStack(spacing: 14) {
+            Wordmark(size: 34)
+            Text(greeting)
+                .font(Theme.display(24))
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
         }
     }
 

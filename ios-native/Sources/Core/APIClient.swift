@@ -62,6 +62,8 @@ final class APIClient {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
+            // Отменённый запрос (пользователь ушёл в другой чат) — не сбой связи.
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
             throw APIError.unreachable
         }
     }
@@ -108,5 +110,12 @@ final class APIClient {
     func chats() async throws -> [ChatSummary] {
         let response: ChatListResponse = try await send("/api/chats")
         return response.chats
+    }
+
+    /// Сообщения активной ветки чата.
+    func messages(chatID: String) async throws -> [ChatMessage] {
+        let safe = chatID.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-_.~"))) ?? chatID
+        let response: ChatDetailResponse = try await send("/api/chats/\(safe)")
+        return response.chat.messages
     }
 }
