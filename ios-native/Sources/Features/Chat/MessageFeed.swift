@@ -29,9 +29,10 @@ struct MessageFeed: View {
                         LazyVStack(alignment: .leading, spacing: 26) {
                             ForEach(model.thread) { message in
                                 if message.isUser {
-                                    UserMessageView(message: message)
-                                } else {
-                                    AssistantMessageView(message: message)
+                                    UserMessageView(message: message, canEdit: live == nil)
+                                } else if message.rawID != live?.replacingID {
+                                    // Перегенерируемый ответ на время заменяет живая строка.
+                                    AssistantMessageView(message: message, canRegenerate: live == nil)
                                 }
                             }
                             if let live {
@@ -53,6 +54,9 @@ struct MessageFeed: View {
                         if atBottom { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
                     }
                     .onChange(of: live?.phase) {
+                        if atBottom { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                    }
+                    .onChange(of: live?.arts.count) {
                         if atBottom { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
                     }
                     .onChange(of: model.thread.count) {
@@ -78,6 +82,9 @@ private struct LiveAnswerView: View {
             }
             if !live.blocks.isEmpty {
                 MarkdownView(blocks: live.blocks)
+            }
+            ForEach(live.arts) { art in
+                ArtView(art: art)
             }
             if live.text.isEmpty || live.stopping {
                 HStack(spacing: 10) {
@@ -126,14 +133,21 @@ private struct FeedNotice: View {
 
 /// Вопрос пользователя — пузырь справа.
 private struct UserMessageView: View {
+    @Environment(AppModel.self) private var model
     let message: FeedMessage
+    let canEdit: Bool
 
     var body: some View {
+        let images = message.attachments.filter { $0.kind == .image }
+        let files = message.attachments.filter { $0.kind != .image }
         VStack(alignment: .trailing, spacing: 8) {
-            if !message.attachmentNames.isEmpty {
+            if !images.isEmpty {
+                AttachmentGrid(items: images)
+            }
+            if !files.isEmpty {
                 VStack(alignment: .trailing, spacing: 6) {
-                    ForEach(Array(message.attachmentNames.enumerated()), id: \.offset) { _, name in
-                        Label(name, systemImage: "paperclip")
+                    ForEach(files) { file in
+                        Label(file.name, systemImage: file.symbol)
                             .font(.system(size: 14))
                             .foregroundStyle(Theme.muted)
                             .lineLimit(1)
@@ -159,6 +173,13 @@ private struct UserMessageView: View {
                         } label: {
                             Label("Скопировать", systemImage: "doc.on.doc")
                         }
+                        if canEdit {
+                            Button {
+                                model.editing = message
+                            } label: {
+                                Label("Изменить", systemImage: "pencil")
+                            }
+                        }
                     }
             }
         }
@@ -169,7 +190,9 @@ private struct UserMessageView: View {
 
 /// Ответ модели — текст во всю ширину, без пузыря; снизу — действия.
 private struct AssistantMessageView: View {
+    @Environment(AppModel.self) private var model
     let message: FeedMessage
+    let canRegenerate: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -179,15 +202,27 @@ private struct AssistantMessageView: View {
             if !message.blocks.isEmpty {
                 MarkdownView(blocks: message.blocks)
             }
-            if message.imageCount > 0 {
-                Label("Изображений: \(message.imageCount) — показ появится на следующем этапе",
-                      systemImage: "photo")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.subtle)
+            ForEach(message.arts) { art in
+                ArtView(art: art)
             }
-            if !message.text.isEmpty {
+            if !message.text.isEmpty || !message.arts.isEmpty {
                 HStack(spacing: 4) {
-                    CopyButton(text: message.text, label: "Скопировать ответ")
+                    if !message.text.isEmpty {
+                        CopyButton(text: message.text, label: "Скопировать ответ")
+                    }
+                    if canRegenerate {
+                        Button {
+                            Task { await model.regenerate(message) }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(Theme.muted)
+                                .frame(width: 44, height: 40)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(PressScaleStyle())
+                        .accessibilityLabel("Ответить заново")
+                    }
                     if !message.model.isEmpty {
                         Text(message.model)
                             .font(.system(size: 13))

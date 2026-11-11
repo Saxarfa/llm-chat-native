@@ -146,6 +146,26 @@ final class APIClient: @unchecked Sendable {
         return object
     }
 
+    /// Файл с сервера (картинка), как есть.
+    func data(_ path: String, timeout: TimeInterval = 60) async throws -> Data {
+        var request = try makeRequest(path, method: "GET", json: nil)
+        request.setValue("*/*", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = timeout
+        do {
+            let (payload, response) = try await session.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(status) else {
+                throw APIError(status: status, message: "Не удалось загрузить изображение.")
+            }
+            return payload
+        } catch let error as APIError {
+            throw error
+        } catch {
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
+            throw APIError.unreachable
+        }
+    }
+
     static func pathSafe(_ value: String) -> String {
         value.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-_.~"))) ?? value
     }

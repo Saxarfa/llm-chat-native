@@ -62,6 +62,14 @@ extension AppModel {
         }
         for answer in answers.dropFirst() {
             entries += (answer?["models"] as? [[String: Any]]) ?? []
+            // Модели картинок AI Studio (Nano Banana) сервер отдаёт отдельным списком.
+            for item in (answer?["image_models"] as? [Any]) ?? [] {
+                if let entry = item as? [String: Any] {
+                    entries.append(entry)
+                } else if let id = item as? String {
+                    entries.append(["id": id])
+                }
+            }
         }
 
         var seen = Set<String>()
@@ -188,9 +196,9 @@ extension AppModel {
     // MARK: - Отправка и остановка
 
     /// Отправляет вопрос. `false` — не ушло (текст нужно вернуть в поле ввода).
-    func send(_ rawText: String) async -> Bool {
+    func send(_ rawText: String, attachments: [DraftAttachment] = []) async -> Bool {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, preview == nil, let api else { return false }
+        guard !text.isEmpty || !attachments.isEmpty, preview == nil, let api else { return false }
         let isNew = activeChatID == nil
         let id = activeChatID ?? "chat_" + UUID().uuidString.lowercased()
         guard lives[id] == nil else { return false }
@@ -198,15 +206,22 @@ extension AppModel {
         let model = activeModelID
         let now = Date().timeIntervalSince1970 * 1000
         let messageID = "user_\(Int(now))_\(String(UInt32.random(in: 0...UInt32.max), radix: 36))"
+        // Картинки кладём под тем же ключом, под каким их потом пришлёт сервер.
+        let files = attachments.enumerated().map { index, item -> FeedAttachment in
+            let key = ChatMessage.attachmentKey(message: messageID, index: index)
+            if item.kind == .image, let bytes = ImageStore.data(item.storeKey) { ImageStore.put(bytes, key: key) }
+            return FeedAttachment(id: key, name: item.name, kind: item.kind)
+        }
         let question = FeedMessage(id: "\(thread.count)-\(messageID)", rawID: messageID, isUser: true, text: text,
-                                   blocks: [], reasoning: "", model: "", attachmentNames: [], imageCount: 0)
+                                   blocks: [], reasoning: "", model: "", attachments: files, arts: [])
         var live = LiveState()
         live.sending = true
         live.pendingUserID = messageID
         lives[id] = live
         sendError = nil
         if isNew {
-            chats.insert(ChatSummary(id: id, title: String(text.prefix(42)), updatedAt: now, modelID: model), at: 0)
+            chats.insert(ChatSummary(id: id, title: text.isEmpty ? "Новый чат" : String(text.prefix(42)),
+                                     updatedAt: now, modelID: model), at: 0)
             thread = [question]
             threadChatID = id
             threadState = .loaded
@@ -220,7 +235,8 @@ extension AppModel {
         let meta = chatMeta[id]
         let body = ChatConfig.payload(chatID: id, model: model, settings: settings,
                                       overrides: isNew ? [:] : meta?.overrides, branch: meta?.branch ?? "main",
-                                      serverURL: serverURL, message: text, messageID: messageID)
+                                      serverURL: serverURL, message: text, messageID: messageID,
+                                      attachments: attachments.map { ["name": $0.name, "dataUrl": $0.dataURL] })
         do {
             _ = try await api.json("/api/chat/generate", method: "POST", body: body, timeout: 60)
             lives[id]?.sending = false
@@ -243,6 +259,80 @@ extension AppModel {
             } else if threadChatID == id {
                 thread.removeAll { $0.rawID == messageID }
             }
+            return false
+        }
+    }
+
+    /// Просит модель ответить заново. Прежний ответ остаётся на сервере вариантом.
+    func regenerate(_ message: FeedMessage) async {
+        guard let id = activeChatID, lives[id] == nil, preview == nil else { return }
+        var live = LiveState()
+        live.sending = true
+        live.replacingID = message.rawID
+        lives[id] = live
+        sendError = nil
+        Haptics.tap()
+        var body = requestBody(for: id)
+        body["message_id"] = message.rawID
+        _ = await launch(id, path: "/api/chat/regenerate", body: body)
+    }
+
+    /// Меняет текст своего сообщения; всё, что было после него, сервер убирает в отдельную ветку.
+    func edit(_ message: FeedMessage, text rawText: String) async -> Bool {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let id = activeChatID, lives[id] == nil, preview == nil else { return false }
+        guard !text.isEmpty || !message.attachments.isEmpty else { return false }
+        var live = LiveState()
+        live.sending = true
+        lives[id] = live
+        sendError = nil
+        Haptics.tap()
+        if let index = thread.firstIndex(where: { $0.rawID == message.rawID }) {
+            var kept = Array(thread.prefix(index))
+            kept.append(FeedMessage(id: message.id, rawID: message.rawID, isUser: true, text: text, blocks: [],
+                                    reasoning: "", model: "", attachments: message.attachments, arts: []))
+            thread = kept
+        }
+        var body = requestBody(for: id)
+        body["message_id"] = message.rawID
+        body["new_content"] = text
+        let sent = await launch(id, path: "/api/chat/edit", body: body)
+        if !sent, activeChatID == id {
+            threadCache[id] = nil
+            await loadThread()
+        }
+        return sent
+    }
+
+    /// Параметры генерации открытого чата — те же, что уходят с новым сообщением.
+    private func requestBody(for id: String) -> [String: Any] {
+        let meta = chatMeta[id]
+        var body = ChatConfig.payload(chatID: id, model: activeModelID, settings: settings, overrides: meta?.overrides,
+                                      branch: meta?.branch ?? "main", serverURL: serverURL, message: "", messageID: "")
+        for key in ["message", "message_id", "attachments"] { body.removeValue(forKey: key) }
+        return body
+    }
+
+    /// Запускает на сервере правку или перегенерацию и принимает обновлённую ленту.
+    private func launch(_ id: String, path: String, body: [String: Any]) async -> Bool {
+        guard let api else { return false }
+        do {
+            let answer = try await api.json(path, method: "POST", body: body, timeout: 60)
+            lives[id]?.sending = false
+            lastEventAt[id] = Date()
+            if let chat = answer["chat"] as? [String: Any] { await apply(chat: chat, to: id) }
+            if eventsTask == nil { restartEvents() }
+            watch(id)
+            return true
+        } catch {
+            lives[id] = nil
+            liveRaw[id] = nil
+            if let failure = error as? APIError, failure.status == 401 {
+                await logout()
+                return false
+            }
+            sendError = (error as? APIError)?.message ?? "Не удалось выполнить запрос."
+            Haptics.error()
             return false
         }
     }
@@ -352,6 +442,9 @@ extension AppModel {
             let known = lives[id] != nil
             var live = lives[id] ?? LiveState()
             if let phase = ChatConfig.text(event["phase"]) { live.phase = phase }
+            if (event["is_regenerate"] as? Bool) == true, let target = ChatConfig.text(event["target_message_id"]) {
+                live.replacingID = target
+            }
             lives[id] = live
             if !chats.contains(where: { $0.id == id }) {
                 Task { await refreshChats() }
@@ -430,6 +523,10 @@ extension AppModel {
         var live = lives[id] ?? LiveState()
         if let phase = ChatConfig.text(event["phase"]) { live.phase = phase }
         if let thinking = event["is_thinking"] as? Bool { live.isThinking = thinking }
+        if event["generated_images"] != nil { live.arts = FeedArt.list(event["generated_images"]) }
+        if (event["is_regenerate"] as? Bool) == true, let target = ChatConfig.text(event["target_message_id"]) {
+            live.replacingID = target
+        }
         if instant {
             // Снимок уже идущего ответа показываем целиком, а не печатаем заново.
             live.reasoning = raw.reasoning

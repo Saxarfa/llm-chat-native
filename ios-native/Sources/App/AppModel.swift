@@ -15,6 +15,8 @@ final class AppModel {
     var chats: [ChatSummary] = []
     var chatsLoading = false
     var chatsError: String?
+    /// Ошибка действия над чатом в шторке (переименование, закрепление, удаление).
+    var chatsNotice: String?
     var activeChatID: String?
 
     enum ThreadState: Equatable {
@@ -39,6 +41,10 @@ final class AppModel {
         var sending = false
         /// Вопрос, показанный в ленте до ответа сервера.
         var pendingUserID: String?
+        /// Картинки, которые модель создаёт в этом ответе.
+        var arts: [FeedArt] = []
+        /// Ответ, который перегенерируется: в ленте его временно заменяет живая строка.
+        var replacingID: String?
     }
 
     /// Ответы, которые сейчас пишутся, по id чата.
@@ -50,6 +56,13 @@ final class AppModel {
     /// Модель для нового чата.
     var draftModel = UserDefaults.standard.string(forKey: AppModel.draftModelKey) ?? ""
     var settings = ServerSettings()
+    /// Вложения ещё не отправленного сообщения.
+    var draftAttachments: [DraftAttachment] = []
+    var attachmentsBusy = false
+    /// Картинка, открытая на весь экран.
+    var viewer: ViewerItem?
+    /// Своё сообщение, которое сейчас правится в поле ввода.
+    var editing: FeedMessage?
 
     let preview: PreviewScene?
     @ObservationIgnored var api: APIClient?
@@ -161,6 +174,9 @@ final class AppModel {
         models = []
         settings = ServerSettings()
         sendError = nil
+        draftAttachments = []
+        viewer = nil
+        editing = nil
         Keychain.set(nil, for: Self.tokenKey)
         api?.token = nil
         user = nil
@@ -210,11 +226,18 @@ final class AppModel {
             phase = .needsLogin
         case .offline:
             phase = .offline
-        case .chat, .sidebar, .thread, .threadTop, .streaming, .models:
+        case .chat, .sidebar, .thread, .threadTop, .streaming, .models, .media:
             user = PreviewScene.user
             chats = PreviewScene.chats
             models = PreviewScene.modelOptions
             draftModel = "gemma-26b-qat"
+            if scene == .media {
+                activeChatID = "3"
+                thread = PreviewScene.mediaFeed()
+                threadState = .loaded
+                threadChatID = "3"
+                draftAttachments = PreviewScene.mediaDraft()
+            }
             if scene == .thread || scene == .threadTop || scene == .streaming {
                 activeChatID = "7"
                 thread = scene == .streaming ? Array(PreviewScene.feed.prefix(3)) : PreviewScene.feed

@@ -49,14 +49,17 @@ enum ChatConfig {
 
     static let defaultPrompt = "You are a helpful, knowledgeable, and precise AI assistant. Provide concise, high-quality answers formatted in Markdown. When writing code, specify the language and follow modern best practices."
 
-    /// Модели картинок и видео AI Studio. В нативном клиенте пока скрыты: показ медиа — этап 4.
+    /// Модели видео AI Studio (Omni). В нативном клиенте скрыты, пока нет показа видео (этап 6).
     static let mediaModels: Set<String> = [
-        "aistudio/gemini-omni-1.2-flash", "aistudio/gemini-omni-1.1-flash", "aistudio/gemini-nano-banana-2.1",
-        "aistudio/gemini-3.1-flash-image", "aistudio/gemini-3.1-flash-lite-image",
-        "aistudio/gemini-3-pro-image", "aistudio/gemini-2.5-flash-image",
+        "aistudio/gemini-omni-1.2-flash", "aistudio/gemini-omni-1.1-flash",
     ]
 
     private static let studioNames: [String: String] = [
+        "aistudio/gemini-nano-banana-2.1": "Nano Banana 2.1",
+        "aistudio/gemini-3.1-flash-image": "Nano Banana 2",
+        "aistudio/gemini-3.1-flash-lite-image": "Nano Banana 2 Lite",
+        "aistudio/gemini-3-pro-image": "Nano Banana Pro",
+        "aistudio/gemini-2.5-flash-image": "Nano Banana",
         "aistudio/gemma-4-31b-it": "Gemma 4 31B",
         "aistudio/gemma-4-26b-a4b-it": "Gemma 4 26B A4B",
         "aistudio/gemini-3.8-flash": "Gemini 3.8 Flash",
@@ -239,7 +242,8 @@ enum ChatConfig {
     /// Тело `POST /api/chat/generate`. `overrides == nil` — параметры чата ещё не загружены:
     /// тогда поле не отправляется вовсе, чтобы сервер не затёр сохранённые.
     static func payload(chatID: String, model: String, settings: ServerSettings, overrides: [String: Any]?,
-                        branch: String, serverURL: URL?, message: String, messageID: String) -> [String: Any] {
+                        branch: String, serverURL: URL?, message: String, messageID: String,
+                        attachments: [[String: Any]] = []) -> [String: Any] {
         let over = overrides ?? [:]
         let shared = settings.shared
         var values = config(model: model, settings: settings, overrides: over)
@@ -278,7 +282,7 @@ enum ChatConfig {
             "search_blacklist": (shared["searchBlacklist"] as? String) ?? "",
             "message": message,
             "message_id": messageID,
-            "attachments": [Any](),
+            "attachments": attachments,
         ]
         if let overrides { body["overrides"] = overrides }
         return body

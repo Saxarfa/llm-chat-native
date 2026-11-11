@@ -43,7 +43,7 @@ enum HorizontalScrollGuard {
     }
 }
 
-private struct GuardsDrawer: ViewModifier {
+struct GuardsDrawer: ViewModifier {
     func body(content: Content) -> some View {
         content.simultaneousGesture(
             DragGesture(minimumDistance: 0).onChanged { _ in

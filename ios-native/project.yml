@@ -10,8 +10,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.3.1"
-    CURRENT_PROJECT_VERSION: "4"
+    MARKETING_VERSION: "0.4.0"
+    CURRENT_PROJECT_VERSION: "5"
     TARGETED_DEVICE_FAMILY: "1"
     CODE_SIGN_STYLE: Manual
     DEVELOPMENT_TEAM: ""
@@ -45,6 +45,8 @@ targets:
         UIRequiredDeviceCapabilities:
           - arm64
         NSLocalNetworkUsageDescription: LLM Chat подключается к вашему компьютеру в локальной сети для чатов и генерации.
+        NSCameraUsageDescription: Камера нужна, чтобы прикрепить снимок к сообщению.
+        NSPhotoLibraryAddUsageDescription: Доступ нужен, чтобы сохранять изображения из чата в «Фото».
         # Сервер — личный ПК в домашней сети или Tailscale, обычно по http.
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true

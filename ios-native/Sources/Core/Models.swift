@@ -67,42 +67,51 @@ struct ChatListResponse: Decodable {
     let chats: [ChatSummary]
 }
 
-/// Сообщение в том виде, в каком его хранит сервер. Читаются только поля, нужные ленте;
-/// содержимое вложений (base64) намеренно не трогается.
+/// Сообщение в том виде, в каком его хранит сервер. Читаются только поля, нужные ленте.
+/// Байты вложений-картинок уходят в `ImageStore`, в самом сообщении остаётся только ключ.
 struct ChatMessage {
     let id: String
     let role: String
     let content: String
     let model: String?
     let reasoning: String?
-    let attachmentNames: [String]
-    let imageCount: Int
+    let attachments: [FeedAttachment]
+    let arts: [FeedArt]
 
     init(id: String, role: String, content: String, model: String? = nil, reasoning: String? = nil,
-         attachmentNames: [String] = [], imageCount: Int = 0) {
+         attachments: [FeedAttachment] = [], arts: [FeedArt] = []) {
         self.id = id
         self.role = role
         self.content = content
         self.model = model
         self.reasoning = reasoning
-        self.attachmentNames = attachmentNames
-        self.imageCount = imageCount
+        self.attachments = attachments
+        self.arts = arts
     }
 
     init(json: [String: Any]) {
-        id = (json["id"] as? String) ?? UUID().uuidString
+        let messageID = (json["id"] as? String) ?? UUID().uuidString
+        id = messageID
         role = (json["role"] as? String) ?? "assistant"
         content = (json["content"] as? String) ?? ""
         model = json["model"] as? String
         reasoning = json["reasoning"] as? String
         let files = (json["attachments"] as? [[String: Any]]) ?? []
-        attachmentNames = files.map { file in
+        attachments = files.enumerated().map { index, file in
             let name = (file["name"] as? String) ?? ""
-            return name.isEmpty ? "Файл" : name
+            let url = (file["dataUrl"] as? String) ?? ""
+            let key = ChatMessage.attachmentKey(message: messageID, index: index)
+            let kind = FeedAttachment.kind(ofDataURL: url)
+            if kind == .image, ImageStore.data(key) == nil, let bytes = ImageStore.decode(dataURL: url) {
+                ImageStore.put(bytes, key: key)
+            }
+            return FeedAttachment(id: key, name: name.isEmpty ? "Файл" : name, kind: kind)
         }
-        let generated = (json["generated_images"] as? [Any])?.count ?? 0
-        let web = (json["web_images"] as? [Any])?.count ?? 0
-        imageCount = generated + web
+        arts = FeedArt.list(json["generated_images"])
+    }
+
+    static func attachmentKey(message: String, index: Int) -> String {
+        "att:\(message):\(index)"
     }
 }
 
@@ -116,8 +125,8 @@ struct FeedMessage: Identifiable, Equatable {
     let blocks: [MarkdownBlock]
     let reasoning: String
     let model: String
-    let attachmentNames: [String]
-    let imageCount: Int
+    let attachments: [FeedAttachment]
+    let arts: [FeedArt]
 
     static func build(from messages: [ChatMessage]) -> [FeedMessage] {
         var result: [FeedMessage] = []
@@ -133,8 +142,8 @@ struct FeedMessage: Identifiable, Equatable {
                 blocks: isUser ? [] : MarkdownParser.parse(text),
                 reasoning: (message.reasoning ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
                 model: message.model ?? "",
-                attachmentNames: message.attachmentNames,
-                imageCount: message.imageCount
+                attachments: message.attachments,
+                arts: message.arts
             ))
         }
         return result

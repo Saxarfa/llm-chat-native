@@ -1,4 +1,4 @@
-import Foundation
+import UIKit
 
 /// Экран для снимка в симуляторе: `--preview=<имя>`. Данные вымышленные, сети нет.
 enum PreviewScene: String, CaseIterable {
@@ -7,6 +7,47 @@ enum PreviewScene: String, CaseIterable {
     case thread, threadTop
     /// Идущий ответ и шторка выбора модели.
     case streaming, models
+    /// Картинки в ленте и вложения в поле ввода.
+    case media
+
+    /// Нарисованная заглушка вместо настоящей картинки.
+    private static func sample(_ top: UIColor, _ bottom: UIColor, size: CGSize) -> UIImage {
+        UIGraphicsImageRenderer(size: size).image { context in
+            let colors = [top.cgColor, bottom.cgColor] as CFArray
+            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
+                context.cgContext.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: size.width, y: size.height),
+                                                     options: [])
+            }
+            UIColor.white.withAlphaComponent(0.85).setFill()
+            context.cgContext.fillEllipse(in: CGRect(x: size.width * 0.58, y: size.height * 0.16,
+                                                     width: size.width * 0.2, height: size.width * 0.2))
+        }
+    }
+
+    private static let warm = (UIColor(red: 0.86, green: 0.48, blue: 0.3, alpha: 1), UIColor(red: 0.2, green: 0.13, blue: 0.3, alpha: 1))
+    private static let cold = (UIColor(red: 0.2, green: 0.5, blue: 0.62, alpha: 1), UIColor(red: 0.07, green: 0.1, blue: 0.2, alpha: 1))
+
+    static func mediaFeed() -> [FeedMessage] {
+        let photo = sample(cold.0, cold.1, size: CGSize(width: 600, height: 600))
+        if let data = photo.jpegData(compressionQuality: 0.8) { ImageStore.put(data, key: "att:m1:0") }
+        ImageStore.put(sample(warm.0, warm.1, size: CGSize(width: 960, height: 640)), key: "art:pv1:p")
+        return FeedMessage.build(from: [
+            ChatMessage(id: "m1", role: "user", content: "Сделай обложку в таком настроении, но теплее — закат над морем.",
+                        attachments: [FeedAttachment(id: "att:m1:0", name: "референс.jpg", kind: .image),
+                                      FeedAttachment(id: "att:m1:1", name: "бриф.md", kind: .markdown)]),
+            ChatMessage(id: "m2", role: "assistant", content: "Готово: тёплый закат, солнце справа, спокойная вода.",
+                        model: "Nano Banana 2.1", arts: [FeedArt(id: "pv1", width: 1536, height: 1024)]),
+        ])
+    }
+
+    static func mediaDraft() -> [DraftAttachment] {
+        var items: [DraftAttachment] = []
+        if let first = try? AttachmentPrep.image(sample(warm.0, warm.1, size: CGSize(width: 300, height: 300)), name: "закат") {
+            items.append(first)
+        }
+        items.append(DraftAttachment(name: "заметки.md", dataURL: "data:text/markdown;base64,", kind: .markdown))
+        return items
+    }
 
     static var current: PreviewScene? {
         for argument in ProcessInfo.processInfo.arguments where argument.hasPrefix("--preview=") {
@@ -67,7 +108,7 @@ enum PreviewScene: String, CaseIterable {
 
         > Файл базы нельзя копировать «как есть», пока она открыта: часть данных лежит в журнале.
         """#, model: "gemma-3-27b", reasoning: "Нужно объяснить кратко: что такое WAL, преимущества, порядок работы и предупреждение о копировании."),
-        ChatMessage(id: "c", role: "user", content: "Покажи, как включить, и сравни с обычным журналом.", attachmentNames: ["schema.sql"]),
+        ChatMessage(id: "c", role: "user", content: "Покажи, как включить, и сравни с обычным журналом.", attachments: [FeedAttachment(id: "att:c:0", name: "schema.sql", kind: .file)]),
         ChatMessage(id: "d", role: "assistant", content: #"""
         Включается одной командой — режим сохраняется в файле базы:
 

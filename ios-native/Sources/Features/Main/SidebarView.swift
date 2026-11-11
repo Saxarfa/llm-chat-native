@@ -4,6 +4,9 @@ import SwiftUI
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
     let onClose: () -> Void
+    @State private var renaming: ChatSummary?
+    @State private var deleting: ChatSummary?
+    @State private var newTitle = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,6 +23,44 @@ struct SidebarView: View {
             footer
         }
         .background(Theme.rail.ignoresSafeArea())
+        .alert("Название чата", isPresented: renameShown) {
+            TextField("Название", text: $newTitle)
+            Button("Сохранить") {
+                if let chat = renaming {
+                    Task { await model.rename(chat, to: newTitle) }
+                }
+                renaming = nil
+            }
+            Button("Отмена", role: .cancel) { renaming = nil }
+        }
+        .confirmationDialog("Удалить чат?", isPresented: deleteShown, titleVisibility: .visible) {
+            Button("Удалить", role: .destructive) {
+                if let chat = deleting {
+                    Task { await model.delete(chat) }
+                }
+                deleting = nil
+            }
+            Button("Отмена", role: .cancel) { deleting = nil }
+        } message: {
+            Text("«\(deleting?.title ?? "")» переместится в корзину. Вернуть чат можно на сайте.")
+        }
+        .alert("Не получилось", isPresented: noticeShown) {
+            Button("Понятно", role: .cancel) { model.chatsNotice = nil }
+        } message: {
+            Text(model.chatsNotice ?? "")
+        }
+    }
+
+    private var renameShown: Binding<Bool> {
+        Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
+    }
+
+    private var deleteShown: Binding<Bool> {
+        Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })
+    }
+
+    private var noticeShown: Binding<Bool> {
+        Binding(get: { model.chatsNotice != nil }, set: { if !$0 { model.chatsNotice = nil } })
     }
 
     @ViewBuilder
@@ -90,6 +131,24 @@ struct SidebarView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())
+        .contextMenu {
+            Button {
+                newTitle = chat.title
+                renaming = chat
+            } label: {
+                Label("Переименовать", systemImage: "pencil")
+            }
+            Button {
+                Task { await model.setPinned(chat, !chat.pinned) }
+            } label: {
+                Label(chat.pinned ? "Открепить" : "Закрепить", systemImage: chat.pinned ? "pin.slash" : "pin")
+            }
+            Button(role: .destructive) {
+                deleting = chat
+            } label: {
+                Label("Удалить", systemImage: "trash")
+            }
+        }
     }
 
     private var footer: some View {
