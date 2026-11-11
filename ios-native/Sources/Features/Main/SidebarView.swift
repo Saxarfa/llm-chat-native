@@ -7,6 +7,7 @@ struct SidebarView: View {
     @State private var renaming: ChatSummary?
     @State private var deleting: ChatSummary?
     @State private var newTitle = ""
+    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -48,6 +49,12 @@ struct SidebarView: View {
             Button("Понятно", role: .cancel) { model.chatsNotice = nil }
         } message: {
             Text(model.chatsNotice ?? "")
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsSheet()
+        }
+        .onAppear {
+            if model.preview == .settings { showSettings = true }
         }
     }
 
@@ -165,6 +172,9 @@ struct SidebarView: View {
     private var footer: some View {
         HStack(spacing: 12) {
             Menu {
+                Button("Настройки", systemImage: "gearshape") {
+                    showSettings = true
+                }
                 Button("Сменить адрес компьютера", systemImage: "desktopcomputer") {
                     model.changeServer()
                 }

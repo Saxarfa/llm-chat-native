@@ -9,6 +9,16 @@ enum PreviewScene: String, CaseIterable {
     case streaming, models
     /// Картинки в ленте и вложения в поле ввода.
     case media
+    /// «Параметры чата» текстовой модели и Nano Banana; настройки приложения.
+    case parameters, nano, settings
+
+    /// Описание модели картинок, как его отдаёт `/api/providers/aistudio`.
+    static let nanoCatalog: [String: Any] = [
+        "id": "aistudio/gemini-3.1-flash-image",
+        "aspect_ratios": ["auto", "1:1", "3:2", "2:3", "16:9", "9:16"],
+        "image_sizes": ["1K", "2K", "4K"],
+        "features": ["thinking_level": true, "google_search": true, "image_search": true],
+    ]
 
     /// Нарисованная заглушка вместо настоящей картинки.
     private static func sample(_ top: UIColor, _ bottom: UIColor, size: CGSize) -> UIImage {

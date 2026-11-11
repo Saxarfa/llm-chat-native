@@ -63,12 +63,19 @@ final class AppModel {
     var viewer: ViewerItem?
     /// Своё сообщение, которое сейчас правится в поле ввода.
     var editing: FeedMessage?
+    /// Параметры открытых чатов (их меняет окно «Параметры чата»).
+    var chatMeta: [String: ChatMeta] = [:]
+    /// Параметры нового чата до первой отправки.
+    var draftOverrides: [String: Any] = [:]
+    /// Описание моделей картинок AI Studio: соотношения сторон, размеры, возможности.
+    var imageCatalog: [String: [String: Any]] = [:]
+    /// Ошибка сохранения параметров или настроек.
+    var settingsNotice: String?
 
     let preview: PreviewScene?
     @ObservationIgnored var api: APIClient?
     /// Уже открывавшиеся чаты показываются сразу, пока идёт обновление с сервера.
     @ObservationIgnored var threadCache: [String: [FeedMessage]] = [:]
-    @ObservationIgnored var chatMeta: [String: ChatMeta] = [:]
     @ObservationIgnored var eventsTask: Task<Void, Never>?
     @ObservationIgnored var eventsConnectedOnce = false
     /// Последний текст потока; в `lives` переносится не чаще нескольких раз в секунду.
@@ -171,6 +178,9 @@ final class AppModel {
         lastEventAt = [:]
         watching = []
         chatMeta = [:]
+        draftOverrides = [:]
+        imageCatalog = [:]
+        settingsNotice = nil
         models = []
         settings = ServerSettings()
         sendError = nil
@@ -226,12 +236,23 @@ final class AppModel {
             phase = .needsLogin
         case .offline:
             phase = .offline
-        case .chat, .sidebar, .thread, .threadTop, .streaming, .models, .media:
+        case .chat, .sidebar, .thread, .threadTop, .streaming, .models, .media, .parameters, .nano, .settings:
             user = PreviewScene.user
             chats = PreviewScene.chats
             models = PreviewScene.modelOptions
             draftModel = "gemma-26b-qat"
-            if scene == .media {
+            if scene == .parameters {
+                activeChatID = "7"
+                thread = PreviewScene.feed
+                threadState = .loaded
+                threadChatID = "7"
+                chatMeta["7"] = ChatMeta(overrides: ["gemma-26b-qat": ["temperature": 0.9]], branch: "main")
+            }
+            if scene == .nano {
+                draftModel = "aistudio/gemini-3.1-flash-image"
+                imageCatalog = ["aistudio/gemini-3.1-flash-image": PreviewScene.nanoCatalog]
+            }
+            if scene == .media || scene == .nano {
                 activeChatID = "3"
                 thread = PreviewScene.mediaFeed()
                 threadState = .loaded

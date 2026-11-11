@@ -7,6 +7,7 @@ struct ChatScreen: View {
     @Environment(AppModel.self) private var model
     let onMenu: () -> Void
     @State private var draft = ""
+    @State private var showParameters = false
 
     var body: some View {
         @Bindable var bound = model
@@ -42,6 +43,20 @@ struct ChatScreen: View {
         .fullScreenCover(item: $bound.viewer) { item in
             ImageViewer(item: item)
         }
+        .sheet(isPresented: $showParameters) {
+            ChatParametersSheet()
+        }
+        .onAppear {
+            if model.preview == .parameters || model.preview == .nano { showParameters = true }
+        }
+    }
+
+    private var parametersButton: some View {
+        CircleIconButton(symbol: "slider.horizontal.3", label: "Параметры чата") {
+            Keyboard.hide()
+            Haptics.tap()
+            showParameters = true
+        }
     }
 
     private var header: some View {
@@ -53,11 +68,13 @@ struct ChatScreen: View {
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity)
+                parametersButton
                 CircleIconButton(symbol: "square.and.pencil", label: "Новый чат") {
                     model.activeChatID = nil
                 }
             } else {
                 Spacer()
+                parametersButton
             }
         }
         .padding(.horizontal, 12)

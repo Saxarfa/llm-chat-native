@@ -57,6 +57,7 @@ extension AppModel {
         let answers = await [local, subscription, studio, web]
 
         var entries: [[String: Any]] = []
+        var catalog: [String: [String: Any]] = [:]
         if let raw = answers[0]?["raw"] as? [String: Any], let data = raw["data"] as? [[String: Any]] {
             entries += data
         }
@@ -66,6 +67,7 @@ extension AppModel {
             for item in (answer?["image_models"] as? [Any]) ?? [] {
                 if let entry = item as? [String: Any] {
                     entries.append(entry)
+                    if let id = entry["id"] as? String { catalog[id] = entry }
                 } else if let id = item as? String {
                     entries.append(["id": id])
                 }
@@ -86,6 +88,7 @@ extension AppModel {
         if !result.isEmpty || answers.contains(where: { $0 != nil }) {
             models = result
         }
+        if answers[2] != nil { imageCatalog = catalog }
     }
 
     func selectModel(_ id: String) async {
@@ -232,9 +235,14 @@ extension AppModel {
         }
         Haptics.tap()
 
+        if isNew {
+            // Параметры, выбранные до первой отправки, становятся параметрами чата.
+            chatMeta[id] = ChatMeta(overrides: draftOverrides, branch: "main")
+            draftOverrides = [:]
+        }
         let meta = chatMeta[id]
         let body = ChatConfig.payload(chatID: id, model: model, settings: settings,
-                                      overrides: isNew ? [:] : meta?.overrides, branch: meta?.branch ?? "main",
+                                      overrides: meta?.overrides, branch: meta?.branch ?? "main",
                                       serverURL: serverURL, message: text, messageID: messageID,
                                       attachments: attachments.map { ["name": $0.name, "dataUrl": $0.dataURL] })
         do {
@@ -254,6 +262,7 @@ extension AppModel {
             sendError = (error as? APIError)?.message ?? "Не удалось отправить сообщение."
             Haptics.error()
             if isNew {
+                draftOverrides = chatMeta.removeValue(forKey: id)?.overrides ?? [:]
                 chats.removeAll { $0.id == id }
                 if activeChatID == id { activeChatID = nil }
             } else if threadChatID == id {
