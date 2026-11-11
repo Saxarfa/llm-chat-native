@@ -63,6 +63,7 @@ private struct TextParameters: View {
     let modelID: String
     @State private var advanced = false
     @State private var instruction = false
+    @State private var knowledge = PreviewScene.current == .parameters
     @State private var confirmReset = false
 
     var body: some View {
@@ -102,6 +103,12 @@ private struct TextParameters: View {
                     }
                 }
             }
+        }
+
+        DisclosureHeader(title: model.activeKnowledge.enabled ? "Базы знаний · включены" : "Базы знаний", open: $knowledge)
+        if knowledge {
+            KnowledgePicker()
+                .transition(.opacity)
         }
 
         if subscription {
@@ -224,6 +231,15 @@ private struct NanoParameters: View {
         let samplingSpecs = Self.samples(for: modelID)
         let googleSearch = (features["google_search"] as? Bool) == true
         let imageSearch = (features["image_search"] as? Bool) == true
+        let video = ChatParameters.isOmni(modelID)
+        let tasks = video && (features["video_tasks"] as? Bool) == true
+        let savedTask = (config["nano_video_task"] as? String) ?? ""
+        let task = tasks && ChatParameters.omniTasks.contains { $0.value == savedTask } ? savedTask : "auto"
+        let durations = ChatParameters.omniDurations(modelID)
+        let savedDuration = ChatParameters.number(config["nano_video_duration"]).map { Int($0) } ?? 0
+        let duration = durations.contains(savedDuration) ? savedDuration : 5
+        let savedResolution = (config["nano_video_resolution"] as? String) ?? ""
+        let resolution = ChatParameters.omniResolutions.contains { $0.value == savedResolution } ? savedResolution : "720p"
 
         if (entry["available"] as? Bool) == false {
             SettingsNote(text: ChatConfig.text(entry["reason"]) ?? "Модель недоступна в текущем подключении AI Studio.",
@@ -240,14 +256,33 @@ private struct NanoParameters: View {
                 }
                 CardDivider()
             }
-            ChoiceRow(title: "Соотношение сторон",
-                      choices: ratios.map { Choice($0, $0 == "auto" ? "Авто" : $0) }, selected: ratio) { value in
-                set("nano_aspect_ratio", value)
+            if tasks {
+                ChoiceRow(title: "Задача видео", choices: ChatParameters.omniTasks, selected: task) { value in
+                    set("nano_video_task", value)
+                }
+                CardDivider()
             }
-            if sizes.count > 1 {
+            if !video || (task != "edit" && task != "extend") {
+                ChoiceRow(title: "Соотношение сторон",
+                          choices: ratios.map { Choice($0, $0 == "auto" ? "Авто" : $0) }, selected: ratio) { value in
+                    set("nano_aspect_ratio", value)
+                }
+            }
+            if !video && sizes.count > 1 {
                 CardDivider()
                 ChoiceRow(title: "Размер", choices: sizes.map { Choice($0, $0) }, selected: size) { value in
                     set("nano_image_size", value)
+                }
+            }
+            if video && task != "edit" {
+                if task != "extend" { CardDivider() }
+                ChoiceRow(title: "Длительность", choices: durations.map { Choice(String($0), "\($0) с") },
+                          selected: String(duration)) { value in
+                    set("nano_video_duration", Int(value) ?? 5)
+                }
+                CardDivider()
+                ChoiceRow(title: "Разрешение", choices: ChatParameters.omniResolutions, selected: resolution) { value in
+                    set("nano_video_resolution", value)
                 }
             }
             if let levels {
@@ -256,6 +291,13 @@ private struct NanoParameters: View {
                     set("nano_thinking", value)
                 }
             }
+        }
+
+        if tasks, let hint = ChatParameters.omniTaskHints[task] {
+            SettingsNote(text: hint)
+        }
+        if video && task != "edit" {
+            SettingsNote(text: "Длительность задаётся для первого ролика. При продолжении её определяет модель.")
         }
 
         if googleSearch || imageSearch {
@@ -289,7 +331,8 @@ private struct NanoParameters: View {
         if (features["system_instruction"] as? Bool) != false {
             SectionCaption(text: "Инструкции для модели")
             SettingsCard {
-                InstructionEditor(placeholder: "Например: стиль акварели, без текста на изображении",
+                InstructionEditor(placeholder: video ? "Например: плавное движение камеры, естественный свет"
+                                                     : "Например: стиль акварели, без текста на изображении",
                                   saved: (config["nano_system_instruction"] as? String) ?? "") { text in
                     await model.setParameter("nano_system_instruction", text)
                     return model.settingsNotice == nil
@@ -300,6 +343,100 @@ private struct NanoParameters: View {
 
     private func set(_ key: String, _ value: Any) {
         Task { await model.setParameter(key, value) }
+    }
+}
+
+/// Базы знаний чата — как `KnowledgePicker` в `KnowledgeSettings.tsx`.
+private struct KnowledgePicker: View {
+    @Environment(AppModel.self) private var model
+    @State private var loaded = false
+    @State private var manage = false
+
+    var body: some View {
+        let selection = model.activeKnowledge
+        let libraries = model.knowledgeLibraries
+        let missing = selection.collections.filter { id in !libraries.contains { $0.id == id } }
+
+        SettingsCard {
+            ToggleRow(title: "Использовать базу знаний", hint: "Модель ищет в выбранных документах",
+                      isOn: selection.enabled) { value in
+                var next = selection
+                next.enabled = value
+                save(next)
+            }
+            if selection.enabled {
+                ForEach(libraries) { library in
+                    CardDivider()
+                    let chosen = selection.collections.contains(library.id)
+                    Button {
+                        Haptics.tap()
+                        var next = selection
+                        if chosen {
+                            next.collections.removeAll { $0 == library.id }
+                        } else {
+                            next.collections.append(library.id)
+                        }
+                        save(next)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: chosen ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 20))
+                                .foregroundStyle(chosen ? Theme.buttonPrimary : Theme.subtle)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(library.name)
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(Theme.ink)
+                                    .lineLimit(1)
+                                Text(Plural.knowledge(library.documents, .document))
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Theme.subtle)
+                            }
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 56)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(RowPressStyle())
+                    .accessibilityAddTraits(chosen ? .isSelected : [])
+                }
+                CardDivider()
+                ToggleRow(title: "Отвечать только по базе",
+                          hint: "Поиск обязателен, веб-поиск отключён. Если подтверждения нет, модель скажет об этом",
+                          isOn: selection.strict) { value in
+                    var next = selection
+                    next.strict = value
+                    save(next)
+                }
+            }
+        }
+        if selection.enabled {
+            if loaded && libraries.isEmpty {
+                SettingsNote(text: "Баз пока нет. Создайте базу и добавьте материалы.")
+            } else if selection.collections.isEmpty {
+                SettingsNote(text: "Выберите хотя бы одну базу.", symbol: "exclamationmark.circle")
+            }
+            if loaded && !missing.isEmpty {
+                Button {
+                    var next = selection
+                    next.collections.removeAll { missing.contains($0) }
+                    save(next)
+                } label: {
+                    SettingsNote(text: "Одна из выбранных баз недоступна. Нажмите, чтобы убрать её из выбора.",
+                                 symbol: "exclamationmark.triangle")
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        WideButton(title: "Управлять базами", symbol: "books.vertical") { manage = true }
+            .task(id: model.knowledgeRevision) {
+                loaded = await model.loadLibraries() || loaded
+            }
+            .sheet(isPresented: $manage) { KnowledgeSheet() }
+    }
+
+    private func save(_ selection: KnowledgeSelection) {
+        Task { await model.saveKnowledge(selection) }
     }
 }
 

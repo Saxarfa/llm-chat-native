@@ -50,6 +50,13 @@ struct FeedArt: Identifiable, Equatable {
 
     var statusText: String {
         if !error.isEmpty { return error }
+        if isVideo {
+            switch status {
+            case "queued", "preparing", "generating": return "Генерация видео…"
+            case "cancelled": return "Генерация остановлена"
+            default: return "Не удалось создать видео"
+            }
+        }
         switch status {
         case "queued": return "Подготовка изображения…"
         case "preparing": return "Освобождаю память…"
@@ -78,8 +85,8 @@ struct FeedArt: Identifiable, Equatable {
         width = (json["width"] as? NSNumber)?.intValue ?? 0
         height = (json["height"] as? NSNumber)?.intValue ?? 0
         isVideo = (json["media_kind"] as? String) == "video"
-        let count = (json["image_count"] as? NSNumber)?.intValue ?? 0
-        ready = status == "done" && count > 0 && !isVideo
+        let count = (json[isVideo ? "video_count" : "image_count"] as? NSNumber)?.intValue ?? 0
+        ready = status == "done" && count > 0
         error = (json["error"] as? String) ?? ""
     }
 
@@ -93,6 +100,8 @@ struct ViewerItem: Identifiable, Equatable {
     enum Source: Equatable {
         case attachment(String)
         case art(String)
+        /// Видео Omni, уже скачанное в файл.
+        case video(String, URL)
     }
 
     let source: Source
@@ -101,6 +110,7 @@ struct ViewerItem: Identifiable, Equatable {
         switch source {
         case .attachment(let key): return key
         case .art(let art): return "art:" + art
+        case .video(let id, _): return "video:" + id
         }
     }
 }
@@ -254,8 +264,23 @@ enum AttachmentPrep {
                                    kind: .pdf)
         case "png", "jpg", "jpeg", "webp", "heic", "heif":
             return try image(data: data, name: name)
+        case "mp4":
+            // Как `prepareChatAttachment` на сайте: MP4 до 24 МБ только для Omni.
+            guard ChatParameters.isOmni(model) else {
+                throw AttachmentError(message: "Для видео MP4 выберите Omni.")
+            }
+            guard data.count <= 24 * 1024 * 1024 else {
+                throw AttachmentError(message: "Выберите видео MP4 размером до 24 МБ.")
+            }
+            guard data.count > 8, data.subdata(in: 4..<8) == Data("ftyp".utf8) else {
+                throw AttachmentError(message: "Не удалось прочитать MP4. Выберите другой файл.")
+            }
+            return DraftAttachment(name: name, dataURL: "data:video/mp4;base64," + data.base64EncodedString(),
+                                   kind: .video)
         default:
-            throw AttachmentError(message: "Выберите Markdown (.md), PDF, PNG, JPEG или WebP.")
+            throw AttachmentError(message: ChatParameters.isOmni(model)
+                                  ? "Выберите MP4, Markdown (.md), PNG, JPEG или WebP."
+                                  : "Выберите Markdown (.md), PDF, PNG, JPEG или WebP.")
         }
     }
 }

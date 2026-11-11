@@ -77,6 +77,9 @@ struct ChatMessage {
     let reasoning: String?
     let attachments: [FeedAttachment]
     let arts: [FeedArt]
+    /// Варианты ответа (после «Ответить заново»): сколько их и какой показан.
+    var variantCount = 0
+    var variantIndex = 0
 
     init(id: String, role: String, content: String, model: String? = nil, reasoning: String? = nil,
          attachments: [FeedAttachment] = [], arts: [FeedArt] = []) {
@@ -108,6 +111,10 @@ struct ChatMessage {
             return FeedAttachment(id: key, name: name.isEmpty ? "Файл" : name, kind: kind)
         }
         arts = FeedArt.list(json["generated_images"])
+        let variants = (json["variants"] as? [Any])?.count ?? 0
+        variantCount = variants
+        let chosen = (json["current_variant_index"] as? NSNumber)?.intValue ?? (variants - 1)
+        variantIndex = max(0, min(chosen, variants - 1))
     }
 
     static func attachmentKey(message: String, index: Int) -> String {
@@ -127,6 +134,8 @@ struct FeedMessage: Identifiable, Equatable {
     let model: String
     let attachments: [FeedAttachment]
     let arts: [FeedArt]
+    var variantCount = 0
+    var variantIndex = 0
 
     static func build(from messages: [ChatMessage]) -> [FeedMessage] {
         var result: [FeedMessage] = []
@@ -143,7 +152,9 @@ struct FeedMessage: Identifiable, Equatable {
                 reasoning: (message.reasoning ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
                 model: message.model ?? "",
                 attachments: message.attachments,
-                arts: message.arts
+                arts: message.arts,
+                variantCount: message.variantCount,
+                variantIndex: message.variantIndex
             ))
         }
         return result

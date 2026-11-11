@@ -54,7 +54,7 @@ struct SidebarView: View {
             SettingsSheet()
         }
         .onAppear {
-            if model.preview == .settings { showSettings = true }
+            if model.preview == .settings || model.preview == .memory || model.preview == .knowledge { showSettings = true }
         }
     }
 

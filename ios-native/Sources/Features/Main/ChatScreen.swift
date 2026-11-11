@@ -8,6 +8,7 @@ struct ChatScreen: View {
     let onMenu: () -> Void
     @State private var draft = ""
     @State private var showParameters = false
+    @State private var showBranches = false
 
     var body: some View {
         @Bindable var bound = model
@@ -41,13 +42,43 @@ struct ChatScreen: View {
             await model.loadThread()
         }
         .fullScreenCover(item: $bound.viewer) { item in
-            ImageViewer(item: item)
+            if case .video(_, let url) = item.source {
+                VideoViewer(url: url)
+            } else {
+                ImageViewer(item: item)
+            }
         }
         .sheet(isPresented: $showParameters) {
             ChatParametersSheet()
         }
+        .sheet(isPresented: $showBranches) {
+            BranchesSheet()
+        }
+        .confirmationDialog(model.pendingDelete?.isUser == true ? "Удалить сообщение?" : "Удалить ответ?",
+                            isPresented: Binding(get: { model.pendingDelete != nil },
+                                                 set: { if !$0 { model.pendingDelete = nil } }),
+                            titleVisibility: .visible) {
+            Button("Удалить", role: .destructive) {
+                if let message = model.pendingDelete {
+                    Task { await model.deleteMessage(message) }
+                }
+                model.pendingDelete = nil
+            }
+            Button("Отмена", role: .cancel) { model.pendingDelete = nil }
+        } message: {
+            Text("Сообщение исчезнет из этой ветки. Другие ветки не изменятся.")
+        }
         .onAppear {
-            if model.preview == .parameters || model.preview == .nano { showParameters = true }
+            if model.preview == .parameters || model.preview == .nano || model.preview == .omni { showParameters = true }
+            if model.preview == .branches { showBranches = true }
+        }
+    }
+
+    private var branchesButton: some View {
+        CircleIconButton(symbol: "arrow.triangle.branch", label: "Ветки диалога: \(model.activeBranchName)") {
+            Keyboard.hide()
+            Haptics.tap()
+            showBranches = true
         }
     }
 
@@ -68,6 +99,9 @@ struct ChatScreen: View {
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity)
+                if model.activeBranches.count > 1 {
+                    branchesButton
+                }
                 parametersButton
                 CircleIconButton(symbol: "square.and.pencil", label: "Новый чат") {
                     model.activeChatID = nil
@@ -113,7 +147,7 @@ struct ComposerBar: View {
     @State private var parkedDraft = ""
 
     private static let fileTypes: [UTType] = {
-        var types: [UTType] = [.pdf, .png, .jpeg, .webP, .heic]
+        var types: [UTType] = [.pdf, .png, .jpeg, .webP, .heic, .mpeg4Movie]
         for kind in ["md", "markdown"] {
             if let type = UTType(filenameExtension: kind) { types.append(type) }
         }

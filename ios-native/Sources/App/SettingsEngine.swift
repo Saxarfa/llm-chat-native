@@ -26,7 +26,8 @@ extension AppModel {
             return
         }
         let previous = chatMeta[id]
-        chatMeta[id] = ChatMeta(overrides: value, branch: previous?.branch ?? "main")
+        chatMeta[id] = ChatMeta(overrides: value, branch: previous?.branch ?? "main",
+                                branches: previous?.branches ?? [])
         guard preview == nil, let api else { return }
         do {
             _ = try await api.json("/api/chats/\(APIClient.pathSafe(id))/overrides", method: "PUT",

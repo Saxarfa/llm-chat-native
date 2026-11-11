@@ -1,3 +1,5 @@
+import AVFoundation
+import AVKit
 import Photos
 import SwiftUI
 import UIKit
@@ -72,7 +74,7 @@ struct ArtView: View {
 
     var body: some View {
         if art.isVideo {
-            note("Видео — просмотр появится на одном из следующих этапов", symbol: "film")
+            VideoArtView(art: art)
         } else if art.ready {
             Button {
                 if image != nil {
@@ -143,6 +145,199 @@ struct ArtView: View {
         Label(text, systemImage: symbol)
             .font(.system(size: 14))
             .foregroundStyle(Theme.subtle)
+    }
+}
+
+/// Ролик Omni в ленте. Скачивается по нажатию (ролики крупные), дальше — из кэша телефона;
+/// после скачивания плитка показывает первый кадр.
+private struct VideoArtView: View {
+    @Environment(AppModel.self) private var model
+    let art: FeedArt
+    @State private var poster: UIImage?
+    @State private var loading = false
+    @State private var failure: String?
+
+    var body: some View {
+        if art.ready {
+            Button {
+                Task { await open() }
+            } label: {
+                tile {
+                    ZStack {
+                        if let poster {
+                            Image(uiImage: poster)
+                                .resizable()
+                                .scaledToFill()
+                        }
+                        VStack(spacing: 10) {
+                            if loading {
+                                ProgressView().tint(.white)
+                            } else {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 22, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 56, height: 56)
+                                    .background(Color.black.opacity(0.55), in: Circle())
+                            }
+                            if poster == nil || failure != nil {
+                                Text(failure ?? (loading ? "Загружаю видео…" : "Видео · нажмите, чтобы посмотреть"))
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(failure == nil ? Theme.muted : Theme.danger)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 16)
+                            }
+                        }
+                    }
+                }
+            }
+            .buttonStyle(PressScaleStyle())
+            .disabled(loading)
+            .accessibilityLabel("Видео модели")
+            .accessibilityHint("Открыть и воспроизвести")
+            .task(id: art.id) {
+                if poster == nil {
+                    poster = ImageStore.image("video:\(art.id):poster")
+                }
+                if poster == nil {
+                    poster = await model.videoPoster(art.id)
+                }
+            }
+        } else if art.busy {
+            tile {
+                VStack(spacing: 12) {
+                    ProgressView().tint(Theme.muted)
+                    Text(art.statusText)
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+        } else {
+            Label(art.statusText, systemImage: "film")
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.subtle)
+        }
+    }
+
+    private func open() async {
+        guard !loading else { return }
+        if model.preview != nil { return }
+        Keyboard.hide()
+        loading = true
+        failure = nil
+        defer { loading = false }
+        do {
+            let file = try await model.videoFile(art.id)
+            if poster == nil { poster = await model.videoPoster(art.id) }
+            model.viewer = ViewerItem(source: .video(art.id, file))
+        } catch is CancellationError {
+        } catch {
+            Haptics.error()
+            failure = (error as? APIError)?.message ?? "Не удалось загрузить видео."
+        }
+    }
+
+    private func tile<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        Theme.surface
+            .aspectRatio(art.ratio, contentMode: .fit)
+            .frame(maxWidth: 340)
+            .overlay { content() }
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.line))
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
+/// Ролик на весь экран: системный плеер, сохранение в «Фото» и «Поделиться».
+struct VideoViewer: View {
+    @Environment(\.dismiss) private var dismiss
+    let url: URL
+    @State private var player: AVPlayer?
+    @State private var note: String?
+    @State private var saving = false
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            if let player {
+                VideoPlayer(player: player)
+                    .ignoresSafeArea(edges: .bottom)
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            HStack {
+                CircleIconButton(symbol: "xmark", label: "Закрыть") { dismiss() }
+                Spacer()
+                ShareLink(item: url) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 40, height: 40)
+                        .background(Theme.fill, in: Circle())
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Поделиться видео")
+                CircleIconButton(symbol: "square.and.arrow.down", label: "Сохранить в Фото") {
+                    Task { await save() }
+                }
+                .disabled(saving)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 52)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let note {
+                Text(note)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.ink)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 40)
+                    .background(Theme.surface, in: Capsule())
+                    .padding(.bottom, 64)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: note)
+        .preferredColorScheme(.dark)
+        .onAppear {
+            // Звук ролика слышен и при беззвучном режиме — как в «Фото».
+            try? AVAudioSession.sharedInstance().setCategory(.playback)
+            let item = AVPlayer(url: url)
+            player = item
+            item.play()
+        }
+        .onDisappear {
+            player?.pause()
+        }
+    }
+
+    private func save() async {
+        guard !saving else { return }
+        saving = true
+        defer { saving = false }
+        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        guard status == .authorized || status == .limited else {
+            Haptics.error()
+            show("Разрешите доступ к «Фото» в настройках iPhone.")
+            return
+        }
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                _ = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
+            }
+            Haptics.success()
+            show("Сохранено в «Фото»")
+        } catch {
+            Haptics.error()
+            show("Не удалось сохранить видео.")
+        }
+    }
+
+    private func show(_ text: String) {
+        note = text
+        Task {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            if note == text { note = nil }
+        }
     }
 }
 
@@ -281,6 +476,8 @@ struct ImageViewer: View {
             } else if image != nil {
                 show("Оригинал недоступен — показана уменьшенная копия.")
             }
+        case .video:
+            break
         }
         loading = false
     }

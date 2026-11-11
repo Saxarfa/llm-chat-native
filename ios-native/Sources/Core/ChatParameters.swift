@@ -152,14 +152,48 @@ enum ChatParameters {
             return [Choice("minimal", "Минимальные"), Choice("medium", "Средние"), Choice("high", "Глубокие")]
         case "aistudio/gemini-3.1-flash-image", "aistudio/gemini-3.1-flash-lite-image":
             return [Choice("minimal", "Минимальные"), Choice("high", "Глубокие")]
+        case "aistudio/gemini-omni-1.1-flash":
+            return [Choice("low", "Low"), Choice("high", "High")]
         default:
             return nil
         }
     }
 
     static func nanoDefaultThinking(_ model: String) -> String {
-        model == "aistudio/gemini-nano-banana-2.1" ? "medium" : "minimal"
+        if isOmni(model) { return "high" }
+        return model == "aistudio/gemini-nano-banana-2.1" ? "medium" : "minimal"
     }
+
+    // MARK: - Omni (видео)
+
+    static let omni12 = "aistudio/gemini-omni-1.2-flash"
+
+    static func isOmni(_ model: String) -> Bool {
+        model == omni12 || model == "aistudio/gemini-omni-1.1-flash"
+    }
+
+    static let omniResolutions: [Choice] = [
+        Choice("360p", "360p"), Choice("720p", "720p"), Choice("1080p", "1080p"), Choice("4k", "4K"),
+    ]
+
+    /// Длительность в секундах: у 1.2 — до 15, у 1.1 — до 10.
+    static func omniDurations(_ model: String) -> [Int] {
+        Array(3...(model == omni12 ? 15 : 10))
+    }
+
+    static let omniTasks: [Choice] = [
+        Choice("auto", "Авто"), Choice("text_to_video", "Из текста"), Choice("image_to_video", "Из картинки"),
+        Choice("reference_to_video", "По образцам"), Choice("edit", "Правка видео"), Choice("extend", "Продление видео"),
+    ]
+
+    static let omniTaskHints: [String: String] = [
+        "auto": "Модель выбирает задачу по вашему сообщению.",
+        "text_to_video": "Опишите сцену, движение и звук.",
+        "image_to_video": "Добавьте картинку и опишите, как её оживить.",
+        "reference_to_video": "Добавьте изображения или MP4 как образцы и опишите новую сцену.",
+        "edit": "Добавьте MP4 или используйте ролик из прошлого ответа. Размер и длительность сохраняются.",
+        "extend": "Добавьте MP4 или используйте ролик из прошлого ответа. Опишите, что произойдёт дальше.",
+    ]
 
     /// Какие числовые параметры AI Studio даёт менять у модели картинок.
     static func nanoSampling(_ model: String) -> (temperature: Bool, topP: Bool, textLimits: Bool) {

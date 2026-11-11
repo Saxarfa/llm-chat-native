@@ -1,3 +1,4 @@
+import AVFoundation
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -75,6 +76,42 @@ extension AppModel {
             return decoded.preparingForDisplay() ?? decoded
         }.value
         if let image { ImageStore.put(image, key: key) }
+        return image
+    }
+
+    // MARK: - Видео модели (Omni)
+
+    /// Где лежит скачанный ролик: папка кэшей, система чистит её сама при нехватке места.
+    nonisolated static func videoURL(_ id: String) -> URL {
+        let folder = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("omni", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let safe = id.replacingOccurrences(of: "[^A-Za-z0-9_-]", with: "_", options: .regularExpression)
+        return folder.appendingPathComponent(safe + ".mp4")
+    }
+
+    /// Скачивает ролик, если его ещё нет на телефоне, и готовит первый кадр для ленты.
+    func videoFile(_ id: String) async throws -> URL {
+        let target = Self.videoURL(id)
+        if FileManager.default.fileExists(atPath: target.path) { return target }
+        guard let api else { throw APIError.unreachable }
+        try await api.download("/api/images/nano/videos/\(APIClient.pathSafe(id))/0", to: target)
+        _ = await videoPoster(id)
+        return target
+    }
+
+    /// Первый кадр уже скачанного ролика (для плитки в ленте).
+    func videoPoster(_ id: String) async -> UIImage? {
+        let key = "video:\(id):poster"
+        if let ready = ImageStore.image(key) { return ready }
+        let file = Self.videoURL(id)
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: file))
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 960, height: 960)
+        guard let frame = try? await generator.image(at: .zero).image else { return nil }
+        let image = UIImage(cgImage: frame)
+        ImageStore.put(image, key: key)
         return image
     }
 

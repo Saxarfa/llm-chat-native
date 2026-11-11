@@ -71,6 +71,15 @@ final class AppModel {
     var imageCatalog: [String: [String: Any]] = [:]
     /// Ошибка сохранения параметров или настроек.
     var settingsNotice: String?
+    /// Идёт смена ветки или варианта ответа: кнопки под ответами недоступны.
+    var branchBusy = false
+    /// Сообщение, удаление которого ждёт подтверждения.
+    var pendingDelete: FeedMessage?
+    /// Растут с событиями `memory_updated` / `knowledge_updated` — открытые окна перечитывают данные.
+    var memoryRevision = 0
+    var knowledgeRevision = 0
+    /// Базы знаний аккаунта (для выбора в «Параметрах чата»).
+    var knowledgeLibraries: [KnowledgeLibrary] = []
 
     let preview: PreviewScene?
     @ObservationIgnored var api: APIClient?
@@ -181,6 +190,9 @@ final class AppModel {
         draftOverrides = [:]
         imageCatalog = [:]
         settingsNotice = nil
+        branchBusy = false
+        pendingDelete = nil
+        knowledgeLibraries = []
         models = []
         settings = ServerSettings()
         sendError = nil
@@ -236,7 +248,8 @@ final class AppModel {
             phase = .needsLogin
         case .offline:
             phase = .offline
-        case .chat, .sidebar, .thread, .threadTop, .streaming, .models, .media, .parameters, .nano, .settings:
+        case .chat, .sidebar, .thread, .threadTop, .streaming, .models, .media, .parameters, .nano, .settings,
+             .branches, .memory, .knowledge, .omni:
             user = PreviewScene.user
             chats = PreviewScene.chats
             models = PreviewScene.modelOptions
@@ -267,6 +280,27 @@ final class AppModel {
             }
             if scene == .streaming {
                 lives["7"] = PreviewScene.live
+            }
+            if scene == .branches {
+                activeChatID = "7"
+                thread = PreviewScene.variantFeed
+                threadState = .loaded
+                threadChatID = "7"
+                chatMeta["7"] = ChatMeta(overrides: [:], branch: "b2", branches: PreviewScene.branchSample)
+            }
+            if scene == .omni {
+                draftModel = "aistudio/gemini-omni-1.2-flash"
+                imageCatalog = ["aistudio/gemini-omni-1.2-flash": PreviewScene.omniCatalog]
+                activeChatID = "3"
+                thread = PreviewScene.omniFeed()
+                threadState = .loaded
+                threadChatID = "3"
+            }
+            if scene == .parameters || scene == .knowledge {
+                knowledgeLibraries = PreviewScene.libraries
+            }
+            if scene == .parameters {
+                chatMeta["7"]?.overrides["knowledge"] = ["enabled": true, "collections": ["l1"], "strict": false] as [String: Any]
             }
             phase = .ready
         }

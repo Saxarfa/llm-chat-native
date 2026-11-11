@@ -171,6 +171,50 @@ final class APIClient: @unchecked Sendable {
         return object
     }
 
+    /// Отправка файла телом запроса как есть (документ в базу знаний).
+    func upload(_ path: String, data body: Data, contentType: String) async throws -> [String: Any] {
+        var request = try makeRequest(path, method: "POST", json: nil)
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 180
+        let data: Data
+        let status: Int
+        do {
+            let (payload, response) = try await session.upload(for: request, from: body)
+            data = payload
+            status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        } catch {
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
+            throw APIError.network(error)
+        }
+        guard (200..<300).contains(status) else {
+            throw APIError(status: status, message: Self.detail(from: data) ?? "Сервер ответил ошибкой \(status).")
+        }
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
+    /// Видео с сервера — во временный файл (ролики Omni крупные, в память их не кладём).
+    func download(_ path: String, to destination: URL, timeout: TimeInterval = 300) async throws {
+        var request = try makeRequest(path, method: "GET", json: nil)
+        request.setValue("*/*", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = timeout
+        let location: URL
+        let status: Int
+        do {
+            let (file, response) = try await session.download(for: request)
+            location = file
+            status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        } catch {
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
+            throw APIError.network(error)
+        }
+        guard (200..<300).contains(status) else {
+            try? FileManager.default.removeItem(at: location)
+            throw APIError(status: status, message: status == 404 ? "Видео недоступно на сервере." : "Не удалось загрузить видео.")
+        }
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: location, to: destination)
+    }
+
     /// Файл с сервера (картинка), как есть.
     func data(_ path: String, timeout: TimeInterval = 60) async throws -> Data {
         var request = try makeRequest(path, method: "GET", json: nil)

@@ -6,6 +6,8 @@ struct SettingsSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var confirmLogout = false
+    @State private var showMemory = false
+    @State private var showKnowledge = false
 
     private var version: String {
         let info = Bundle.main.infoDictionary
@@ -71,11 +73,20 @@ struct SettingsSheet: View {
                     }
 
                     Group {
+                    SectionCaption(text: "Данные")
+                    SettingsCard {
+                        NavRow(title: "Память", symbol: "brain") { showMemory = true }
+                        CardDivider()
+                        NavRow(title: "Базы знаний", symbol: "books.vertical") { showKnowledge = true }
+                    }
+                    }
+
+                    Group {
                     SectionCaption(text: "О приложении")
                     SettingsCard {
                         ValueRow(title: "Версия", value: version)
                     }
-                    SettingsNote(text: "Темы, память, базы знаний и остальные настройки — на сайте. Изменения оттуда приходят сюда сразу.")
+                    SettingsNote(text: "Темы и остальные настройки — на сайте. Изменения оттуда приходят сюда сразу.")
                     }
 
                     Button(role: .destructive) {
@@ -104,12 +115,51 @@ struct SettingsSheet: View {
         .presentationCornerRadius(28)
         .preferredColorScheme(.dark)
         .settingsNotice()
+        .sheet(isPresented: $showMemory) { MemorySheet() }
+        .sheet(isPresented: $showKnowledge) { KnowledgeSheet() }
+        .task {
+            // Снимок: второе окно открывается, когда первое уже на экране.
+            guard model.preview == .memory || model.preview == .knowledge else { return }
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            if model.preview == .memory { showMemory = true } else { showKnowledge = true }
+        }
         .confirmationDialog("Выйти из аккаунта?", isPresented: $confirmLogout, titleVisibility: .visible) {
             Button("Выйти", role: .destructive) {
                 dismiss()
                 Task { await model.logout() }
             }
             Button("Отмена", role: .cancel) {}
+        }
+    }
+
+    private struct NavRow: View {
+        let title: String
+        let symbol: String
+        let action: () -> Void
+
+        var body: some View {
+            Button {
+                Haptics.tap()
+                action()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: symbol)
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.muted)
+                        .frame(width: 22)
+                    Text(title)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.subtle)
+                }
+                .font(.system(size: 16))
+                .foregroundStyle(Theme.ink)
+                .padding(.horizontal, 16)
+                .frame(minHeight: 52)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(RowPressStyle())
         }
     }
 

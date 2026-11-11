@@ -241,6 +241,16 @@ private struct UserMessageView: View {
                             } label: {
                                 Label("Изменить", systemImage: "pencil")
                             }
+                            Button {
+                                Task { await model.forkBranch(at: message) }
+                            } label: {
+                                Label("Новая ветка отсюда", systemImage: "arrow.triangle.branch")
+                            }
+                            Button(role: .destructive) {
+                                model.pendingDelete = message
+                            } label: {
+                                Label("Удалить сообщение", systemImage: "trash")
+                            }
                         }
                     }
             }
@@ -283,7 +293,14 @@ private struct AssistantMessageView: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(PressScaleStyle())
+                        .disabled(model.branchBusy)
                         .accessibilityLabel("Ответить заново")
+                    }
+                    if message.variantCount > 1 {
+                        VariantStepper(message: message, enabled: canRegenerate && !model.branchBusy)
+                    }
+                    if canRegenerate {
+                        AnswerMoreMenu(message: message)
                     }
                     if !message.model.isEmpty {
                         Text(ChatConfig.modelName(message.model, profiles: model.settings.modelProfiles))
@@ -297,6 +314,69 @@ private struct AssistantMessageView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// «‹ 2 / 3 ›» — переключение сохранённых вариантов ответа.
+private struct VariantStepper: View {
+    @Environment(AppModel.self) private var model
+    let message: FeedMessage
+    let enabled: Bool
+
+    var body: some View {
+        HStack(spacing: 0) {
+            step("chevron.left", label: "Предыдущий вариант", to: message.variantIndex - 1)
+            Text("\(message.variantIndex + 1)/\(message.variantCount)")
+                .font(.system(size: 13, weight: .medium).monospacedDigit())
+                .foregroundStyle(Theme.muted)
+                .accessibilityLabel("Вариант \(message.variantIndex + 1) из \(message.variantCount)")
+            step("chevron.right", label: "Следующий вариант", to: message.variantIndex + 1)
+        }
+    }
+
+    private func step(_ symbol: String, label: String, to index: Int) -> some View {
+        let possible = index >= 0 && index < message.variantCount
+        return Button {
+            Task { await model.selectVariant(message, index: index) }
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(possible && enabled ? Theme.muted : Theme.subtle.opacity(0.5))
+                .frame(width: 32, height: 40)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressScaleStyle())
+        .disabled(!possible || !enabled)
+        .accessibilityLabel(label)
+    }
+}
+
+/// «…» под ответом: ветка от этого места и удаление.
+private struct AnswerMoreMenu: View {
+    @Environment(AppModel.self) private var model
+    let message: FeedMessage
+
+    var body: some View {
+        Menu {
+            Button {
+                Task { await model.forkBranch(at: message) }
+            } label: {
+                Label("Новая ветка отсюда", systemImage: "arrow.triangle.branch")
+            }
+            Button(role: .destructive) {
+                model.pendingDelete = message
+            } label: {
+                Label("Удалить ответ", systemImage: "trash")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Theme.muted)
+                .frame(width: 44, height: 40)
+                .contentShape(Rectangle())
+        }
+        .disabled(model.branchBusy)
+        .accessibilityLabel("Ещё действия с ответом")
     }
 }
 

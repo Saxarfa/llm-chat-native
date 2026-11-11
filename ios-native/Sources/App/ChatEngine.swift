@@ -165,9 +165,10 @@ extension AppModel {
     }
 
     /// Принимает чат с сервера: параметры для отправки и сообщения для ленты.
-    private func apply(chat: [String: Any], to id: String) async {
+    func apply(chat: [String: Any], to id: String) async {
         chatMeta[id] = ChatMeta(overrides: ChatConfig.dict(chat["overrides"]),
-                                branch: ChatConfig.text(chat["active_branch_id"]) ?? "main")
+                                branch: ChatConfig.text(chat["active_branch_id"]) ?? "main",
+                                branches: ChatBranch.list(chat["branches"]))
         update(summary: id, from: chat)
         let raw = (chat["messages"] as? [[String: Any]]) ?? []
         // Ответ, снятый до того как сервер сохранил только что отправленный вопрос,
@@ -433,6 +434,12 @@ extension AppModel {
             return
         case "all_chats_cleared", "project_data_restored":
             Task { await refreshChats() }
+            return
+        case "memory_updated":
+            memoryRevision += 1
+            return
+        case "knowledge_updated":
+            knowledgeRevision += 1
             return
         default:
             break

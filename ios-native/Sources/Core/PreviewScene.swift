@@ -11,6 +11,66 @@ enum PreviewScene: String, CaseIterable {
     case media
     /// «Параметры чата» текстовой модели и Nano Banana; настройки приложения.
     case parameters, nano, settings
+    /// Этап 6: ветки и варианты ответа, память, базы знаний, видео Omni.
+    case branches, memory, knowledge, omni
+
+    static let omniCatalog: [String: Any] = [
+        "id": "aistudio/gemini-omni-1.2-flash",
+        "kind": "video",
+        "aspect_ratios": ["auto", "16:9", "9:16", "1:1"],
+        "features": ["video_tasks": true, "thinking_level": false, "system_instruction": true],
+    ]
+
+    static let memorySample: MemorySnapshot = {
+        var snapshot = MemorySnapshot()
+        snapshot.version = 3
+        snapshot.facts = [
+            MemoryFact(id: "f1", text: "Живёт в Казани, часовой пояс UTC+3"),
+            MemoryFact(id: "f2", text: "Предпочитает короткие ответы без вступлений", origin: "model"),
+            MemoryFact(id: "f3", text: "Пишет на Python и Swift"),
+            MemoryFact(id: "f4", scope: "preset1", text: "В историях — мрачное фэнтези, повествование от третьего лица"),
+        ]
+        return snapshot
+    }()
+
+    static let libraries: [KnowledgeLibrary] = [
+        KnowledgeLibrary(id: "l1", name: "Документы по работе", documents: 3),
+        KnowledgeLibrary(id: "l2", name: "Лор мира", documents: 12),
+    ]
+
+    static let documents: [KnowledgeDocument] = [
+        KnowledgeDocument(id: "d1", title: "Регламент резервного копирования.pdf", chunks: 48),
+        KnowledgeDocument(id: "d2", title: "Схема базы данных.md", status: "indexing", progress: 40),
+        KnowledgeDocument(id: "d3", title: "Старый отчёт.docx", status: "error", error: "Не удалось прочитать DOCX"),
+    ]
+
+    static let branchSample: [ChatBranch] = [
+        ChatBranch(id: "main", name: "Основная", messageCount: 4),
+        ChatBranch(id: "b1", name: "Ветка 1", parentID: "main", messageCount: 3),
+        ChatBranch(id: "b2", name: "Короче и с примером", parentID: "b1", messageCount: 6),
+    ]
+
+    /// Лента с несколькими вариантами последнего ответа.
+    static var variantFeed: [FeedMessage] {
+        var items = feed
+        if let last = items.indices.last {
+            items[last].variantCount = 3
+            items[last].variantIndex = 1
+        }
+        return items
+    }
+
+    static func omniFeed() -> [FeedMessage] {
+        ImageStore.put(sample(cold.0, cold.1, size: CGSize(width: 960, height: 540)), key: "video:pv2:poster")
+        return FeedMessage.build(from: [
+            ChatMessage(id: "o1", role: "user", content: "Оживи закат: медленный наезд камеры, лёгкие волны, звук прибоя."),
+            ChatMessage(id: "o2", role: "assistant", content: "Готово — 6 секунд, 720p.", model: "aistudio/gemini-omni-1.2-flash",
+                        arts: [FeedArt(id: "pv2", width: 1280, height: 720, isVideo: true)]),
+            ChatMessage(id: "o3", role: "user", content: "Продли ещё на пару секунд — пусть пролетит чайка."),
+            ChatMessage(id: "o4", role: "assistant", content: "", model: "aistudio/gemini-omni-1.2-flash",
+                        arts: [FeedArt(id: "pv3", status: "generating", width: 1280, height: 720, ready: false, isVideo: true)]),
+        ])
+    }
 
     /// Описание модели картинок, как его отдаёт `/api/providers/aistudio`.
     static let nanoCatalog: [String: Any] = [

@@ -20,6 +20,33 @@ struct ServerSettings {
 struct ChatMeta {
     var overrides: [String: Any]
     var branch: String
+    /// Ветки диалога; у чата без веток — пусто или одна «Основная».
+    var branches: [ChatBranch] = []
+}
+
+/// Ветка диалога (`branches` в ответе `/api/chats/{id}`), без сообщений.
+struct ChatBranch: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let parentID: String?
+    let messageCount: Int
+
+    init(id: String, name: String, parentID: String? = nil, messageCount: Int = 0) {
+        self.id = id
+        self.name = name
+        self.parentID = parentID
+        self.messageCount = messageCount
+    }
+
+    static func list(_ value: Any?) -> [ChatBranch] {
+        ((value as? [[String: Any]]) ?? []).compactMap { item in
+            guard let id = item["id"] as? String, !id.isEmpty else { return nil }
+            let name = ((item["name"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return ChatBranch(id: id, name: name.isEmpty ? "Основная" : name,
+                              parentID: item["parent_id"] as? String,
+                              messageCount: (item["message_count"] as? NSNumber)?.intValue ?? 0)
+        }
+    }
 }
 
 struct ModelOption: Identifiable, Equatable {
@@ -49,12 +76,12 @@ enum ChatConfig {
 
     static let defaultPrompt = "You are a helpful, knowledgeable, and precise AI assistant. Provide concise, high-quality answers formatted in Markdown. When writing code, specify the language and follow modern best practices."
 
-    /// Модели видео AI Studio (Omni). В нативном клиенте скрыты, пока нет показа видео (этап 6).
-    static let mediaModels: Set<String> = [
-        "aistudio/gemini-omni-1.2-flash", "aistudio/gemini-omni-1.1-flash",
-    ]
+    /// Модели, скрытые в списке выбора. С этапа 6 (видео Omni) пусто: показываются все.
+    static let mediaModels: Set<String> = []
 
     private static let studioNames: [String: String] = [
+        "aistudio/gemini-omni-1.2-flash": "Gemini Omni 1.2 Flash",
+        "aistudio/gemini-omni-1.1-flash": "Gemini Omni 1.1 Flash",
         "aistudio/gemini-nano-banana-2.1": "Nano Banana 2.1",
         "aistudio/gemini-3.1-flash-image": "Nano Banana 2",
         "aistudio/gemini-3.1-flash-lite-image": "Nano Banana 2 Lite",
