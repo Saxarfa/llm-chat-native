@@ -1,0 +1,5 @@
+# Создаются командой `xcodegen generate` из project.yml
+*.xcodeproj
+/Info.plist
+build/
+DerivedData/

@@ -1,0 +1,96 @@
+name: Build native iOS app (SwiftUI)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'ios-native/**'
+      - '.github/workflows/build-ios-native.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ios-native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Xcode project
+        working-directory: ios-native
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          xcodegen generate
+          xcodebuild -version
+      - name: Verify free-account compatibility
+        run: |
+          set -euo pipefail
+          # Бесплатный Apple ID: одно приложение, без расширений и платных возможностей.
+          if find ios-native -name '*.entitlements' -o -name '*.appex' | grep -q .; then
+            echo 'Entitlements or extensions are not allowed'; exit 1
+          fi
+          test "$(grep -c 'com.apple.product-type.application"' ios-native/LLMChat.xcodeproj/project.pbxproj)" -ge 1
+          if grep -q 'com.apple.product-type.app-extension' ios-native/LLMChat.xcodeproj/project.pbxproj; then
+            echo 'App extensions are not allowed'; exit 1
+          fi
+      - name: Compile unsigned Release
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          xcodebuild -project ios-native/LLMChat.xcodeproj -scheme LLMChat -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build/ios CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            build > build-ios-native.log 2>&1 || { grep -E 'error:|warning: unre|FAILED' build-ios-native.log | head -n 80; exit 1; }
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          app=build/ios/Build/Products/Release-iphoneos/LLMChat.app
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")" = app.llmchat.native
+          test -n "$(/usr/libexec/PlistBuddy -c 'Print :NSLocalNetworkUsageDescription' "$app/Info.plist")"
+          test -f "$app/LLMChat"
+          test ! -e "$app/_CodeSignature"
+          test -z "$(find "$app" -name '*.appex' -o -name '*.mobileprovision')"
+          mkdir -p build/package/Payload
+          ditto "$app" build/package/Payload/LLMChat.app
+          cd build/package
+          zip -qry ../LLM-Chat-native-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LLM-Chat-native-unsigned
+          path: build/LLM-Chat-native-unsigned.ipa
+          if-no-files-found: error
+      - name: Capture screens in simulator
+        run: |
+          set -euo pipefail
+          xcodebuild -project ios-native/LLMChat.xcodeproj -scheme LLMChat -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/simulator CODE_SIGNING_ALLOWED=NO build > build-simulator.log 2>&1
+          device=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next(d["udid"] for group in json.load(sys.stdin)["devices"].values() for d in group if "iPhone" in d["name"]))')
+          xcrun simctl boot "$device" || true
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl ui "$device" appearance dark || true
+          xcrun simctl install "$device" build/simulator/Build/Products/Debug-iphonesimulator/LLMChat.app
+          mkdir -p build/screens
+          # Имена экранов — PreviewScene в ios-native/Sources/Core/PreviewScene.swift; данные вымышленные.
+          for scene in connect login offline chat sidebar; do
+            xcrun simctl terminate "$device" app.llmchat.native || true
+            xcrun simctl launch "$device" app.llmchat.native "--preview=$scene"
+            sleep 4
+            xcrun simctl io "$device" screenshot "build/screens/$scene.png"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-screens
+          path: |
+            build/screens
+            build-simulator.log
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ios-native-build-log
+          path: build-ios-native.log
+          if-no-files-found: ignore
