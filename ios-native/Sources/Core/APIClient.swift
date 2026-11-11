@@ -7,6 +7,31 @@ struct APIError: LocalizedError, Equatable {
 
     static let unreachable = APIError(status: 0, message: "Не удалось подключиться к компьютеру. Проверьте адрес и что сервер запущен.")
     static let notOurServer = APIError(status: 0, message: "По этому адресу отвечает не LLM Chat.")
+
+    /// Сетевой сбой с понятной причиной: по одному «не удалось подключиться» не разобрать,
+    /// что случилось — нет сети, молчит компьютер или запрос запретила сама iOS.
+    static func network(_ error: Error) -> APIError {
+        guard let code = (error as? URLError)?.code else { return unreachable }
+        let reason: String
+        switch code {
+        case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed:
+            reason = "Телефон не в сети. Если подключаетесь через Tailscale — проверьте, что он включён."
+        case .timedOut:
+            reason = "Компьютер не ответил вовремя. Проверьте, что сервер запущен, а Tailscale включён на обоих устройствах."
+        case .cannotConnectToHost:
+            reason = "Компьютер найден, но сервер не принимает подключение. Проверьте, что LLM Chat запущен и порт указан верно."
+        case .cannotFindHost, .dnsLookupFailed:
+            reason = "Адрес не найден. Проверьте, как он написан."
+        case .appTransportSecurityRequiresSecureConnection:
+            reason = "iOS запретила незашифрованное подключение к этому адресу."
+        case .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
+             .serverCertificateNotYetValid, .serverCertificateHasUnknownRoot:
+            reason = "Не удалось установить защищённое соединение. Попробуйте адрес с http://."
+        default:
+            reason = "Не удалось подключиться к компьютеру. Проверьте адрес и что сервер запущен."
+        }
+        return APIError(status: 0, message: "\(reason) (код \(code.rawValue))")
+    }
 }
 
 /// Запросы к серверу LLM Chat на ПК. Вход — по bearer-токену, как у сайта.
@@ -73,7 +98,7 @@ final class APIClient: @unchecked Sendable {
         } catch {
             // Отменённый запрос (пользователь ушёл в другой чат) — не сбой связи.
             if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
-            throw APIError.unreachable
+            throw APIError.network(error)
         }
     }
 
@@ -135,7 +160,7 @@ final class APIClient: @unchecked Sendable {
             status = (response as? HTTPURLResponse)?.statusCode ?? 0
         } catch {
             if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
-            throw APIError.unreachable
+            throw APIError.network(error)
         }
         guard (200..<300).contains(status) else {
             throw APIError(status: status, message: Self.detail(from: data) ?? "Сервер ответил ошибкой \(status).")
@@ -162,7 +187,7 @@ final class APIClient: @unchecked Sendable {
             throw error
         } catch {
             if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
-            throw APIError.unreachable
+            throw APIError.network(error)
         }
     }
 

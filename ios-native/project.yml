@@ -10,8 +10,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.5"
-    CURRENT_PROJECT_VERSION: "7"
+    MARKETING_VERSION: "0.5.1"
+    CURRENT_PROJECT_VERSION: "8"
     TARGETED_DEVICE_FAMILY: "1"
     CODE_SIGN_STYLE: Manual
     DEVELOPMENT_TEAM: ""
@@ -48,6 +48,7 @@ targets:
         NSCameraUsageDescription: Камера нужна, чтобы прикрепить снимок к сообщению.
         NSPhotoLibraryAddUsageDescription: Доступ нужен, чтобы сохранять изображения из чата в «Фото».
         # Сервер — личный ПК в домашней сети или Tailscale, обычно по http.
+        # Только NSAllowsArbitraryLoads: рядом с NSAllowsLocalNetworking iOS его игнорирует,
+        # и http остаётся разрешён лишь к локальной сети — адреса Tailscale 100.x блокируются.
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
-          NSAllowsLocalNetworking: true
