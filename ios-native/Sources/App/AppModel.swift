@@ -153,7 +153,7 @@ final class AppModel {
             return
         }
         if preview != nil {
-            thread = PreviewScene.thread
+            thread = PreviewScene.feed
             threadState = .loaded
             threadChatID = id
             return
@@ -206,7 +206,7 @@ final class AppModel {
             chats = PreviewScene.chats
             if scene == .thread || scene == .threadTop {
                 activeChatID = "7"
-                thread = PreviewScene.thread
+                thread = PreviewScene.feed
                 threadState = .loaded
                 threadChatID = "7"
             }

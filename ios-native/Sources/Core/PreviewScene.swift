@@ -25,7 +25,7 @@ enum PreviewScene: String, CaseIterable {
         ChatSummary(id: "7", title: "Как устроен WAL в SQLite"),
     ]
 
-    static let thread: [FeedMessage] = FeedMessage.build(from: [
+    static let feed: [FeedMessage] = FeedMessage.build(from: [
         ChatMessage(id: "a", role: "user", content: "Объясни коротко, как устроен WAL в SQLite и когда его включать."),
         ChatMessage(id: "b", role: "assistant", content: #"""
         ## Журнал упреждающей записи
