@@ -26,20 +26,23 @@ struct AuthResponse: Decodable {
 /// Строка списка диалогов. Сервер отдаёт больше полей — здесь только нужные списку.
 struct ChatSummary: Decodable, Identifiable, Equatable {
     let id: String
-    let title: String
-    let pinned: Bool
-    let updatedAt: Double
+    var title: String
+    var pinned: Bool
+    var updatedAt: Double
+    var modelID: String
 
     enum CodingKeys: String, CodingKey {
         case id, title, pinned, updatedAt
         case updatedAtSnake = "updated_at"
+        case modelID = "model_id"
     }
 
-    init(id: String, title: String, pinned: Bool = false, updatedAt: Double = 0) {
+    init(id: String, title: String, pinned: Bool = false, updatedAt: Double = 0, modelID: String = "") {
         self.id = id
         self.title = title
         self.pinned = pinned
         self.updatedAt = updatedAt
+        self.modelID = modelID
     }
 
     init(from decoder: Decoder) throws {
@@ -56,6 +59,7 @@ struct ChatSummary: Decodable, Identifiable, Equatable {
         let camel = (try? box.decodeIfPresent(Double.self, forKey: .updatedAt)) ?? nil
         let snake = (try? box.decodeIfPresent(Double.self, forKey: .updatedAtSnake)) ?? nil
         updatedAt = camel ?? snake ?? 0
+        modelID = ((try? box.decodeIfPresent(String.self, forKey: .modelID)) ?? nil) ?? ""
     }
 }
 
@@ -64,8 +68,8 @@ struct ChatListResponse: Decodable {
 }
 
 /// Сообщение в том виде, в каком его хранит сервер. Читаются только поля, нужные ленте;
-/// содержимое вложений (base64) намеренно не разбирается.
-struct ChatMessage: Decodable {
+/// содержимое вложений (base64) намеренно не трогается.
+struct ChatMessage {
     let id: String
     let role: String
     let content: String
@@ -73,20 +77,6 @@ struct ChatMessage: Decodable {
     let reasoning: String?
     let attachmentNames: [String]
     let imageCount: Int
-
-    private struct Named: Decodable {
-        let name: String?
-    }
-
-    private struct Ignored: Decodable {
-        init(from decoder: Decoder) throws {}
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case id, role, content, model, reasoning, attachments
-        case generatedImages = "generated_images"
-        case webImages = "web_images"
-    }
 
     init(id: String, role: String, content: String, model: String? = nil, reasoning: String? = nil,
          attachmentNames: [String] = [], imageCount: Int = 0) {
@@ -99,32 +89,28 @@ struct ChatMessage: Decodable {
         self.imageCount = imageCount
     }
 
-    init(from decoder: Decoder) throws {
-        let box = try decoder.container(keyedBy: CodingKeys.self)
-        id = ((try? box.decodeIfPresent(String.self, forKey: .id)) ?? nil) ?? UUID().uuidString
-        role = ((try? box.decodeIfPresent(String.self, forKey: .role)) ?? nil) ?? "assistant"
-        content = ((try? box.decodeIfPresent(String.self, forKey: .content)) ?? nil) ?? ""
-        model = (try? box.decodeIfPresent(String.self, forKey: .model)) ?? nil
-        reasoning = (try? box.decodeIfPresent(String.self, forKey: .reasoning)) ?? nil
-        let files = ((try? box.decodeIfPresent([Named].self, forKey: .attachments)) ?? nil) ?? []
-        attachmentNames = files.map { ($0.name ?? "").isEmpty ? "Файл" : ($0.name ?? "") }
-        let generated = ((try? box.decodeIfPresent([Ignored].self, forKey: .generatedImages)) ?? nil) ?? []
-        let web = ((try? box.decodeIfPresent([Ignored].self, forKey: .webImages)) ?? nil) ?? []
-        imageCount = generated.count + web.count
+    init(json: [String: Any]) {
+        id = (json["id"] as? String) ?? UUID().uuidString
+        role = (json["role"] as? String) ?? "assistant"
+        content = (json["content"] as? String) ?? ""
+        model = json["model"] as? String
+        reasoning = json["reasoning"] as? String
+        let files = (json["attachments"] as? [[String: Any]]) ?? []
+        attachmentNames = files.map { file in
+            let name = (file["name"] as? String) ?? ""
+            return name.isEmpty ? "Файл" : name
+        }
+        let generated = (json["generated_images"] as? [Any])?.count ?? 0
+        let web = (json["web_images"] as? [Any])?.count ?? 0
+        imageCount = generated + web
     }
-}
-
-struct ChatDetailResponse: Decodable {
-    struct Detail: Decodable {
-        let messages: [ChatMessage]
-    }
-
-    let chat: Detail
 }
 
 /// Сообщение, подготовленное для ленты: Markdown разобран один раз при загрузке.
 struct FeedMessage: Identifiable, Equatable {
     let id: String
+    /// Идентификатор сообщения на сервере (в `id` к нему добавлен номер в ленте).
+    let rawID: String
     let isUser: Bool
     let text: String
     let blocks: [MarkdownBlock]
@@ -141,6 +127,7 @@ struct FeedMessage: Identifiable, Equatable {
             result.append(FeedMessage(
                 // Номер в начале защищает ленту от повторяющихся id в старых чатах.
                 id: "\(result.count)-\(message.id)",
+                rawID: message.id,
                 isUser: isUser,
                 text: text,
                 blocks: isUser ? [] : MarkdownParser.parse(text),

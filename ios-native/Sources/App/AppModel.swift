@@ -27,10 +27,44 @@ final class AppModel {
     /// Чей это `thread`: пока не совпал с `activeChatID`, лента показывает загрузку.
     var threadChatID: String?
 
+    /// Идущий ответ модели в чате: текст приходит целиком с каждым событием сервера.
+    struct LiveState: Equatable {
+        var phase = "Обработка запроса…"
+        var text = ""
+        var blocks: [MarkdownBlock] = []
+        var reasoning = ""
+        var isThinking = false
+        var stopping = false
+        /// Запрос на отправку ещё не подтверждён сервером.
+        var sending = false
+        /// Вопрос, показанный в ленте до ответа сервера.
+        var pendingUserID: String?
+    }
+
+    /// Ответы, которые сейчас пишутся, по id чата.
+    var lives: [String: LiveState] = [:]
+    /// Ошибка отправки или генерации — показывается над полем ввода.
+    var sendError: String?
+    var models: [ModelOption] = []
+    var modelsLoading = false
+    /// Модель для нового чата.
+    var draftModel = UserDefaults.standard.string(forKey: AppModel.draftModelKey) ?? ""
+    var settings = ServerSettings()
+
     let preview: PreviewScene?
-    @ObservationIgnored private var api: APIClient?
+    @ObservationIgnored var api: APIClient?
     /// Уже открывавшиеся чаты показываются сразу, пока идёт обновление с сервера.
-    @ObservationIgnored private var threadCache: [String: [FeedMessage]] = [:]
+    @ObservationIgnored var threadCache: [String: [FeedMessage]] = [:]
+    @ObservationIgnored var chatMeta: [String: ChatMeta] = [:]
+    @ObservationIgnored var eventsTask: Task<Void, Never>?
+    @ObservationIgnored var eventsConnectedOnce = false
+    /// Последний текст потока; в `lives` переносится не чаще нескольких раз в секунду.
+    @ObservationIgnored var liveRaw: [String: (text: String, reasoning: String)] = [:]
+    @ObservationIgnored var liveFlushScheduled = false
+    @ObservationIgnored var lastEventAt: [String: Date] = [:]
+    @ObservationIgnored var watching: Set<String> = []
+
+    static let draftModelKey = "draft_model"
 
     private static let serverKey = "server_url"
     private static let tokenKey = "token"
@@ -80,6 +114,7 @@ final class AppModel {
             let auth = try await api.me()
             accept(auth)
             await refreshChats()
+            startSession()
         } catch let error as APIError where error.status == 401 {
             Keychain.set(nil, for: Self.tokenKey)
             api.token = nil
@@ -107,10 +142,22 @@ final class AppModel {
         let auth = try await api.login(username: username, password: password)
         accept(auth)
         await refreshChats()
+        startSession()
     }
 
     func logout() async {
+        eventsTask?.cancel()
+        eventsTask = nil
+        eventsConnectedOnce = false
         await api?.logout()
+        lives = [:]
+        liveRaw = [:]
+        lastEventAt = [:]
+        watching = []
+        chatMeta = [:]
+        models = []
+        settings = ServerSettings()
+        sendError = nil
         Keychain.set(nil, for: Self.tokenKey)
         api?.token = nil
         user = nil
@@ -144,47 +191,6 @@ final class AppModel {
         }
     }
 
-    /// Загружает ленту активного чата. Вызывается экраном при смене `activeChatID`.
-    func loadThread() async {
-        guard let id = activeChatID else {
-            thread = []
-            threadState = .idle
-            threadChatID = nil
-            return
-        }
-        if preview != nil {
-            thread = PreviewScene.feed
-            threadState = .loaded
-            threadChatID = id
-            return
-        }
-        guard let api else { return }
-        threadChatID = id
-        if let cached = threadCache[id] {
-            thread = cached
-            threadState = .loaded
-        } else {
-            thread = []
-            threadState = .loading
-        }
-        do {
-            let messages = try await api.messages(chatID: id)
-            // Разбор Markdown длинного чата — вне главного потока.
-            let items = await Task.detached(priority: .userInitiated) { FeedMessage.build(from: messages) }.value
-            guard activeChatID == id else { return }
-            threadCache[id] = items
-            if items != thread { thread = items }
-            threadState = .loaded
-        } catch is CancellationError {
-            return
-        } catch let error as APIError where error.status == 401 {
-            await logout()
-        } catch {
-            guard activeChatID == id, thread.isEmpty else { return }
-            threadState = .failed((error as? APIError)?.message ?? "Не удалось загрузить чат.")
-        }
-    }
-
     private func accept(_ auth: AuthResponse) {
         api?.token = auth.token
         Keychain.set(auth.token, for: Self.tokenKey)
@@ -201,14 +207,19 @@ final class AppModel {
             phase = .needsLogin
         case .offline:
             phase = .offline
-        case .chat, .sidebar, .thread, .threadTop:
+        case .chat, .sidebar, .thread, .threadTop, .streaming, .models:
             user = PreviewScene.user
             chats = PreviewScene.chats
-            if scene == .thread || scene == .threadTop {
+            models = PreviewScene.modelOptions
+            draftModel = "gemma-26b-qat"
+            if scene == .thread || scene == .threadTop || scene == .streaming {
                 activeChatID = "7"
-                thread = PreviewScene.feed
+                thread = scene == .streaming ? Array(PreviewScene.feed.prefix(3)) : PreviewScene.feed
                 threadState = .loaded
                 threadChatID = "7"
+            }
+            if scene == .streaming {
+                lives["7"] = PreviewScene.live
             }
             phase = .ready
         }

@@ -5,6 +5,8 @@ enum PreviewScene: String, CaseIterable {
     case connect, login, offline, chat, sidebar
     /// Лента: `thread` — у последнего сообщения, `threadTop` — с начала.
     case thread, threadTop
+    /// Идущий ответ и шторка выбора модели.
+    case streaming, models
 
     static var current: PreviewScene? {
         for argument in ProcessInfo.processInfo.arguments where argument.hasPrefix("--preview=") {
@@ -24,6 +26,24 @@ enum PreviewScene: String, CaseIterable {
         ChatSummary(id: "6", title: "Рецепт плова"),
         ChatSummary(id: "7", title: "Как устроен WAL в SQLite"),
     ]
+
+    static let modelOptions: [ModelOption] = [
+        ModelOption(id: "gemma-26b-qat", name: "Gemma 26B QAT", group: .local, loaded: true),
+        ModelOption(id: "qwen-3.8-27b-it", name: "Qwen 3.8 27B It", group: .local, loaded: false),
+        ModelOption(id: "muse-glimmer-30b", name: "Muse Glimmer 30B", group: .local, loaded: false),
+        ModelOption(id: "aistudio/gemini-3.8-flash", name: "Gemini 3.8 Flash", group: .studio, loaded: false),
+        ModelOption(id: "aistudio/gemma-4-31b-it", name: "Gemma 4 31B", group: .studio, loaded: false),
+        ModelOption(id: "gemini-web/pro", name: "Gemini Pro", group: .subscription, loaded: false),
+    ]
+
+    static var live: AppModel.LiveState {
+        let text = "Включается одной командой — режим сохраняется в файле базы:\n\n```python\nimport sqlite3\n\nconn = sqlite3.connect(\"app.db\")\nconn.execute(\"PRAGMA journal_mode=WAL\")\n```\n\nПосле этого рядом с базой появятся"
+        var state = AppModel.LiveState()
+        state.phase = "Генерация ответа…"
+        state.text = text
+        state.blocks = MarkdownParser.parse(text)
+        return state
+    }
 
     static let feed: [FeedMessage] = FeedMessage.build(from: [
         ChatMessage(id: "a", role: "user", content: "Объясни коротко, как устроен WAL в SQLite и когда его включать."),

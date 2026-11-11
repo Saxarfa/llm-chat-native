@@ -10,10 +10,12 @@ struct APIError: LocalizedError, Equatable {
 }
 
 /// Запросы к серверу LLM Chat на ПК. Вход — по bearer-токену, как у сайта.
-final class APIClient {
+final class APIClient: @unchecked Sendable {
     let baseURL: URL
     var token: String?
     private let session: URLSession
+    /// Отдельная сессия для долгого потока событий: без общего предела времени.
+    private let streamSession: URLSession
 
     init(baseURL: URL, token: String? = nil) {
         self.baseURL = baseURL
@@ -24,6 +26,13 @@ final class APIClient {
         config.httpCookieStorage = nil
         config.httpShouldSetCookies = false
         session = URLSession(configuration: config)
+        let streaming = URLSessionConfiguration.default
+        streaming.timeoutIntervalForRequest = 45
+        streaming.timeoutIntervalForResource = 60 * 60 * 24
+        streaming.httpCookieStorage = nil
+        streaming.httpShouldSetCookies = false
+        streaming.requestCachePolicy = .reloadIgnoringLocalCacheData
+        streamSession = URLSession(configuration: streaming)
     }
 
     /// Приводит ввод вроде `192.168.1.5:8000` к адресу со схемой и без хвостового `/`.
@@ -112,10 +121,71 @@ final class APIClient {
         return response.chats
     }
 
-    /// Сообщения активной ветки чата.
-    func messages(chatID: String) async throws -> [ChatMessage] {
-        let safe = chatID.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-_.~"))) ?? chatID
-        let response: ChatDetailResponse = try await send("/api/chats/\(safe)")
-        return response.chat.messages
+    /// Запрос с ответом-словарём: для разделов, где сервер отдаёт произвольный JSON
+    /// (настройки, параметры чата) и строгая модель только мешала бы.
+    func json(_ path: String, method: String = "GET", body: [String: Any]? = nil,
+              timeout: TimeInterval? = nil) async throws -> [String: Any] {
+        var request = try makeRequest(path, method: method, json: body)
+        if let timeout { request.timeoutInterval = timeout }
+        let data: Data
+        let status: Int
+        do {
+            let (payload, response) = try await session.data(for: request)
+            data = payload
+            status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        } catch {
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
+            throw APIError.unreachable
+        }
+        guard (200..<300).contains(status) else {
+            throw APIError(status: status, message: Self.detail(from: data) ?? "Сервер ответил ошибкой \(status).")
+        }
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw APIError(status: status, message: "Сервер прислал неожиданный ответ.")
+        }
+        return object
+    }
+
+    static func pathSafe(_ value: String) -> String {
+        value.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-_.~"))) ?? value
+    }
+
+    /// Поток событий сервера (`/api/sync/events`): живой ответ модели, смена названий и т.п.
+    /// Каждое событие — одна строка `data: {json}`; строки `: heartbeat` раз в 15 секунд
+    /// не дают соединению считаться зависшим.
+    func events() -> AsyncThrowingStream<[String: Any], Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    var request = try self.makeRequest("/api/sync/events", method: "GET", json: nil)
+                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    request.timeoutInterval = 45
+                    let (bytes, response) = try await self.streamSession.bytes(for: request)
+                    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    guard status == 200 else {
+                        throw APIError(status: status, message: "Соединение недоступно.")
+                    }
+                    // Разбор по байту перевода строки: готовый `lines` режет ещё и по
+                    // редким символам-разделителям внутри текста ответа.
+                    var buffer = Data()
+                    let prefix = Data("data:".utf8)
+                    for try await byte in bytes {
+                        if byte != 0x0A {
+                            buffer.append(byte)
+                            continue
+                        }
+                        if buffer.starts(with: prefix),
+                           let object = try? JSONSerialization.jsonObject(with: Data(buffer.dropFirst(prefix.count))) as? [String: Any] {
+                            continuation.yield(object)
+                        }
+                        buffer.removeAll(keepingCapacity: true)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
     }
 }

@@ -18,6 +18,7 @@ struct LLMChatApp: App {
 /// Выбирает экран по состоянию: адрес ПК, вход, нет связи или сам чат.
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -40,5 +41,8 @@ struct RootView: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: model.phase)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { model.resumed() }
+        }
     }
 }

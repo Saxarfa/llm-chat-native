@@ -1,11 +1,16 @@
 import SwiftUI
 import UIKit
 
-/// Лента сообщений открытого чата. Открывается у последнего сообщения.
+/// Лента сообщений открытого чата. Открывается у последнего сообщения и, пока
+/// пользователь не отлистал вверх, держится у низа во время живого ответа.
 struct MessageFeed: View {
     @Environment(AppModel.self) private var model
+    @State private var atBottom = true
+
+    private static let bottomID = "feed-bottom"
 
     var body: some View {
+        let live = model.activeLive
         switch model.threadChatID == model.activeChatID ? model.threadState : .loading {
         case .idle, .loading:
             ProgressView()
@@ -16,27 +21,80 @@ struct MessageFeed: View {
                 Task { await model.loadThread() }
             }
         case .loaded:
-            if model.thread.isEmpty {
+            if model.thread.isEmpty && live == nil {
                 FeedNotice(text: "В этом чате пока нет сообщений.", actionTitle: nil, action: {})
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 26) {
-                        ForEach(model.thread) { message in
-                            if message.isUser {
-                                UserMessageView(message: message)
-                            } else {
-                                AssistantMessageView(message: message)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 26) {
+                            ForEach(model.thread) { message in
+                                if message.isUser {
+                                    UserMessageView(message: message)
+                                } else {
+                                    AssistantMessageView(message: message)
+                                }
                             }
+                            if let live {
+                                LiveAnswerView(live: live)
+                            }
+                            Color.clear
+                                .frame(height: 1)
+                                .id(Self.bottomID)
+                                .onAppear { atBottom = true }
+                                .onDisappear { atBottom = false }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
+                    }
+                    .defaultScrollAnchor(model.preview == .threadTop ? .top : .bottom)
+                    .scrollDismissesKeyboard(.interactively)
+                    .onChange(of: live?.text.count) {
+                        if atBottom { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                    }
+                    .onChange(of: live?.phase) {
+                        if atBottom { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                    }
+                    .onChange(of: model.thread.count) {
+                        // Свой новый вопрос всегда показываем, даже если лента была отлистана.
+                        if atBottom || model.thread.last?.isUser == true {
+                            withAnimation(Theme.spring) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 20)
                 }
-                .defaultScrollAnchor(model.preview == .threadTop ? .top : .bottom)
-                .scrollDismissesKeyboard(.interactively)
             }
         }
+    }
+}
+
+/// Ответ, который пишется прямо сейчас.
+private struct LiveAnswerView: View {
+    let live: AppModel.LiveState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if !live.reasoning.isEmpty {
+                ReasoningView(text: live.reasoning, title: live.isThinking ? "Размышляет…" : "Размышления")
+            }
+            if !live.blocks.isEmpty {
+                MarkdownView(blocks: live.blocks)
+            }
+            if live.text.isEmpty || live.stopping {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(Theme.muted)
+                    Text(live.stopping ? "Останавливаю…" : live.phase)
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(2)
+                }
+                .frame(minHeight: 28)
+                .transition(.opacity)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -148,6 +206,7 @@ private struct AssistantMessageView: View {
 /// Размышления модели: свёрнуты, раскрываются по нажатию.
 private struct ReasoningView: View {
     let text: String
+    var title = "Размышления"
     @State private var open = false
 
     var body: some View {
@@ -157,7 +216,7 @@ private struct ReasoningView: View {
                 withAnimation(Theme.spring) { open.toggle() }
             } label: {
                 HStack(spacing: 6) {
-                    Text("Размышления")
+                    Text(title)
                         .font(.system(size: 15))
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
