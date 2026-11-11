@@ -5,9 +5,20 @@ import UIKit
 /// пользователь не отлистал вверх, держится у низа во время живого ответа.
 struct MessageFeed: View {
     @Environment(AppModel.self) private var model
+    /// Низ ленты на экране или рядом — можно следовать за новым текстом.
     @State private var atBottom = true
+    /// Сколько последних сообщений построено.
+    @State private var shown = MessageFeed.page
+    @State private var touch = TouchClock()
 
     private static let bottomID = "feed-bottom"
+    private static let space = "feed-space"
+    private static let page = 30
+
+    private func follow(_ proxy: ScrollViewProxy) {
+        guard atBottom, Date().timeIntervalSince(touch.last) > 0.3 else { return }
+        proxy.scrollTo(Self.bottomID, anchor: .bottom)
+    }
 
     var body: some View {
         let live = model.activeLive
@@ -24,50 +35,101 @@ struct MessageFeed: View {
             if model.thread.isEmpty && live == nil {
                 FeedNotice(text: "В этом чате пока нет сообщений.", actionTitle: nil, action: {})
             } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 26) {
-                            ForEach(model.thread) { message in
-                                if message.isUser {
-                                    UserMessageView(message: message, canEdit: live == nil)
-                                } else if message.rawID != live?.replacingID {
-                                    // Перегенерируемый ответ на время заменяет живая строка.
-                                    AssistantMessageView(message: message, canRegenerate: live == nil)
+                let visible = model.thread.suffix(shown)
+                let earlier = model.thread.count - visible.count
+                GeometryReader { box in
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            // Обычный (не ленивый) столбец: у ленивого высота содержимого
+                            // оценивается приблизительно, из-за чего низ ленты обрезался.
+                            // Чтобы длинный чат не строился целиком, показываем последние
+                            // сообщения, а более ранние — по кнопке.
+                            VStack(alignment: .leading, spacing: 26) {
+                                if earlier > 0 {
+                                    Button("Показать более ранние (\(earlier))") {
+                                        let anchor = visible.first?.id
+                                        shown += Self.page
+                                        DispatchQueue.main.async {
+                                            if let anchor { proxy.scrollTo(anchor, anchor: .top) }
+                                        }
+                                    }
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(Theme.muted)
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                    .buttonStyle(PressScaleStyle())
                                 }
+                                ForEach(visible) { message in
+                                    if message.isUser {
+                                        UserMessageView(message: message, canEdit: live == nil)
+                                            .id(message.id)
+                                    } else if message.rawID != live?.replacingID {
+                                        // Перегенерируемый ответ на время заменяет живая строка.
+                                        AssistantMessageView(message: message, canRegenerate: live == nil)
+                                            .id(message.id)
+                                    }
+                                }
+                                if let live {
+                                    LiveAnswerView(live: live)
+                                }
+                                Color.clear
+                                    .frame(height: 1)
+                                    .background(GeometryReader { mark in
+                                        Color.clear.preference(key: BottomEdgeKey.self,
+                                                               value: mark.frame(in: .named(Self.space)).maxY)
+                                    })
+                                    .id(Self.bottomID)
                             }
-                            if let live {
-                                LiveAnswerView(live: live)
-                            }
-                            Color.clear
-                                .frame(height: 1)
-                                .id(Self.bottomID)
-                                .onAppear { atBottom = true }
-                                .onDisappear { atBottom = false }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .padding(.bottom, 8)
+                            // Короткий чат начинается сверху, а не прижимается к полю ввода.
+                            .frame(minHeight: box.size.height, alignment: .top)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        .padding(.bottom, 8)
-                    }
-                    .defaultScrollAnchor(model.preview == .threadTop ? .top : .bottom)
-                    .scrollDismissesKeyboard(.interactively)
-                    .onChange(of: live?.text.count) {
-                        if atBottom { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
-                    }
-                    .onChange(of: live?.phase) {
-                        if atBottom { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
-                    }
-                    .onChange(of: live?.arts.count) {
-                        if atBottom { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
-                    }
-                    .onChange(of: model.thread.count) {
-                        // Свой новый вопрос всегда показываем, даже если лента была отлистана.
-                        if atBottom || model.thread.last?.isUser == true {
-                            withAnimation(Theme.spring) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                        .coordinateSpace(name: Self.space)
+                        .defaultScrollAnchor(model.preview == .threadTop ? .top : .bottom)
+                        .scrollDismissesKeyboard(.interactively)
+                        .onPreferenceChange(BottomEdgeKey.self) { edge in
+                            let near = edge - box.size.height < 80
+                            if near != atBottom { atBottom = near }
+                        }
+                        // Пока палец ведёт ленту, она не должна убегать к низу за новым текстом.
+                        .simultaneousGesture(DragGesture(minimumDistance: 4).onChanged { _ in
+                            touch.last = Date()
+                        })
+                        .onChange(of: live?.text.count) { follow(proxy) }
+                        .onChange(of: live?.phase) { follow(proxy) }
+                        .onChange(of: live?.arts.count) { follow(proxy) }
+                        .onChange(of: live == nil) {
+                            // Ответ дописан: под ним появляются кнопки — показать и их.
+                            DispatchQueue.main.async { follow(proxy) }
+                        }
+                        .onChange(of: model.thread.count) {
+                            // Свой новый вопрос всегда показываем, даже если лента была отлистана.
+                            if model.thread.last?.isUser == true {
+                                atBottom = true
+                                withAnimation(Theme.spring) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                            } else {
+                                follow(proxy)
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/// Время последнего движения пальца по ленте. Класс, а не `@State`-значение:
+/// запись не должна перерисовывать ленту.
+private final class TouchClock {
+    var last = Date.distantPast
+}
+
+/// Положение нижнего края содержимого относительно видимой области ленты.
+private struct BottomEdgeKey: PreferenceKey {
+    static let defaultValue: CGFloat = .greatestFiniteMagnitude
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
@@ -224,7 +286,7 @@ private struct AssistantMessageView: View {
                         .accessibilityLabel("Ответить заново")
                     }
                     if !message.model.isEmpty {
-                        Text(message.model)
+                        Text(ChatConfig.modelName(message.model, profiles: model.settings.modelProfiles))
                             .font(.system(size: 13))
                             .foregroundStyle(Theme.subtle)
                             .lineLimit(1)

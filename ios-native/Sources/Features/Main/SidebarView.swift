@@ -90,14 +90,16 @@ struct SidebarView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
+                let pinned = model.chats.filter { $0.pinned }
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    Text("Недавние")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Theme.subtle)
-                        .padding(.horizontal, 12)
-                        .padding(.top, 8)
-                        .padding(.bottom, 6)
-                    ForEach(model.chats) { chat in
+                    if !pinned.isEmpty {
+                        sectionTitle("Закреплённые")
+                        ForEach(pinned) { chat in
+                            row(chat)
+                        }
+                    }
+                    sectionTitle("Недавние")
+                    ForEach(model.chats.filter { !$0.pinned }) { chat in
                         row(chat)
                     }
                 }
@@ -106,6 +108,15 @@ struct SidebarView: View {
             }
             .refreshable { await model.refreshChats() }
         }
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(Theme.subtle)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
     }
 
     private func row(_ chat: ChatSummary) -> some View {
