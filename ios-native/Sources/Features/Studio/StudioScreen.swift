@@ -305,15 +305,17 @@ private struct StudioFilmstrip: View {
     }
 }
 
-/// Миниатюра арта (320 px с сервера).
+/// Квадратная миниатюра арта (320 px с сервера, обрезана по центру).
+/// Все места показа — квадраты (история, лента, чип при наборе).
 struct StudioThumb: View {
     @Environment(AppModel.self) private var model
     let id: String
     @State private var image: UIImage?
 
     var body: some View {
-        // Размер задаёт подложка, картинка лишь заполняет её поверх — иначе `scaledToFill`
-        // раздувает ячейку до размера самой картинки (миниатюры в истории наезжали друг на друга).
+        // Размер задаёт подложка, а картинка заранее обрезана в квадрат: `scaledToFill`
+        // неквадратной картинки выступал за ячейку — в 0.7 миниатюры истории наезжали друг на друга,
+        // а невидимый выступ после `clipped` всё равно ловил нажатия.
         Theme.surface
             .overlay {
                 if let image {
@@ -324,13 +326,23 @@ struct StudioThumb: View {
                 }
             }
             .clipped()
+            .contentShape(Rectangle())
             .task(id: id) {
-            if image == nil { image = ImageStore.image("art:\(id):t") }
-            if image == nil {
-                let loaded = await model.studio.thumbnail(id)
-                withAnimation(.easeOut(duration: 0.2)) { image = loaded }
+                if image == nil { image = ImageStore.image("art:\(id):t").map(Self.square) }
+                if image == nil, let loaded = await model.studio.thumbnail(id) {
+                    let square = Self.square(loaded)
+                    withAnimation(.easeOut(duration: 0.2)) { image = square }
+                }
             }
-        }
+    }
+
+    /// Центральный квадрат картинки (в пикселях — от ориентации не зависит).
+    static func square(_ image: UIImage) -> UIImage {
+        guard let cg = image.cgImage, cg.width != cg.height else { return image }
+        let side = min(cg.width, cg.height)
+        let rect = CGRect(x: (cg.width - side) / 2, y: (cg.height - side) / 2, width: side, height: side)
+        guard let cropped = cg.cropping(to: rect) else { return image }
+        return UIImage(cgImage: cropped, scale: image.scale, orientation: image.imageOrientation)
     }
 }
 
