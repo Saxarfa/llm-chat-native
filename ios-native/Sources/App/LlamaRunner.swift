@@ -157,14 +157,14 @@ final class LlamaRunner: @unchecked Sendable {
         // Ответу оставляем не меньше четверти контекста; старые сообщения уходят первыми.
         let reserve = sampling.maxTokens > 0 ? min(sampling.maxTokens, contextSize / 2) : max(256, contextSize / 4)
         var history = messages
-        var tokens = try tokenize(prompt(history))
+        var tokens = try tokenize(prompt(history, thinking: sampling.thinking))
         while tokens.count > contextSize - reserve {
             let firstTurn = history.firstIndex { $0.role != "system" }
             guard let index = firstTurn, history.count - index > 1 else {
                 throw PhoneEngineError(message: "Сообщение не помещается в контекст модели (\(contextSize) токенов). Сократите его.")
             }
             history.remove(at: index)
-            tokens = try tokenize(prompt(history))
+            tokens = try tokenize(prompt(history, thinking: sampling.thinking))
         }
 
         var result = PhoneRunStats(promptTokens: tokens.count)
@@ -201,7 +201,8 @@ final class LlamaRunner: @unchecked Sendable {
             let special = String(decoding: piece(token, special: true), as: UTF8.self)
             if PhoneChatFormat.turnMarkers.contains(special) { break }
             result.tokens += 1
-            pending += piece(token)
+            // Служебные токены размышлений Gemma 4 — в теги, понятные `ThinkSplitter`.
+            if let tag = PhoneChatFormat.thinkTags[special] { pending += Array(tag.utf8) } else { pending += piece(token) }
             var text: String?
             if let decoded = String(bytes: pending, encoding: .utf8) {
                 text = decoded
@@ -255,8 +256,16 @@ final class LlamaRunner: @unchecked Sendable {
 
     /// Промпт по шаблону чата из самой модели (Gemma 4 — своим кодом, её шаблон только Jinja);
     /// незнакомый шаблон — ChatML.
-    private func prompt(_ messages: [(role: String, content: String)]) -> String {
-        if let custom = PhoneChatFormat.render(template: template, messages: messages) { return custom }
+    private func prompt(_ messages: [(role: String, content: String)], thinking: Bool) -> String {
+        let kind = PhoneThinking.kind(template: template)
+        if let custom = PhoneChatFormat.render(template: template, messages: messages,
+                                               thinking: thinking && kind == .gemma4) { return custom }
+        let base = templated(messages)
+        // Qwen3 и похожие: пустой блок размышлений в начале ответа выключает их.
+        return kind == .switchable && !thinking ? base + PhoneChatFormat.thinkingOff : base
+    }
+
+    private func templated(_ messages: [(role: String, content: String)]) -> String {
         let roles = messages.map { strdup($0.role) }
         let contents = messages.map { strdup($0.content) }
         defer {

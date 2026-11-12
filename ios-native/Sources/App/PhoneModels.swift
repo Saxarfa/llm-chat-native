@@ -41,14 +41,21 @@ final class PhoneModels {
     var loading = false
     var generating = false
     var notice: String?
+    /// Сведения из заголовков файлов (шаблон, рассуждения, обучающий контекст).
+    var infos: [String: GGUFInfo] = [:]
 
     @ObservationIgnored weak var app: AppModel?
     @ObservationIgnored let runner = LlamaRunner()
     @ObservationIgnored private var resumeData: [String: Data] = [:]
     @ObservationIgnored private var started = false
+    /// С каким контекстом из настроек загружена модель (фактический может быть меньше обучающего).
+    @ObservationIgnored private var loadedWanted = 0
 
     static let tokenKey = "hf_token"
     static let context = 4096
+    /// Ключ размера контекста в параметрах модели (`model_configs` на ПК).
+    static let contextKey = "phone_context"
+    static let contextChoices = [2048, 4096, 8192, 16384, 32768]
 
     private var isPreview: Bool { app?.preview != nil }
 
@@ -133,7 +140,38 @@ final class PhoneModels {
 
     var diskUsed: Int64 { installed.reduce(0) { $0 + $1.size } }
 
-    func fit(_ size: Int64) -> PhoneMemory.Fit { PhoneMemory.fit(fileSize: size, available: availableMemory) }
+    func fit(_ size: Int64, context: Int = PhoneModels.context) -> PhoneMemory.Fit {
+        PhoneMemory.fit(fileSize: size, available: availableMemory, context: context)
+    }
+
+    // MARK: - Сведения о модели
+
+    /// Читает заголовок файла один раз (в фоне: у больших словарей это десятки миллисекунд).
+    func loadInfo(_ file: String) async {
+        guard infos[file] == nil else { return }
+        if isPreview {
+            infos[file] = PreviewScene.phoneInfo(file)
+            return
+        }
+        let url = Self.path(of: file)
+        if let info = await Task.detached(priority: .utility, operation: { GGUFInfo.read(url: url) }).value {
+            infos[file] = info
+        }
+    }
+
+    /// Варианты контекста не больше обучающего.
+    func contextChoices(_ file: String) -> [Int] {
+        let limit = infos[file]?.trainContext ?? Self.contextChoices.last!
+        let list = Self.contextChoices.filter { $0 <= limit }
+        return list.isEmpty ? [Self.contextChoices[0]] : list
+    }
+
+    /// Размер контекста из настроек модели.
+    func wantedContext(_ file: String) -> Int {
+        let saved = app?.settings.modelConfigs[PhoneModelID.make(file: file)]
+        let value = ChatParameters.number(ChatConfig.dict(saved)[Self.contextKey]).map { Int($0) } ?? Self.context
+        return Self.contextChoices.contains(value) ? value : Self.context
+    }
 
     // MARK: - Токен
 
@@ -333,6 +371,7 @@ final class PhoneModels {
         if loadedFile == model.file { await unload() }
         if !isPreview { try? FileManager.default.removeItem(at: Self.path(of: model.file)) }
         installed.removeAll { $0.file == model.file }
+        infos[model.file] = nil
         saveIndex()
     }
 
@@ -352,18 +391,20 @@ final class PhoneModels {
             contextSize = Self.context
             return
         }
-        if loadedFile == file, runner.loadedPath != nil { return }
+        let wanted = wantedContext(file)
+        if loadedFile == file, runner.loadedPath != nil, loadedWanted == wanted { return }
         guard let model = installed.first(where: { $0.file == file }) else {
             throw PhoneEngineError(message: "Модели «\(PhoneModelNames.title(file))» нет на этом телефоне. Скачайте её в окне «Модели на телефоне».")
         }
         await unload()
-        if fit(model.size) == .tooBig {
-            throw PhoneEngineError(message: "Модели нужно около \(PhoneMemory.gigabytes(PhoneMemory.needed(fileSize: model.size))) памяти, а свободно \(PhoneMemory.gigabytes(availableMemory)). Выберите модель поменьше или квантование ниже.")
+        if fit(model.size, context: wanted) == .tooBig {
+            throw PhoneEngineError(message: "Модели нужно около \(PhoneMemory.gigabytes(PhoneMemory.needed(fileSize: model.size, context: wanted))) памяти, а свободно \(PhoneMemory.gigabytes(availableMemory)). Выберите модель поменьше, квантование ниже или контекст меньше (Модели на телефоне → Настройки).")
         }
         loading = true
         defer { loading = false }
-        contextSize = try await runner.load(path: Self.path(of: file).path, context: Self.context)
+        contextSize = try await runner.load(path: Self.path(of: file).path, context: wanted)
         loadedFile = file
+        loadedWanted = wanted
     }
 
     /// Ответ модели кусками текста. В режиме снимков — заготовленный текст.

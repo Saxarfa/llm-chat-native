@@ -18,6 +18,12 @@ struct SidebarView: View {
             .padding(.horizontal, 20)
             .frame(height: 56)
 
+            if model.offline {
+                OfflineBanner()
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+            }
+
             studioRow
                 .padding(.horizontal, 8)
                 .padding(.bottom, 4)

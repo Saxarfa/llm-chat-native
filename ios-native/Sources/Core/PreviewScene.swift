@@ -17,6 +17,43 @@ enum PreviewScene: String, CaseIterable {
     case studio, studioSettings, studioHistory, studioArt
     /// Этап 8: окно «Модели на телефоне» и чат с моделью телефона.
     case phoneModels, phoneChat
+    /// Этап 8.2: настройки модели телефона, «Параметры чата» для неё, работа без ПК.
+    case phoneSettings, phoneParameters, phoneOffline
+
+    /// Чаты телефона без связи с ПК: один уже был на ПК, второй ещё не дошёл.
+    static let localChats: [LocalChat] = {
+        let model = PhoneModelID.make(file: "Qwen3-4B-Instruct-2507-Q4_K_M.gguf")
+        let messages: [[String: Any]] = [
+            ["id": "user_1", "role": "user", "content": "Составь список вещей в поход на два дня", "timestamp": 1_700_000_100_000],
+            ["id": "asst_1", "role": "assistant", "model": model, "timestamp": 1_700_000_160_000,
+             "content": "**Основное:**
+- рюкзак 40–50 л
+- палатка и спальник
+- коврик
+
+**Еда и вода:**
+- 2 л воды и фильтр
+- горелка, газ, котелок
+
+**Одежда:** термобельё, флис, дождевик."],
+        ]
+        return [
+            LocalChat(id: "local_1", title: "Список вещей в поход", model: model, messages: messages, overrides: [:],
+                      created: 1_700_000_100_000, serverUpdatedAt: 0, changed: 1_700_000_160_000, dirty: true),
+            LocalChat(id: "local_2", title: "Перевод письма на английский", model: model,
+                      messages: [["id": "user_2", "role": "user", "content": "Переведи: «Спасибо за встречу»", "timestamp": 1_700_000_000_000],
+                                 ["id": "asst_2", "role": "assistant", "model": model, "content": "Thank you for the meeting.", "timestamp": 1_700_000_010_000]],
+                      overrides: [:], created: 1_700_000_000_000, serverUpdatedAt: 1_700_000_010_000,
+                      changed: 1_700_000_010_000, dirty: false),
+        ]
+    }()
+
+    /// Заголовок файла для снимков: Qwen3 умеет выключать рассуждения, Llama — нет.
+    static func phoneInfo(_ file: String) -> GGUFInfo {
+        file.hasPrefix("Qwen3")
+            ? GGUFInfo(architecture: "qwen3", chatTemplate: "{%- if enable_thinking %}<think>{% endif %}", trainContext: 262_144)
+            : GGUFInfo(architecture: "llama", chatTemplate: "<|start_header_id|>", trainContext: 8192)
+    }
 
     static let phoneInstalled: [PhoneModel] = [
         PhoneModel(file: "Qwen3-4B-Instruct-2507-Q4_K_M.gguf", repo: "unsloth/Qwen3-4B-Instruct-2507-GGUF",

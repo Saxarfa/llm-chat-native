@@ -95,6 +95,12 @@ final class AppModel {
     @ObservationIgnored var rawChats: [String: RawChat] = [:]
     /// Чаты, где сейчас отвечает модель телефона.
     @ObservationIgnored var phoneRuns: Set<String> = []
+    /// ПК не ответил при запуске: работают только модели телефона и их чаты (этап 8.2).
+    var offline = false
+    /// Чаты телефона и снимок входа на самом телефоне.
+    @ObservationIgnored let store: PhoneStore
+    @ObservationIgnored var reconnectTask: Task<Void, Never>?
+    @ObservationIgnored var syncing = false
 
     struct RawChat {
         var messages: [[String: Any]]
@@ -123,6 +129,7 @@ final class AppModel {
 
     init(preview: PreviewScene? = PreviewScene.current) {
         self.preview = preview
+        store = PhoneStore(folder: preview == nil ? PhoneStore.defaultFolder : nil)
         studio.app = self
         phone.app = self
     }
@@ -177,7 +184,8 @@ final class AppModel {
             api.token = nil
             phase = .needsLogin
         } catch {
-            phase = .offline
+            // Вход на этом телефоне уже был — работаем с моделями телефона, пока ПК не ответит.
+            if !enterOffline() { phase = .offline }
         }
     }
 
@@ -207,6 +215,10 @@ final class AppModel {
         eventsTask = nil
         eventsConnectedOnce = false
         await api?.logout()
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        offline = false
+        store.clear()
         lives = [:]
         liveRaw = [:]
         pendingFinish = [:]
@@ -249,11 +261,11 @@ final class AppModel {
     }
 
     func refreshChats() async {
-        guard preview == nil, let api else { return }
+        guard preview == nil, !offline, let api else { return }
         chatsLoading = true
         defer { chatsLoading = false }
         do {
-            chats = try await api.chats()
+            chats = mergeLocal(try await api.chats())
             chatsError = nil
             if let active = activeChatID, !chats.contains(where: { $0.id == active }) {
                 activeChatID = nil
@@ -265,10 +277,11 @@ final class AppModel {
         }
     }
 
-    private func accept(_ auth: AuthResponse) {
+    func accept(_ auth: AuthResponse) {
         api?.token = auth.token
         Keychain.set(auth.token, for: Self.tokenKey)
         user = auth.user
+        if preview == nil { store.saveSession(user: auth.user, settings: nil) }
         phase = .ready
     }
 
@@ -281,9 +294,19 @@ final class AppModel {
             phase = .needsLogin
         case .offline:
             phase = .offline
+        case .phoneOffline:
+            user = PreviewScene.user
+            phone.loadPreview()
+            store.seed(PreviewScene.localChats)
+            chats = store.summaries
+            offline = true
+            draftModel = PhoneModelID.make(file: PreviewScene.phoneInstalled[0].file)
+            activeChatID = store.summaries.first?.id
+            if let id = activeChatID { showLocal(id) }
+            phase = .ready
         case .chat, .sidebar, .thread, .threadTop, .streaming, .models, .media, .parameters, .nano, .settings,
              .branches, .memory, .knowledge, .omni, .studio, .studioSettings, .studioHistory, .studioArt,
-             .phoneModels, .phoneChat:
+             .phoneModels, .phoneChat, .phoneSettings, .phoneParameters:
             user = PreviewScene.user
             chats = PreviewScene.chats
             models = PreviewScene.modelOptions
@@ -337,10 +360,13 @@ final class AppModel {
                 screen = .studio
                 studio.loadPreview()
             }
-            if [.models, .phoneModels, .phoneChat].contains(scene) {
+            if [.models, .phoneModels, .phoneChat, .phoneSettings, .phoneParameters].contains(scene) {
                 phone.loadPreview()
             }
-            if scene == .phoneChat {
+            if scene == .phoneParameters {
+                settings.modelConfigs[PhoneModelID.make(file: PreviewScene.phoneInstalled[0].file)] = ["thinking": true, "temperature": 0.6]
+            }
+            if scene == .phoneChat || scene == .phoneParameters {
                 draftModel = PhoneModelID.make(file: PreviewScene.phoneInstalled[0].file)
             }
             if scene == .parameters {

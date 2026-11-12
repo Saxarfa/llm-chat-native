@@ -32,7 +32,16 @@ struct ChatScreen: View {
         .contentShape(Rectangle())
         .onTapGesture { Keyboard.hide() }
         .safeAreaInset(edge: .top, spacing: 0) {
-            header
+            VStack(spacing: 0) {
+                header
+                if model.offline {
+                    OfflineBanner()
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 6)
+                        .background(Theme.canvas)
+                        .transition(.opacity)
+                }
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ComposerBar(text: $draft)
@@ -69,7 +78,7 @@ struct ChatScreen: View {
             Text("Сообщение исчезнет из этой ветки. Другие ветки не изменятся.")
         }
         .onAppear {
-            if model.preview == .parameters || model.preview == .nano || model.preview == .omni { showParameters = true }
+            if [.parameters, .nano, .omni, .phoneParameters].contains(model.preview) { showParameters = true }
             if model.preview == .branches { showBranches = true }
         }
     }
@@ -227,7 +236,7 @@ struct ComposerBar: View {
             .ignoresSafeArea()
         }
         .onAppear {
-            if model.preview == .models || model.preview == .phoneModels { showModels = true }
+            if model.preview == .models || model.preview == .phoneModels || model.preview == .phoneSettings { showModels = true }
         }
         .onChange(of: model.editing) { _, message in
             if let message {

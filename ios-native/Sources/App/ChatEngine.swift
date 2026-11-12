@@ -27,6 +27,7 @@ extension AppModel {
         Task {
             await loadSettings()
             await refreshModels()
+            await syncPhoneChats()
         }
         restartEvents()
     }
@@ -34,12 +35,17 @@ extension AppModel {
     /// Приложение вернулось на экран: соединение могло умереть, пока оно спало.
     func resumed() {
         guard preview == nil, phase == .ready else { return }
+        if offline {
+            Task { await tryReconnect() }
+            return
+        }
         restartEvents()
     }
 
     func loadSettings() async {
-        guard let api, let json = try? await api.json("/api/settings") else { return }
+        guard !offline, let api, let json = try? await api.json("/api/settings") else { return }
         settings = ServerSettings(json: json)
+        if let user { store.saveSession(user: user, settings: json) }
     }
 
     func refreshModels() async {
@@ -102,7 +108,12 @@ extension AppModel {
         }
         let previous = chats[index].modelID
         chats[index].modelID = id
-        guard preview == nil, let api else { return }
+        if var local = store.chats[chatID] {
+            local.model = id
+            store.put(local)
+        }
+        // Без связи модель меняется только в копии на телефоне; на ПК уйдёт со снимком чата.
+        guard preview == nil, !offline, let api else { return }
         do {
             _ = try await api.json("/api/chats/\(APIClient.pathSafe(chatID))/metadata", method: "PATCH",
                                    body: ["model_id": id])
@@ -125,6 +136,14 @@ extension AppModel {
         if preview != nil {
             threadChatID = id
             threadState = .loaded
+            return
+        }
+        if offline {
+            if !showLocal(id), lives[id] == nil {
+                thread = []
+                threadChatID = id
+                threadState = .failed("Нет связи с ПК. Этот чат откроется, когда ПК будет доступен.")
+            }
             return
         }
         guard let api else { return }
@@ -159,6 +178,8 @@ extension AppModel {
         } catch let error as APIError where error.status == 401 {
             await logout()
         } catch {
+            // Связь пропала — у чата телефона есть копия на самом телефоне.
+            if activeChatID == id, lives[id] == nil, showLocal(id) { return }
             // Чат, который только создаётся отправкой, сервер ещё может не знать.
             guard activeChatID == id, thread.isEmpty, lives[id] == nil else { return }
             threadState = .failed((error as? APIError)?.message ?? "Не удалось загрузить чат.")
@@ -177,8 +198,18 @@ extension AppModel {
         if let pending = lives[id]?.pendingUserID, !raw.contains(where: { ($0["id"] as? String) == pending }) {
             return
         }
+        // На телефоне есть ответ, которого ПК ещё не видел, — показываем его и досылаем.
+        if let local = store.chats[id], local.dirty, !phoneRuns.contains(id) {
+            showLocal(id)
+            Task { await syncPhoneChats() }
+            return
+        }
         if chat["messages"] is [[String: Any]] {
             rawChats[id] = RawChat(messages: raw, updatedAt: Self.updatedAt(chat), title: ChatConfig.text(chat["title"]))
+            // Чаты моделей телефона держим и на телефоне — чтобы открывались без ПК.
+            if let model = ChatConfig.text(chat["model_id"]), PhoneModelID.isPhone(model) {
+                persistPhone(id, model: model, dirty: false)
+            }
         }
         // Разбор Markdown длинного чата — вне главного потока.
         let items = await Task.detached(priority: .userInitiated) {
@@ -446,6 +477,7 @@ extension AppModel {
             // Первое соединение идёт сразу после загрузки; догонять нужно только после обрыва.
             if eventsConnectedOnce {
                 Task {
+                    await syncPhoneChats()
                     await refreshChats()
                     await loadThread()
                 }
@@ -481,6 +513,7 @@ extension AppModel {
         lastEventAt[id] = Date()
         switch type {
         case "chat_deleted":
+            store.remove(id)
             chats.removeAll { $0.id == id }
             lives[id] = nil
             liveRaw[id] = nil

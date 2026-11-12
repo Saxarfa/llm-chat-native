@@ -127,9 +127,9 @@ enum PhoneMemory {
 
     /// `available` — сколько ещё может занять приложение (`os_proc_available_memory`),
     /// плюс то, что уже занимает загруженная модель.
-    static func fit(fileSize: Int64, available: Int64) -> Fit {
+    static func fit(fileSize: Int64, available: Int64, context: Int = 4096) -> Fit {
         guard available > 0 else { return .tight }
-        let need = needed(fileSize: fileSize)
+        let need = needed(fileSize: fileSize, context: context)
         if need <= available * 85 / 100 { return .fits }
         if need <= available { return .tight }
         return .tooBig
@@ -146,6 +146,19 @@ enum PhoneMemory {
 /// Делит вывод модели на размышления (`<think>…</think>`) и ответ — как это делает сервер.
 enum ThinkSplitter {
     static func split(_ raw: String) -> (reasoning: String, text: String) {
+        let parts = splitTags(raw)
+        return (stripHeader(parts.reasoning), parts.text)
+    }
+
+    /// Gemma 4 начинает размышление строкой «thought».
+    private static func stripHeader(_ reasoning: String) -> String {
+        guard reasoning.hasPrefix("thought") else { return reasoning }
+        let rest = reasoning.dropFirst("thought".count)
+        guard rest.isEmpty || rest.first?.isNewline == true else { return reasoning }
+        return rest.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func splitTags(_ raw: String) -> (reasoning: String, text: String) {
         var body = raw
         let trimmed = body.drop { $0.isWhitespace }
         guard trimmed.hasPrefix("<think>") else {
@@ -178,6 +191,8 @@ struct PhoneSampling: Equatable {
     /// `-1` — до конца контекста.
     var maxTokens: Int = -1
     var stop: [String] = []
+    /// Рассуждать перед ответом (если модель умеет).
+    var thinking = false
 
     init() {}
 
@@ -192,19 +207,25 @@ struct PhoneSampling: Equatable {
         if let value = number("frequency_penalty") { frequencyPenalty = Float(value) }
         if let value = number("max_tokens") { maxTokens = Int(value) }
         stop = ((config["stop"] as? [Any]) ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty }
+        thinking = (config["thinking"] as? Bool) ?? false
     }
 }
 
 /// Промпт для моделей, чей шаблон llama.cpp без Jinja не знает.
 /// Gemma 4: `<|turn>роль\n…<turn|>\n`, ответ модели — роль `model` (сверено с шаблоном из её GGUF).
 enum PhoneChatFormat {
-    static func render(template: String?, messages: [(role: String, content: String)]) -> String? {
+    static func render(template: String?, messages: [(role: String, content: String)], thinking: Bool = false) -> String? {
         guard let template, template.contains("<|turn>") else { return nil }
         var rest = messages[...]
         var out = ""
+        var system: String?
         if let first = rest.first, first.role == "system" {
-            out += "<|turn>system\n\(first.content.trimmingCharacters(in: .whitespacesAndNewlines))<turn|>\n"
+            system = first.content.trimmingCharacters(in: .whitespacesAndNewlines)
             rest = rest.dropFirst()
+        }
+        // Рассуждения включает метка в самом начале системной реплики (как enable_thinking в шаблоне).
+        if system != nil || thinking {
+            out += "<|turn>system\n" + (thinking ? "<|think|>" : "") + (system ?? "") + "<turn|>\n"
         }
         for message in rest {
             let role = message.role == "assistant" ? "model" : message.role
@@ -212,6 +233,12 @@ enum PhoneChatFormat {
         }
         return out + "<|turn>model\n"
     }
+
+    /// Служебные токены размышлений Gemma 4 → теги, которые понимает `ThinkSplitter`.
+    static let thinkTags = ["<|channel>": "<think>", "<channel|>": "</think>"]
+
+    /// Окончание промпта, выключающее рассуждения у моделей вроде Qwen3 (как enable_thinking=false).
+    static let thinkingOff = "<think>\n\n</think>\n\n"
 
     /// Метки границ реплик у распространённых шаблонов: если модель их пишет, ответ закончен.
     static let turnMarkers = ["<|im_end|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>",

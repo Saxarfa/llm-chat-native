@@ -94,7 +94,7 @@ jobs:
           xcrun simctl install "$device" build/simulator/Build/Products/Debug-iphonesimulator/LLMChat.app
           mkdir -p build/screens
           # Имена экранов — PreviewScene в ios-native/Sources/Core/PreviewScene.swift; данные вымышленные.
-          for scene in connect login offline chat sidebar thread threadTop streaming models media parameters nano settings branches memory knowledge omni studio studioSettings studioHistory studioArt phoneModels phoneChat; do
+          for scene in connect login offline chat sidebar thread threadTop streaming models media parameters nano settings branches memory knowledge omni studio studioSettings studioHistory studioArt phoneModels phoneChat phoneSettings phoneParameters phoneOffline; do
             xcrun simctl terminate "$device" app.llmchat.native || true
             xcrun simctl launch "$device" app.llmchat.native "--preview=$scene"
             sleep 4

@@ -48,6 +48,11 @@ enum Haptics {
     static func error() {
         UINotificationFeedbackGenerator().notificationOccurred(.error)
     }
+
+    /// Лёгкий щелчок шага ползунка.
+    static func selection() {
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
 }
 
 enum Keyboard {

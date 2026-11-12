@@ -67,7 +67,7 @@ struct ModelPickerSheet: View {
         }
         .task {
             // Режим снимков: второе окно — после того, как первое доехало.
-            guard model.preview == .phoneModels else { return }
+            guard model.preview == .phoneModels || model.preview == .phoneSettings else { return }
             try? await Task.sleep(nanoseconds: 700_000_000)
             showPhone = true
         }

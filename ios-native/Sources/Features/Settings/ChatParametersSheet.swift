@@ -77,10 +77,32 @@ private struct TextParameters: View {
         let main = specs.filter { ChatParameters.mainKeys.contains($0.key) }
         let rest = specs.filter { !ChatParameters.mainKeys.contains($0.key) }
         let mode = ChatConfig.text(overrides["searchMode"]) ?? ChatConfig.text(model.settings.shared["searchMode"]) ?? "auto"
-        let thinkingOn = (config["thinking"] as? Bool) ?? (overrides["thinking"] as? Bool) ?? true
+        let onPhone = PhoneModelID.isPhone(modelID)
+        // У моделей телефона рассуждения по умолчанию выключены: они заметно замедляют ответ.
+        let thinkingOn = (config["thinking"] as? Bool) ?? (overrides["thinking"] as? Bool) ?? !onPhone
+        let phoneThinking = model.phone.infos[PhoneModelID.file(of: modelID)]?.thinking
 
         SettingsNote(text: "Рассуждения сохраняются для модели. Остальные параметры — только для этого чата.")
 
+        if onPhone {
+            SettingsCard {
+                if phoneThinking?.canToggle == true {
+                    ToggleRow(title: "Рассуждения", hint: "Модель сначала думает, потом отвечает. Дольше, но точнее",
+                              isOn: thinkingOn) { value in
+                        Task { await model.setParameter("thinking", value) }
+                    }
+                } else {
+                    Text(phoneThinking == .always ? "Эта модель рассуждает всегда — выключить нельзя."
+                         : (phoneThinking == nil ? "Читаю сведения о модели…" : "Эта модель не умеет рассуждать перед ответом."))
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.muted)
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .task { await model.phone.loadInfo(PhoneModelID.file(of: modelID)) }
+            SettingsNote(text: "Модель работает на телефоне: веб-поиск и базы знаний ей недоступны. Размер контекста и значения для всех чатов — в «Модели на телефоне» → настройки модели.")
+        } else {
         SettingsCard {
             SegmentRow(title: ChatParameters.usesGoogleSearch(modelID) ? "Google Search" : "Веб-поиск",
                        choices: ChatParameters.searchModes, selected: mode) { value in
@@ -109,6 +131,7 @@ private struct TextParameters: View {
         if knowledge {
             KnowledgePicker()
                 .transition(.opacity)
+        }
         }
 
         if subscription {

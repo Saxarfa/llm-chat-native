@@ -18,8 +18,9 @@ private final class StatsBox: @unchecked Sendable {
     }
 }
 
-/// Чат с моделью телефона: отвечает llama.cpp на самом iPhone, а переписка, как и у всех
-/// чатов, хранится на ПК — вопрос и ответ уходят туда снимком (`PUT /api/chats/{id}`).
+/// Чат с моделью телефона: отвечает llama.cpp на самом iPhone. Переписка хранится и на телефоне
+/// (`PhoneStore`), и на ПК — вопрос и ответ уходят туда снимком (`PUT /api/chats/{id}`);
+/// без связи снимок ждёт на телефоне (`OfflineEngine`).
 extension AppModel {
     /// Вопрос уже в ленте. Загружает модель; `false` — ответа не будет (текст вернётся в поле).
     func startOnPhone(_ id: String, model: String, text: String, messageID: String, now: Double, isNew: Bool) async -> Bool {
@@ -31,6 +32,7 @@ extension AppModel {
         if isNew { entry.title = Self.phoneTitle(text) }
         entry.messages.append(question)
         rawChats[id] = entry
+        persistPhone(id, model: model, dirty: true)
         if phone.loadedFile != file { lives[id]?.phase = "Загружаю модель в память…" }
         do {
             try await phone.ensureLoaded(file)
@@ -45,21 +47,23 @@ extension AppModel {
                 draftOverrides = chatMeta.removeValue(forKey: id)?.overrides ?? [:]
                 chats.removeAll { $0.id == id }
                 rawChats[id] = nil
+                store.remove(id)
                 if activeChatID == id { activeChatID = nil }
-            } else if threadChatID == id {
-                thread.removeAll { $0.rawID == messageID }
+            } else {
+                persistPhone(id, model: model, dirty: true)
+                if threadChatID == id { thread.removeAll { $0.rawID == messageID } }
             }
             return false
         }
         lives[id]?.sending = false
         lives[id]?.phase = "Генерация ответа…"
-        Task { await runOnPhone(id, model: model, isNew: isNew, created: now) }
+        Task { await runOnPhone(id, model: model) }
         return true
     }
 
-    private func runOnPhone(_ id: String, model: String, isNew: Bool, created: Double) async {
+    private func runOnPhone(_ id: String, model: String) async {
         // Вопрос — сразу на ПК: чат появится в списке и на сайте, ответ допишется следом.
-        let early = await savePhoneChat(id, model: model, isNew: isNew, created: created)
+        _ = await savePhoneChat(id, model: model)
 
         let config = ChatConfig.config(model: model, settings: settings, overrides: chatMeta[id]?.overrides ?? [:])
         let system = (ChatConfig.present(config["systemPrompt"]) as? String) ?? ChatConfig.defaultPrompt
@@ -104,13 +108,13 @@ extension AppModel {
             rawChats[id]?.messages.append(answer)
         }
 
-        let saved = await savePhoneChat(id, model: model, isNew: isNew && early.chat == nil, created: created)
+        let saved = await savePhoneChat(id, model: model)
         phoneRuns.remove(id)
         if let chat = saved.chat {
             finish(id, chat: chat, error: failure, notify: failure == nil)
             return
         }
-        // ПК недоступен (или режим снимков): ответ остаётся в ленте и уйдёт на ПК со следующим сохранением.
+        // ПК недоступен (или режим снимков): ответ сохранён на телефоне и уйдёт на ПК, когда будет связь.
         pendingFinish[id] = nil
         lives[id] = nil
         liveRaw[id] = nil
@@ -129,34 +133,18 @@ extension AppModel {
         }
     }
 
-    /// Снимок переписки — на ПК. Возвращает сохранённый чат или текст ошибки.
-    private func savePhoneChat(_ id: String, model: String, isNew: Bool, created: Double) async -> (chat: [String: Any]?, error: String?) {
-        guard preview == nil, let api, let entry = rawChats[id] else { return (nil, nil) }
-        var body: [String: Any] = [
-            "id": id,
-            "title": entry.title ?? chats.first(where: { $0.id == id })?.title ?? "Новый диалог",
-            "messages": entry.messages,
-            "model_id": model,
-            "expected_branch_id": chatMeta[id]?.branch ?? "main",
-        ]
-        if entry.updatedAt > 0 { body["updatedAt"] = Int(entry.updatedAt) }
-        if isNew {
-            body["createdAt"] = Int(created)
-            body["overrides"] = chatMeta[id]?.overrides ?? [String: Any]()
-        }
-        do {
-            let answer = try await api.json("/api/chats/\(APIClient.pathSafe(id))", method: "PUT", body: body, timeout: 30)
-            guard let chat = answer["chat"] as? [String: Any] else { return (nil, "ПК не вернул сохранённый чат.") }
-            if let messages = chat["messages"] as? [[String: Any]] {
-                rawChats[id] = RawChat(messages: messages, updatedAt: Self.updatedAt(chat), title: ChatConfig.text(chat["title"]))
-            }
+    /// Снимок переписки — на телефон и на ПК. Возвращает сохранённый на ПК чат или текст для пользователя.
+    private func savePhoneChat(_ id: String, model: String) async -> (chat: [String: Any]?, error: String?) {
+        guard rawChats[id] != nil else { return (nil, nil) }
+        persistPhone(id, model: model, dirty: true)
+        guard let local = store.chats[id] else { return (nil, nil) }
+        switch await push(local) {
+        case .saved(let chat):
             return (chat, nil)
-        } catch let error as APIError where error.status == 401 {
-            await logout()
-            return (nil, nil)
-        } catch {
-            let reason = (error as? APIError)?.message ?? "нет связи"
-            return (nil, "Ответ не сохранён на ПК (\(reason)). Он уйдёт туда со следующим сообщением, пока чат открыт.")
+        case .unreachable:
+            return (nil, offline || preview != nil ? nil : "ПК не отвечает — переписка сохранена на телефоне и уйдёт на ПК, когда связь появится.")
+        case .failed(let message):
+            return (nil, "Переписка сохранена на телефоне, но ПК её не принял: \(message)")
         }
     }
 

@@ -12,6 +12,7 @@ struct PhoneModelsSheet: View {
     @State private var editingToken = false
     @State private var tokenDraft = ""
     @State private var removing: PhoneModel?
+    @State private var configuring: PhoneModel?
 
     private var phone: PhoneModels { model.phone }
 
@@ -69,6 +70,16 @@ struct PhoneModelsSheet: View {
         } message: { item in
             Text("«\(item.name)» освободит место. Чаты с ней на ПК останутся.")
         }
+        .sheet(item: $configuring) { item in
+            PhoneModelSettingsSheet(item: item)
+                .environment(model)
+        }
+        .task {
+            // В режиме снимков окно настроек открывается само.
+            guard model.preview == .phoneSettings, configuring == nil, let first = phone.installed.first else { return }
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            configuring = first
+        }
         .alert("Модели на телефоне", isPresented: Binding(get: { phone.notice != nil }, set: { if !$0 { phone.notice = nil } })) {
             Button("Понятно", role: .cancel) {}
         } message: {
@@ -123,8 +134,22 @@ struct PhoneModelsSheet: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.ink)
             }
+            Button {
+                Haptics.tap()
+                configuring = item
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.muted)
+                    .frame(width: 40, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PressScaleStyle())
+            .accessibilityLabel("Настройки: \(item.name)")
+            .accessibilityIdentifier("phone.settings")
             Menu {
                 Button("Выбрать для чата", systemImage: "bubble.left") { onChoose(item.chatID) }
+                Button("Настройки модели", systemImage: "slider.horizontal.3") { configuring = item }
                 if loaded {
                     Button("Выгрузить из памяти", systemImage: "memorychip") { Task { await phone.unload() } }
                         .disabled(phone.generating)

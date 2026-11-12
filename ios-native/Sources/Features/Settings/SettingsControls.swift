@@ -224,12 +224,16 @@ struct SegmentRow: View {
     }
 }
 
-/// Числовой параметр: ползунок (длина ответа — числом). Сохраняется, когда палец отпущен.
+/// Числовой параметр: значение можно вбить с клавиатуры, потянуть ползунком или подстроить
+/// кнопками «−»/«+». Сохраняется, когда палец отпущен или ввод закончен.
 struct ParameterRow: View {
     let spec: ParameterSpec
     let value: Double
     /// `nil` — строку источника не показывать.
     var changed: Bool?
+    /// Подписи источника значения.
+    var changedLabel = "Изменено в этом чате"
+    var sourceLabel = "Из профиля модели"
     let onCommit: (Double) -> Void
     var onReset: (() -> Void)?
 
@@ -241,6 +245,8 @@ struct ParameterRow: View {
     private var isLength: Bool { spec.key == "max_tokens" || spec.key == "nano_max_output_tokens" }
     private var unlimited: Bool { isLength && value == -1 }
     private var upper: Double { Swift.max(spec.max, value) }
+    /// У длинных шкал (Top-K) «−»/«+» шагают крупнее.
+    private var buttonStep: Double { spec.max - spec.min > 200 ? Swift.max(spec.step, 5) : spec.step }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -260,32 +266,50 @@ struct ParameterRow: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Описание: \(spec.label)")
                 Spacer(minLength: 8)
-                if isLength {
-                    if unlimited {
-                        Text("Максимум")
-                            .font(.system(size: 15))
-                            .foregroundStyle(Theme.muted)
-                    } else {
-                        TextField("", text: $text)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                            .font(.system(size: 15).monospacedDigit())
-                            .foregroundStyle(Theme.ink)
-                            .focused($typing)
-                            .padding(.horizontal, 10)
-                            .frame(width: 110, height: 36)
-                            .background(Theme.fill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            .accessibilityLabel(spec.label)
-                    }
-                } else {
-                    Text(Self.format(draft, spec: spec))
-                        .font(.system(size: 15).monospacedDigit())
+                if unlimited {
+                    Text("Максимум")
+                        .font(.system(size: 15))
                         .foregroundStyle(Theme.muted)
+                } else {
+                    TextField("", text: $text)
+                        .keyboardType(spec.isInteger ? .numberPad : (spec.min < 0 ? .numbersAndPunctuation : .decimalPad))
+                        .multilineTextAlignment(.trailing)
+                        .font(.system(size: 15).monospacedDigit())
+                        .foregroundStyle(Theme.ink)
+                        .focused($typing)
+                        .submitLabel(.done)
+                        .onSubmit { typing = false }
+                        .padding(.horizontal, 10)
+                        .frame(width: isLength ? 110 : 76, height: 36)
+                        .background(Theme.fill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(typing ? Theme.buttonPrimary.opacity(0.7) : .clear, lineWidth: 1)
+                        }
+                        .accessibilityLabel("\(spec.label), значение")
+                        .accessibilityIdentifier("param.\(spec.key).field")
+                    // У цифровой клавиатуры нет «Ввода» — закончить ввод можно здесь.
+                    if typing {
+                        Button {
+                            typing = false
+                        } label: {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Theme.buttonPrimaryText)
+                                .frame(width: 36, height: 36)
+                                .background(Theme.buttonPrimary, in: Circle())
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(PressScaleStyle())
+                        .padding(.leading, 6)
+                        .accessibilityLabel("Готово")
+                        .transition(.opacity)
+                    }
                 }
             }
 
             if help {
-                Text(spec.hint)
+                Text(spec.hint + (isLength ? "" : " От \(Self.format(spec.min, spec: spec)) до \(Self.format(spec.max, spec: spec))."))
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -297,17 +321,29 @@ struct ParameterRow: View {
                     Haptics.tap()
                     onCommit(on ? -1 : 2048)
                 })) {
-                    Text("Максимум, доступный серверу")
+                    Text("Максимум, доступный модели")
                         .font(.system(size: 14))
                         .foregroundStyle(Theme.muted)
                 }
                 .tint(Theme.buttonPrimary)
             } else {
-                Slider(value: $draft, in: spec.min...upper, step: spec.step, onEditingChanged: { editing in
-                    if !editing, draft != value { onCommit(draft) }
-                })
-                .tint(Theme.buttonPrimary)
-                .accessibilityLabel(spec.label)
+                HStack(spacing: 6) {
+                    stepButton(symbol: "minus", delta: -buttonStep)
+                    Slider(value: Binding(get: { draft }, set: { new in
+                        let snapped = snap(new)
+                        if snapped != draft {
+                            draft = snapped
+                            text = Self.format(snapped, spec: spec)
+                            Haptics.selection()
+                        }
+                    }), in: spec.min...upper, onEditingChanged: { editing in
+                        if !editing, draft != value { onCommit(draft) }
+                    })
+                    .tint(Theme.buttonPrimary)
+                    .accessibilityLabel(spec.label)
+                    .accessibilityIdentifier("param.\(spec.key).slider")
+                    stepButton(symbol: "plus", delta: buttonStep)
+                }
                 if spec.key == "temperature" || spec.key == "nano_temperature" {
                     HStack {
                         Text("Предсказуемее")
@@ -316,12 +352,13 @@ struct ParameterRow: View {
                     }
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.subtle)
+                    .padding(.horizontal, 40)
                 }
             }
 
             if let changed {
                 HStack(spacing: 8) {
-                    Text(changed ? "Изменено в этом чате" : "Из профиля модели")
+                    Text(changed ? changedLabel : sourceLabel)
                     Spacer(minLength: 8)
                     if changed, let onReset {
                         Button {
@@ -349,25 +386,75 @@ struct ParameterRow: View {
         }
     }
 
+    private func stepButton(symbol: String, delta: Double) -> some View {
+        let next = snap(draft + delta)
+        return Button {
+            guard next != draft else { return }
+            Haptics.selection()
+            draft = next
+            text = Self.format(next, spec: spec)
+            onCommit(next)
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(next == draft ? Theme.subtle : Theme.ink)
+                .frame(width: 34, height: 34)
+                .background(Theme.fill, in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(PressScaleStyle())
+        .disabled(next == draft)
+        .accessibilityLabel(symbol == "minus" ? "Уменьшить: \(spec.label)" : "Увеличить: \(spec.label)")
+    }
+
+    /// Значение в пределах шкалы, кратное шагу.
+    private func snap(_ raw: Double) -> Double {
+        Self.snap(raw, spec: spec, upper: upper)
+    }
+
+    static func snap(_ raw: Double, spec: ParameterSpec, upper: Double) -> Double {
+        let clamped = Swift.min(Swift.max(raw, spec.min), upper)
+        let steps = ((clamped - spec.min) / spec.step).rounded()
+        let value = Swift.min(spec.min + steps * spec.step, upper)
+        return spec.isInteger ? value.rounded() : (value * 1000).rounded() / 1000
+    }
+
     private func sync(_ new: Double) {
         draft = Swift.min(Swift.max(new, spec.min), upper)
-        text = new == -1 ? "" : String(Int(new))
+        text = new == -1 && isLength ? "" : Self.format(new, spec: spec)
     }
 
     private func commitText() {
-        guard isLength, !unlimited else { return }
-        guard let number = Int(text.trimmingCharacters(in: .whitespaces)), Double(number) >= spec.min else {
-            text = String(Int(value))
+        guard !unlimited else { return }
+        guard let number = Self.parse(text) else {
+            text = Self.format(value, spec: spec)
             return
         }
-        let clamped = Swift.min(Double(number), upper)
-        text = String(Int(clamped))
+        // Вбитое число не обязано попадать в шаг ползунка, но держится в пределах параметра.
+        let clamped = Self.clampTyped(number, spec: spec, upper: isLength ? upper : spec.max)
+        text = Self.format(clamped, spec: spec)
+        draft = Swift.min(clamped, upper)
         if clamped != value { onCommit(clamped) }
+    }
+
+    static func clampTyped(_ number: Double, spec: ParameterSpec, upper: Double) -> Double {
+        let clamped = Swift.min(Swift.max(number, spec.min), upper)
+        return spec.isInteger ? clamped.rounded() : (clamped * 1000).rounded() / 1000
+    }
+
+    /// Число из поля ввода: запятая или точка, минус.
+    static func parse(_ raw: String) -> Double? {
+        let cleaned = raw.trimmingCharacters(in: .whitespaces)
+            .replacingOccurrences(of: ",", with: ".")
+            .replacingOccurrences(of: "\u{2212}", with: "-")
+            .replacingOccurrences(of: " ", with: "")
+        guard !cleaned.isEmpty else { return nil }
+        return Double(cleaned)
     }
 
     static func format(_ value: Double, spec: ParameterSpec) -> String {
         if spec.isInteger { return String(Int(value.rounded())) }
-        return value.formatted(.number.precision(.fractionLength(0...2)))
+        return value.formatted(.number.precision(.fractionLength(0...3)).grouping(.never))
     }
 }
 

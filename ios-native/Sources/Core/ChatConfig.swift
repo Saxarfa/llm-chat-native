@@ -240,7 +240,9 @@ enum ChatConfig {
         config.merge(modelDefaults(model)) { _, new in new }
         let profile = dict(settings.modelProfiles[model])
         config["systemPrompt"] = present(profile["systemPrompt"]) ?? present(settings.shared["systemPrompt"]) ?? defaultPrompt
+        // `null` на сервере — значение сброшено: действует профиль.
         let saved = dict(settings.modelConfigs[model]).merging(dict(overrides[model])) { _, new in new }
+            .filter { !($0.value is NSNull) }
         config.merge(saved) { _, new in new }
 
         if model.hasPrefix("google-subscription/") || model.hasPrefix("gemini-web/"), text(config["reasoning_strength"]) == nil {

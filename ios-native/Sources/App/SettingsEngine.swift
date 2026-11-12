@@ -78,9 +78,17 @@ extension AppModel {
 
     // MARK: - Настройки аккаунта
 
+    /// Значение по умолчанию для всех чатов с моделью; `nil` — убрать (сервер хранит `null`,
+    /// `ChatConfig.config` его не учитывает).
+    func setModelDefault(model: String, key: String, value: Any?) async {
+        await saveModelConfig(model: model, patch: [key: value ?? NSNull()])
+    }
+
     private func saveModelConfig(model: String, patch: [String: Any]) async {
         let previous = settings.modelConfigs[model]
-        settings.modelConfigs[model] = ChatConfig.dict(previous).merging(patch) { _, new in new }
+        var merged = ChatConfig.dict(previous).merging(patch) { _, new in new }
+        for (key, value) in patch where value is NSNull { merged.removeValue(forKey: key) }
+        settings.modelConfigs[model] = merged
         do {
             try await postSettings(["model_configs": [model: patch]])
         } catch {
@@ -106,8 +114,8 @@ extension AppModel {
 
     /// Инструкция модели: как «Профиль модели → Инструкции» на сайте, пишется и в профиль,
     /// и в параметры модели (там она главнее профиля).
-    func saveModelInstruction(_ text: String) async -> Bool {
-        let model = activeModelID
+    func saveModelInstruction(_ text: String, model chosen: String? = nil) async -> Bool {
+        let model = chosen ?? activeModelID
         let profile = settings.modelProfiles[model]
         let config = settings.modelConfigs[model]
         settings.modelProfiles[model] = ChatConfig.dict(profile).merging(["systemPrompt": text]) { _, new in new }

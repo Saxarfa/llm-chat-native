@@ -1,6 +1,6 @@
 import Foundation
 
-struct User: Decodable, Equatable {
+struct User: Codable, Equatable {
     let id: Int
     let username: String
     let avatar: String?

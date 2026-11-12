@@ -134,6 +134,18 @@ extension AppModel {
         let previous = chats[index]
         change(&chats[index])
         Haptics.tap()
+        if var local = store.chats[chat.id] {
+            local.title = chats[index].title
+            local.pinned = chats[index].pinned
+            store.put(local)
+            // Чат ещё не дошёл до ПК — менять там нечего, название уйдёт со снимком.
+            if offline || local.serverUpdatedAt == 0 { return }
+        }
+        if offline {
+            chats[index] = previous
+            chatsNotice = "Нет связи с ПК. Изменить этот чат можно, когда ПК будет доступен."
+            return
+        }
         do {
             _ = try await api.json("/api/chats/\(APIClient.pathSafe(chat.id))/metadata", method: "PATCH", body: body)
         } catch {
@@ -146,8 +158,23 @@ extension AppModel {
     /// Удаление: сервер кладёт чат в корзину, вернуть его можно на сайте.
     func delete(_ chat: ChatSummary) async {
         guard preview == nil, let api else { return }
+        // Чат только на телефоне: на ПК удалять нечего.
+        if let local = store.chats[chat.id], local.serverUpdatedAt == 0 {
+            store.remove(chat.id)
+            chats.removeAll { $0.id == chat.id }
+            threadCache[chat.id] = nil
+            if activeChatID == chat.id { activeChatID = nil }
+            Haptics.success()
+            return
+        }
+        if offline {
+            chatsNotice = "Нет связи с ПК. Удалить этот чат можно, когда ПК будет доступен."
+            Haptics.error()
+            return
+        }
         do {
             _ = try await api.json("/api/chats/\(APIClient.pathSafe(chat.id))", method: "DELETE")
+            store.remove(chat.id)
             chats.removeAll { $0.id == chat.id }
             lives[chat.id] = nil
             liveRaw[chat.id] = nil
