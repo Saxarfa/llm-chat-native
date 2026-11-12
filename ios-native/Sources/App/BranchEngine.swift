@@ -21,7 +21,7 @@ extension AppModel {
     /// Менять историю можно, когда модель не отвечает и не идёт другое изменение.
     var canChangeHistory: Bool {
         guard let id = activeChatID else { return false }
-        return lives[id] == nil && !branchBusy && preview == nil
+        return lives[id] == nil && !branchBusy
     }
 
     /// Показать другой сохранённый вариант ответа.

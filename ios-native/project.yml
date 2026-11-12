@@ -10,8 +10,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.6"
-    CURRENT_PROJECT_VERSION: "9"
+    MARKETING_VERSION: "0.7"
+    CURRENT_PROJECT_VERSION: "10"
     TARGETED_DEVICE_FAMILY: "1"
     CODE_SIGN_STYLE: Manual
     DEVELOPMENT_TEAM: ""
@@ -19,7 +19,9 @@ targets:
   LLMChat:
     type: application
     platform: iOS
-    scheme: {}
+    scheme:
+      testTargets:
+        - LLMChatUITests
     sources:
       - path: Sources
       - path: Resources
@@ -52,3 +54,16 @@ targets:
         # и http остаётся разрешён лишь к локальной сети — адреса Tailscale 100.x блокируются.
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
+  # Автотесты с нажатиями (XCUITest) — запускаются в симуляторе в workflow, в IPA не попадают.
+  LLMChatUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: LLMChat
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.llmchat.native.uitests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_TARGET_NAME: LLMChat

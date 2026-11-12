@@ -30,7 +30,13 @@ struct MainView: View {
                     .allowsHitTesting(isOpen)
                     .accessibilityHidden(!isOpen)
 
-                ChatScreen(onMenu: { setOpen(!isOpen) })
+                Group {
+                    if model.screen == .studio {
+                        StudioScreen(onMenu: { setOpen(!isOpen) })
+                    } else {
+                        ChatScreen(onMenu: { setOpen(!isOpen) })
+                    }
+                }
                     .frame(width: geo.size.width)
                     .background(Theme.canvas.ignoresSafeArea())
                     .overlay {

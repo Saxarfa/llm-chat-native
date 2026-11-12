@@ -13,6 +13,8 @@ enum PreviewScene: String, CaseIterable {
     case parameters, nano, settings
     /// Этап 6: ветки и варианты ответа, память, базы знаний, видео Omni.
     case branches, memory, knowledge, omni
+    /// Этап 7: студия картинок — главный экран, настройки, история, арт на весь экран.
+    case studio, studioSettings, studioHistory, studioArt
 
     static let omniCatalog: [String: Any] = [
         "id": "aistudio/gemini-omni-1.2-flash",

@@ -18,6 +18,10 @@ struct SidebarView: View {
             .padding(.horizontal, 20)
             .frame(height: 56)
 
+            studioRow
+                .padding(.horizontal, 8)
+                .padding(.bottom, 4)
+
             list
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -117,6 +121,35 @@ struct SidebarView: View {
         }
     }
 
+    /// Студия картинок — отдельный экран, как пункт «Генерация» на сайте.
+    private var studioRow: some View {
+        let active = model.screen == .studio
+        return Button {
+            model.screen = .studio
+            onClose()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.muted)
+                    .frame(width: 22)
+                Text("Студия картинок")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                Spacer(minLength: 0)
+                if model.studio.pendingJob != nil {
+                    ProgressView().controlSize(.mini).tint(Theme.muted)
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
+            .background(active ? Theme.fillActive : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(RowPressStyle())
+        .accessibilityIdentifier("sidebar.studio")
+    }
+
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 13, weight: .medium))
@@ -127,9 +160,10 @@ struct SidebarView: View {
     }
 
     private func row(_ chat: ChatSummary) -> some View {
-        let active = chat.id == model.activeChatID
+        let active = chat.id == model.activeChatID && model.screen == .chat
         return Button {
             model.activeChatID = chat.id
+            model.screen = .chat
             onClose()
         } label: {
             HStack(spacing: 12) {
@@ -195,6 +229,7 @@ struct SidebarView: View {
 
             Button {
                 model.activeChatID = nil
+                model.screen = .chat
                 onClose()
             } label: {
                 Label("Новый чат", systemImage: "plus")

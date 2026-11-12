@@ -74,19 +74,34 @@ jobs:
           xcrun simctl install "$device" build/simulator/Build/Products/Debug-iphonesimulator/LLMChat.app
           mkdir -p build/screens
           # Имена экранов — PreviewScene в ios-native/Sources/Core/PreviewScene.swift; данные вымышленные.
-          for scene in connect login offline chat sidebar thread threadTop streaming models media parameters nano settings branches memory knowledge omni; do
+          for scene in connect login offline chat sidebar thread threadTop streaming models media parameters nano settings branches memory knowledge omni studio studioSettings studioHistory studioArt; do
             xcrun simctl terminate "$device" app.llmchat.native || true
             xcrun simctl launch "$device" app.llmchat.native "--preview=$scene"
             sleep 4
             xcrun simctl io "$device" screenshot "build/screens/$scene.png"
           done
+      - name: UI tests (XCUITest) in simulator
+        run: |
+          set -euo pipefail
+          device=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next(d["udid"] for group in json.load(sys.stdin)["devices"].values() for d in group if "iPhone" in d["name"]))')
+          mkdir -p build/uitest-screens
+          # TEST_RUNNER_* передаётся тестам без приставки: снимки шагов пишутся прямо в папку.
+          export TEST_RUNNER_SCREENS_DIR="$PWD/build/uitest-screens"
+          xcodebuild test -project ios-native/LLMChat.xcodeproj -scheme LLMChat -configuration Debug             -destination "platform=iOS Simulator,id=$device" -derivedDataPath build/uitest             -resultBundlePath build/uitest.xcresult CODE_SIGNING_ALLOWED=NO > build-uitest.log 2>&1             || { grep -E 'error:|failed|Failing|XCTAssert|Test Case .* failed' build-uitest.log | tail -n 60; status=1; }
+          grep -E 'Test Case .*(passed|failed)|Executed [0-9]+ test' build-uitest.log | tail -n 20 || true
+          if [ -z "$(ls build/uitest-screens)" ]; then
+            xcrun xcresulttool export attachments --path build/uitest.xcresult --output-path build/uitest-screens || true
+          fi
+          exit ${status:-0}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: native-screens
           path: |
             build/screens
+            build/uitest-screens
             build-simulator.log
+            build-uitest.log
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: failure()

@@ -441,6 +441,9 @@ extension AppModel {
         case "knowledge_updated":
             knowledgeRevision += 1
             return
+        case "image_settings_updated":
+            studio.receive(event)
+            return
         default:
             break
         }

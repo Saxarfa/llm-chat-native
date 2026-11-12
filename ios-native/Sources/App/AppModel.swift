@@ -2,6 +2,10 @@ import Foundation
 import Observation
 
 /// Состояние приложения: адрес ПК, вход, список диалогов.
+enum MainScreen: Equatable {
+    case chat, studio
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -80,6 +84,10 @@ final class AppModel {
     var knowledgeRevision = 0
     /// Базы знаний аккаунта (для выбора в «Параметрах чата»).
     var knowledgeLibraries: [KnowledgeLibrary] = []
+    /// Что открыто справа от шторки: чат или студия картинок.
+    var screen: MainScreen = .chat
+    /// Студия картинок; своё наблюдаемое состояние.
+    @ObservationIgnored let studio = StudioModel()
 
     let preview: PreviewScene?
     @ObservationIgnored var api: APIClient?
@@ -102,6 +110,7 @@ final class AppModel {
 
     init(preview: PreviewScene? = PreviewScene.current) {
         self.preview = preview
+        studio.app = self
     }
 
     var activeChat: ChatSummary? {
@@ -193,6 +202,8 @@ final class AppModel {
         branchBusy = false
         pendingDelete = nil
         knowledgeLibraries = []
+        studio.reset()
+        screen = .chat
         models = []
         settings = ServerSettings()
         sendError = nil
@@ -249,7 +260,7 @@ final class AppModel {
         case .offline:
             phase = .offline
         case .chat, .sidebar, .thread, .threadTop, .streaming, .models, .media, .parameters, .nano, .settings,
-             .branches, .memory, .knowledge, .omni:
+             .branches, .memory, .knowledge, .omni, .studio, .studioSettings, .studioHistory, .studioArt:
             user = PreviewScene.user
             chats = PreviewScene.chats
             models = PreviewScene.modelOptions
@@ -298,6 +309,10 @@ final class AppModel {
             }
             if scene == .parameters || scene == .knowledge {
                 knowledgeLibraries = PreviewScene.libraries
+            }
+            if [.studio, .studioSettings, .studioHistory, .studioArt].contains(scene) {
+                screen = .studio
+                studio.loadPreview()
             }
             if scene == .parameters {
                 chatMeta["7"]?.overrides["knowledge"] = ["enabled": true, "collections": ["l1"], "strict": false] as [String: Any]
