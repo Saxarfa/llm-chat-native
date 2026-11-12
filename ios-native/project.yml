@@ -10,8 +10,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.7.1"
-    CURRENT_PROJECT_VERSION: "11"
+    MARKETING_VERSION: "0.8"
+    CURRENT_PROJECT_VERSION: "12"
     TARGETED_DEVICE_FAMILY: "1"
     CODE_SIGN_STYLE: Manual
     DEVELOPMENT_TEAM: ""
@@ -26,6 +26,10 @@ targets:
     sources:
       - path: Sources
       - path: Resources
+    dependencies:
+      # llama.cpp для моделей на телефоне: workflow скачивает готовый xcframework из релиза.
+      - framework: Frameworks/llama.xcframework
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.llmchat.native

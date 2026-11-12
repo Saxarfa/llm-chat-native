@@ -1,7 +1,23 @@
 import SwiftUI
 
+/// Система будит приложение, когда фоновая загрузка модели закончилась.
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String,
+                     completionHandler: @escaping () -> Void) {
+        guard identifier == DownloadCenter.identifier else {
+            completionHandler()
+            return
+        }
+        DownloadCenter.shared.backgroundCompletion = completionHandler
+        // Сессию нужно создать заново, иначе события не придут; файл переносит сам делегат,
+        // а список моделей сверится с папкой при следующем открытии.
+        DownloadCenter.shared.reattach()
+    }
+}
+
 @main
 struct LLMChatApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel()
 
     var body: some Scene {

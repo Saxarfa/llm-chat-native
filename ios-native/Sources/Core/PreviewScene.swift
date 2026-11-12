@@ -15,6 +15,31 @@ enum PreviewScene: String, CaseIterable {
     case branches, memory, knowledge, omni
     /// Этап 7: студия картинок — главный экран, настройки, история, арт на весь экран.
     case studio, studioSettings, studioHistory, studioArt
+    /// Этап 8: окно «Модели на телефоне» и чат с моделью телефона.
+    case phoneModels, phoneChat
+
+    static let phoneInstalled: [PhoneModel] = [
+        PhoneModel(file: "Qwen3-4B-Instruct-2507-Q4_K_M.gguf", repo: "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+                   size: 2_500_000_000, added: 1_700_000_200),
+        PhoneModel(file: "Llama-3.2-3B-Instruct-Q4_K_M.gguf", repo: "bartowski/Llama-3.2-3B-Instruct-GGUF",
+                   size: 2_020_000_000, added: 1_700_000_100),
+        PhoneModel(file: "gemma-3-12b-it-Q4_K_M.gguf", repo: nil, size: 7_300_000_000, added: 1_700_000_000),
+    ]
+
+    static let phoneRepos: [HFRepo] = [
+        HFRepo(id: "unsloth/Qwen3-4B-Instruct-2507-GGUF", downloads: 812_400, likes: 214),
+        HFRepo(id: "unsloth/gemma-3-4b-it-GGUF", downloads: 640_100, likes: 133),
+        HFRepo(id: "bartowski/Llama-3.2-3B-Instruct-GGUF", downloads: 402_700, likes: 177),
+        HFRepo(id: "unsloth/Qwen3-1.7B-GGUF", downloads: 351_000, likes: 96),
+    ]
+
+    static let phoneFiles: [HFFile] = [
+        HFFile(path: "Qwen3-4B-Instruct-2507-Q2_K.gguf", size: 1_670_000_000),
+        HFFile(path: "Qwen3-4B-Instruct-2507-Q4_K_M.gguf", size: 2_500_000_000),
+        HFFile(path: "Qwen3-4B-Instruct-2507-Q6_K.gguf", size: 3_310_000_000),
+        HFFile(path: "Qwen3-4B-Instruct-2507-Q8_0.gguf", size: 4_280_000_000),
+        HFFile(path: "Qwen3-4B-Instruct-2507-F16.gguf", size: 8_050_000_000),
+    ]
 
     static let omniCatalog: [String: Any] = [
         "id": "aistudio/gemini-omni-1.2-flash",

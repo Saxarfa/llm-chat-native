@@ -23,6 +23,7 @@ extension AppModel {
     /// После входа: настройки аккаунта, список моделей и поток событий.
     func startSession() {
         guard preview == nil else { return }
+        phone.start()
         Task {
             await loadSettings()
             await refreshModels()
@@ -148,7 +149,7 @@ extension AppModel {
             if (status["is_generating"] as? Bool) == true {
                 applyLive(id, event: ChatConfig.dict(status["snapshot"]), instant: true)
                 watch(id)
-            } else if lives[id]?.sending != true {
+            } else if lives[id]?.sending != true, !phoneRuns.contains(id) {
                 lives[id] = nil
                 liveRaw[id] = nil
             }
@@ -176,6 +177,9 @@ extension AppModel {
         if let pending = lives[id]?.pendingUserID, !raw.contains(where: { ($0["id"] as? String) == pending }) {
             return
         }
+        if chat["messages"] is [[String: Any]] {
+            rawChats[id] = RawChat(messages: raw, updatedAt: Self.updatedAt(chat), title: ChatConfig.text(chat["title"]))
+        }
         // Разбор Markdown длинного чата — вне главного потока.
         let items = await Task.detached(priority: .userInitiated) {
             FeedMessage.build(from: raw.map { ChatMessage(json: $0) })
@@ -202,7 +206,13 @@ extension AppModel {
     /// Отправляет вопрос. `false` — не ушло (текст нужно вернуть в поле ввода).
     func send(_ rawText: String, attachments: [DraftAttachment] = []) async -> Bool {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || !attachments.isEmpty, preview == nil, let api else { return false }
+        let onPhone = PhoneModelID.isPhone(activeModelID)
+        guard !text.isEmpty || !attachments.isEmpty, onPhone || preview == nil else { return false }
+        if onPhone, !attachments.isEmpty {
+            sendError = "Модель на телефоне понимает только текст. Уберите вложения или выберите модель на ПК."
+            Haptics.error()
+            return false
+        }
         let isNew = activeChatID == nil
         let id = activeChatID ?? "chat_" + UUID().uuidString.lowercased()
         guard lives[id] == nil else { return false }
@@ -241,6 +251,13 @@ extension AppModel {
             chatMeta[id] = ChatMeta(overrides: draftOverrides, branch: "main")
             draftOverrides = [:]
         }
+        if onPhone {
+            return await startOnPhone(id, model: model, text: text, messageID: messageID, now: now, isNew: isNew)
+        }
+        guard let api else {
+            lives[id] = nil
+            return false
+        }
         let meta = chatMeta[id]
         let body = ChatConfig.payload(chatID: id, model: model, settings: settings,
                                       overrides: meta?.overrides, branch: meta?.branch ?? "main",
@@ -276,6 +293,10 @@ extension AppModel {
     /// Просит модель ответить заново. Прежний ответ остаётся на сервере вариантом.
     func regenerate(_ message: FeedMessage) async {
         guard let id = activeChatID, lives[id] == nil, preview == nil else { return }
+        if PhoneModelID.isPhone(activeModelID) {
+            sendError = "«Ответить заново» для моделей на телефоне появится в следующем обновлении."
+            return
+        }
         var live = LiveState()
         live.sending = true
         live.replacingID = message.rawID
@@ -291,6 +312,10 @@ extension AppModel {
     func edit(_ message: FeedMessage, text rawText: String) async -> Bool {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let id = activeChatID, lives[id] == nil, preview == nil else { return false }
+        if PhoneModelID.isPhone(activeModelID) {
+            sendError = "Правка сообщений для моделей на телефоне появится в следующем обновлении."
+            return false
+        }
         guard !text.isEmpty || !message.attachments.isEmpty else { return false }
         var live = LiveState()
         live.sending = true
@@ -348,6 +373,10 @@ extension AppModel {
     }
 
     func stop() async {
+        if let id = activeChatID, phoneRuns.contains(id), lives[id]?.stopping != true {
+            stopOnPhone(id)
+            return
+        }
         guard let id = activeChatID, lives[id] != nil, lives[id]?.stopping != true, let api else { return }
         lives[id]?.stopping = true
         Haptics.tap()
@@ -501,7 +530,7 @@ extension AppModel {
     }
 
     /// Ответ закончен или остановлен: убрать живую строку и показать сохранённые сообщения.
-    private func finish(_ id: String, chat: [String: Any]?, error: String?, notify: Bool) {
+    func finish(_ id: String, chat: [String: Any]?, error: String?, notify: Bool) {
         // Последний кусок текста ещё не допоказан — сначала плавно дописать его, потом закончить.
         if error == nil, id == activeChatID, let live = lives[id], !live.stopping,
            let raw = liveRaw[id], raw.text != live.text {
@@ -533,7 +562,7 @@ extension AppModel {
         }
     }
 
-    private func applyLive(_ id: String, event: [String: Any], instant: Bool = false) {
+    func applyLive(_ id: String, event: [String: Any], instant: Bool = false) {
         var raw = liveRaw[id] ?? (text: lives[id]?.text ?? "", reasoning: lives[id]?.reasoning ?? "")
         if let text = event["text"] as? String { raw.text = text }
         if let reasoning = event["reasoning"] as? String { raw.reasoning = reasoning }

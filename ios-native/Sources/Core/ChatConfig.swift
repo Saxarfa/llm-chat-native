@@ -51,11 +51,12 @@ struct ChatBranch: Identifiable, Equatable {
 
 struct ModelOption: Identifiable, Equatable {
     enum Group: Int, CaseIterable {
-        case local, studio, subscription
+        case local, phone, studio, subscription
 
         var title: String {
             switch self {
             case .local: return "Локальные"
+            case .phone: return "На телефоне"
             case .studio: return "AI Studio"
             case .subscription: return "Подписка"
             }
@@ -144,6 +145,7 @@ enum ChatConfig {
     // MARK: - Имена и группы моделей
 
     static func group(of id: String) -> ModelOption.Group {
+        if PhoneModelID.isPhone(id) { return .phone }
         if id.hasPrefix("aistudio/") { return .studio }
         if id.hasPrefix("google-subscription/") || id.hasPrefix("gemini-web/") { return .subscription }
         return .local
@@ -151,6 +153,7 @@ enum ChatConfig {
 
     static func modelName(_ id: String, profiles: [String: Any]) -> String {
         if let alias = text(dict(profiles[id])["alias"]) { return alias }
+        if PhoneModelID.isPhone(id) { return PhoneModelNames.display(id) }
         if id.hasPrefix("gemini-web/") {
             return ("Gemini " + titleCased(String(id.dropFirst("gemini-web/".count))))
                 .replacingOccurrences(of: "Flash Lite", with: "Flash-Lite")

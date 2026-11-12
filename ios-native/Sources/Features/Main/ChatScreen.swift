@@ -185,6 +185,7 @@ struct ComposerBar: View {
                     .focused($focused)
                     .padding(.horizontal, 6)
                     .padding(.top, 4)
+                    .accessibilityIdentifier("chat.input")
 
                 HStack(spacing: 6) {
                     if model.editing == nil {
@@ -226,7 +227,7 @@ struct ComposerBar: View {
             .ignoresSafeArea()
         }
         .onAppear {
-            if model.preview == .models { showModels = true }
+            if model.preview == .models || model.preview == .phoneModels { showModels = true }
         }
         .onChange(of: model.editing) { _, message in
             if let message {

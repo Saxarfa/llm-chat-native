@@ -4,6 +4,7 @@ import SwiftUI
 struct ModelPickerSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @State private var showPhone = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,29 +21,33 @@ struct ModelPickerSheet: View {
             .padding(.top, 26)
             .padding(.bottom, 10)
 
-            if model.models.isEmpty {
-                emptyState
-            } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(ModelOption.Group.allCases, id: \.rawValue) { group in
-                            let items = model.models.filter { $0.group == group }
-                            if !items.isEmpty {
-                                Text(group.title)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(Theme.subtle)
-                                    .padding(.horizontal, 12)
-                                    .padding(.top, 14)
-                                    .padding(.bottom, 6)
-                                ForEach(items) { item in
-                                    row(item)
-                                }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    if model.models.isEmpty {
+                        emptyState
+                            .padding(.vertical, 24)
+                    }
+                    ForEach(ModelOption.Group.allCases, id: \.rawValue) { group in
+                        let items = model.allModels.filter { $0.group == group }
+                        // «На телефоне» видна всегда: из неё открывается окно моделей телефона.
+                        if !items.isEmpty || group == .phone {
+                            Text(group.title)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(Theme.subtle)
+                                .padding(.horizontal, 12)
+                                .padding(.top, 14)
+                                .padding(.bottom, 6)
+                            ForEach(items) { item in
+                                row(item)
+                            }
+                            if group == .phone {
+                                managePhone
                             }
                         }
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 24)
                 }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 24)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -52,6 +57,46 @@ struct ModelPickerSheet: View {
         .presentationCornerRadius(28)
         .preferredColorScheme(.dark)
         .task { await model.refreshModels() }
+        .sheet(isPresented: $showPhone) {
+            PhoneModelsSheet { id in
+                Task { await model.selectModel(id) }
+                showPhone = false
+                dismiss()
+            }
+            .environment(model)
+        }
+        .task {
+            // Режим снимков: второе окно — после того, как первое доехало.
+            guard model.preview == .phoneModels else { return }
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            showPhone = true
+        }
+    }
+
+    private var managePhone: some View {
+        Button {
+            Haptics.tap()
+            showPhone = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "iphone")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.muted)
+                    .frame(width: 22)
+                Text(model.phone.installed.isEmpty ? "Скачать модель на телефон…" : "Модели на телефоне…")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.muted)
+                Spacer(minLength: 8)
+                if !model.phone.downloads.isEmpty {
+                    ProgressView().controlSize(.small).tint(Theme.muted)
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressScaleStyle())
+        .accessibilityIdentifier("phone.manage")
     }
 
     private var emptyState: some View {

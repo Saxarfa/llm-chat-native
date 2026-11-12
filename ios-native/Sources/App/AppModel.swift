@@ -88,6 +88,19 @@ final class AppModel {
     var screen: MainScreen = .chat
     /// Студия картинок; своё наблюдаемое состояние.
     @ObservationIgnored let studio = StudioModel()
+    /// Модели на самом iPhone (этап 8); своё наблюдаемое состояние.
+    @ObservationIgnored let phone = PhoneModels()
+    /// Сообщения чатов в том виде, как их хранит сервер: ответ модели телефона
+    /// дописывается к ним и уходит на ПК целиком (`PUT /api/chats/{id}`).
+    @ObservationIgnored var rawChats: [String: RawChat] = [:]
+    /// Чаты, где сейчас отвечает модель телефона.
+    @ObservationIgnored var phoneRuns: Set<String> = []
+
+    struct RawChat {
+        var messages: [[String: Any]]
+        var updatedAt: Double
+        var title: String? = nil
+    }
 
     let preview: PreviewScene?
     @ObservationIgnored var api: APIClient?
@@ -111,7 +124,11 @@ final class AppModel {
     init(preview: PreviewScene? = PreviewScene.current) {
         self.preview = preview
         studio.app = self
+        phone.app = self
     }
+
+    /// Модели для выбора: с ПК и с самого телефона.
+    var allModels: [ModelOption] { models + phone.options }
 
     var activeChat: ChatSummary? {
         chats.first { $0.id == activeChatID }
@@ -203,6 +220,11 @@ final class AppModel {
         pendingDelete = nil
         knowledgeLibraries = []
         studio.reset()
+        phone.reset()
+        for id in phoneRuns { lives[id] = nil }
+        phone.cancel()
+        phoneRuns = []
+        rawChats = [:]
         screen = .chat
         models = []
         settings = ServerSettings()
@@ -260,7 +282,8 @@ final class AppModel {
         case .offline:
             phase = .offline
         case .chat, .sidebar, .thread, .threadTop, .streaming, .models, .media, .parameters, .nano, .settings,
-             .branches, .memory, .knowledge, .omni, .studio, .studioSettings, .studioHistory, .studioArt:
+             .branches, .memory, .knowledge, .omni, .studio, .studioSettings, .studioHistory, .studioArt,
+             .phoneModels, .phoneChat:
             user = PreviewScene.user
             chats = PreviewScene.chats
             models = PreviewScene.modelOptions
@@ -313,6 +336,12 @@ final class AppModel {
             if [.studio, .studioSettings, .studioHistory, .studioArt].contains(scene) {
                 screen = .studio
                 studio.loadPreview()
+            }
+            if [.models, .phoneModels, .phoneChat].contains(scene) {
+                phone.loadPreview()
+            }
+            if scene == .phoneChat {
+                draftModel = PhoneModelID.make(file: PreviewScene.phoneInstalled[0].file)
             }
             if scene == .parameters {
                 chatMeta["7"]?.overrides["knowledge"] = ["enabled": true, "collections": ["l1"], "strict": false] as [String: Any]

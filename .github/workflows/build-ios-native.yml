@@ -16,6 +16,22 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch llama.cpp (iOS xcframework)
+        run: |
+          set -euo pipefail
+          # Движок моделей на телефоне (этап 8). Релиз зафиксирован; контрольная сумма — из GitHub.
+          tag=b11870
+          sum=5206da648efdb196350da7d6dad2edf34a4290cdbe93c27680ce025f273567e3
+          curl -sSfL -o "$RUNNER_TEMP/llama.zip" "https://github.com/ggml-org/llama.cpp/releases/download/$tag/llama-$tag-xcframework.zip"
+          echo "$sum  $RUNNER_TEMP/llama.zip" | shasum -a 256 -c -
+          rm -rf "$RUNNER_TEMP/llama" && mkdir -p "$RUNNER_TEMP/llama"
+          unzip -q "$RUNNER_TEMP/llama.zip" -d "$RUNNER_TEMP/llama"
+          framework=$(find "$RUNNER_TEMP/llama" -maxdepth 4 -type d -name llama.xcframework | head -n 1)
+          test -n "$framework"
+          mkdir -p ios-native/Frameworks
+          rm -rf ios-native/Frameworks/llama.xcframework
+          cp -R "$framework" ios-native/Frameworks/
+          ls ios-native/Frameworks/llama.xcframework
       - name: Generate Xcode project
         working-directory: ios-native
         run: |
@@ -74,7 +90,7 @@ jobs:
           xcrun simctl install "$device" build/simulator/Build/Products/Debug-iphonesimulator/LLMChat.app
           mkdir -p build/screens
           # Имена экранов — PreviewScene в ios-native/Sources/Core/PreviewScene.swift; данные вымышленные.
-          for scene in connect login offline chat sidebar thread threadTop streaming models media parameters nano settings branches memory knowledge omni studio studioSettings studioHistory studioArt; do
+          for scene in connect login offline chat sidebar thread threadTop streaming models media parameters nano settings branches memory knowledge omni studio studioSettings studioHistory studioArt phoneModels phoneChat; do
             xcrun simctl terminate "$device" app.llmchat.native || true
             xcrun simctl launch "$device" app.llmchat.native "--preview=$scene"
             sleep 4
