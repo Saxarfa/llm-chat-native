@@ -271,7 +271,9 @@ struct ParameterRow: View {
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.muted)
                 } else {
-                    TextField("", text: $text)
+                    // При вводе поле пустое, прежнее значение — бледной подсказкой: новое число
+                    // набирается сразу, без стирания (курсор мог встать в начало — «1.250.7»).
+                    TextField(Self.format(value, spec: spec), text: $text)
                         .keyboardType(spec.isInteger ? .numberPad : (spec.min < 0 ? .numbersAndPunctuation : .decimalPad))
                         .multilineTextAlignment(.trailing)
                         .font(.system(size: 15).monospacedDigit())
@@ -382,7 +384,7 @@ struct ParameterRow: View {
         .onAppear { sync(value) }
         .onChange(of: value) { _, new in sync(new) }
         .onChange(of: typing) { _, focused in
-            if !focused { commitText() }
+            if focused { text = "" } else { commitText() }
         }
     }
 
