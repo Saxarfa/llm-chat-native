@@ -124,11 +124,27 @@ final class StudioUITests: XCTestCase {
         XCTAssertTrue(format.waitForExistence(timeout: 10))
 
         // Свайп вправо по ленте артов листает её, а не вытягивает боковое меню.
+        // Открытое меню сдвигает экран студии вправо — по этому и проверяем.
         let strip = element(app, "studio.filmstrip")
         XCTAssertTrue(strip.waitForExistence(timeout: 5))
+        let left = format.frame.minX
         strip.swipeRight()
         sleep(1)
-        XCTAssertFalse(element(app, "sidebar.studio").exists, "свайп по ленте артов открыл меню")
+        snap("ui-05b-swipe-strip")
+        XCTAssertTrue(format.exists && abs(format.frame.minX - left) < 2,
+                      "свайп по ленте артов сдвинул экран (открылось меню): \(format.frame.minX) vs \(left)")
+
+        // Контроль: свайп по сцене меню открывает, иначе проверка выше ничего не доказывает.
+        element(app, "studio.canvas").swipeRight()
+        sleep(1)
+        snap("ui-05c-swipe-stage")
+        XCTAssertTrue(!format.exists || format.frame.minX > left + 100, "свайп по сцене не открыл меню")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        sleep(1)
+        XCTAssertTrue(format.waitForExistence(timeout: 3))
+        let deadline = Date().addingTimeInterval(3)
+        while abs(format.frame.minX - left) > 2, Date() < deadline { usleep(200_000) }
+        XCTAssertEqual(format.frame.minX, left, accuracy: 2, "меню не закрылось")
 
         format.tap()
         XCTAssertTrue(app.staticTexts["Формат изображения"].waitForExistence(timeout: 5))
