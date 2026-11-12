@@ -112,7 +112,8 @@ final class PhoneSettingsUITests: XCTestCase {
         // Сначала убрать клавиатуру: иначе первое нажатие на «Меню» уходит на неё.
         if app.keyboards.firstMatch.exists {
             text(app, contains: "Работаю прямо на телефоне").tap()
-            _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 3)
+            let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.keyboards.firstMatch)
+            wait(for: [gone], timeout: 3)
         }
         app.buttons["Меню"].firstMatch.tap()
         let other = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Перевод письма")).firstMatch
