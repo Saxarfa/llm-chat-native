@@ -512,26 +512,35 @@ struct ComposerBar: View {
             Haptics.tap()
             showModels = true
         } label: {
-            HStack(spacing: 5) {
-                Text(model.activeModelName)
-                    .foregroundStyle(Theme.ink.opacity(0.85))
-                    .lineLimit(1)
-                if let level = reasoningLabel {
-                    Text(level)
-                        .foregroundStyle(Theme.subtle)
-                        .lineLimit(1)
-                }
+            // Целиком «модель + уровень», если влезает; иначе только модель, а не два обрезанных слова.
+            ViewThatFits(in: .horizontal) {
+                chip(level: reasoningLabel).fixedSize()
+                chip(level: nil).fixedSize()
+                chip(level: nil)
             }
-            .font(.system(size: 14, weight: .medium))
-            .padding(.horizontal, 12)
-            .frame(height: 34)
-            .background(Theme.fill, in: Capsule())
             .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel("Модель: \(model.activeModelName)")
         .accessibilityHint("Выбрать модель")
+    }
+
+    private func chip(level: String?) -> some View {
+        HStack(spacing: 5) {
+            Text(model.activeModelName)
+                .foregroundStyle(Theme.ink.opacity(0.85))
+                .lineLimit(1)
+            if let level {
+                Text(level)
+                    .foregroundStyle(Theme.subtle)
+                    .lineLimit(1)
+            }
+        }
+        .font(.system(size: 14, weight: .medium))
+        .padding(.horizontal, 12)
+        .frame(height: 34)
+        .background(Theme.fill, in: Capsule())
     }
 
     /// Микрофон: диктовка в поле ввода (речь распознаёт iOS).
