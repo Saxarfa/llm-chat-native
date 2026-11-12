@@ -20,8 +20,8 @@ struct ChatParametersSheet: View {
                 .id(id)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 32)
-                .contentShape(Rectangle())
-                .onTapGesture { Keyboard.hide() }
+                // Без «нажатия по пустому месту»: оно срабатывало и от нажатия по полю ввода
+                // и сразу прятало клавиатуру. Клавиатура уходит, если потянуть список.
             }
             .scrollDismissesKeyboard(.interactively)
         }

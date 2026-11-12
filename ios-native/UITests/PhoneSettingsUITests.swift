@@ -57,7 +57,8 @@ final class PhoneSettingsUITests: XCTestCase {
         let field = element(app, "param.temperature.field")
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         // Курсор — в конец поля (текст выровнен вправо), старое значение стираем.
-        field.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        field.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3), "нажатие по полю открывает клавиатуру")
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "1.25")
         snap("ui-s2-typing")
         let done = app.buttons["Готово"].firstMatch
