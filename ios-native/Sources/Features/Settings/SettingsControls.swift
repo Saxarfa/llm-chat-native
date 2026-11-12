@@ -39,7 +39,7 @@ struct SettingsCard<Content: View>: View {
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -126,7 +126,7 @@ struct ToggleRow: View {
                 }
             }
         }
-        .tint(Theme.buttonPrimary)
+        .tint(Theme.accent)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .frame(minHeight: 52)

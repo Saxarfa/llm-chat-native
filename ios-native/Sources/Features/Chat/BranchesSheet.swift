@@ -31,9 +31,8 @@ struct BranchesSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Theme.surface)
+        .presentationBackground(Theme.sheet)
         .presentationCornerRadius(28)
-        .preferredColorScheme(.dark)
         .confirmationDialog("Удалить ветку «\(deleting?.name ?? "")»?",
                             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
                             titleVisibility: .visible) {

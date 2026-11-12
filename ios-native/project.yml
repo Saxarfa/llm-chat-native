@@ -10,8 +10,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.10"
-    CURRENT_PROJECT_VERSION: "15"
+    MARKETING_VERSION: "0.11"
+    CURRENT_PROJECT_VERSION: "16"
     TARGETED_DEVICE_FAMILY: "1"
     CODE_SIGN_STYLE: Manual
     DEVELOPMENT_TEAM: ""
@@ -63,6 +63,9 @@ targets:
         NSLocalNetworkUsageDescription: LLM Chat подключается к вашему компьютеру в локальной сети для чатов и генерации.
         NSCameraUsageDescription: Камера нужна, чтобы прикрепить снимок к сообщению.
         NSPhotoLibraryAddUsageDescription: Доступ нужен, чтобы сохранять изображения из чата в «Фото».
+        NSPhotoLibraryUsageDescription: Последние снимки показываются в меню «+», чтобы прикрепить их одним нажатием.
+        NSMicrophoneUsageDescription: Микрофон нужен для диктовки сообщения.
+        NSSpeechRecognitionUsageDescription: Речь превращается в текст сообщения средствами iOS.
         # Сервер — личный ПК в домашней сети или Tailscale, обычно по http.
         # Только NSAllowsArbitraryLoads: рядом с NSAllowsLocalNetworking iOS его игнорирует,
         # и http остаётся разрешён лишь к локальной сети — адреса Tailscale 100.x блокируются.

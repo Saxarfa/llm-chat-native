@@ -22,6 +22,14 @@ enum PreviewScene: String, CaseIterable {
     /// 0.10: меню «+» у поля ввода (вложения, поиск, рассуждения, память, базы знаний);
     /// вопрос в очереди, пока модель отвечает, и линия контекста.
     case tools, queue
+    /// 0.11, вид как у Claude: экран «Недавние», лента и настройки в светлой теме,
+    /// разделы настроек «Компьютер» и «Профиль модели».
+    case recents, light, settingsLight, computer, modelProfile
+
+    /// Тема снимка: светлая — у сцен `light…`, у остальных тёмная.
+    var appearance: Appearance {
+        self == .light || self == .settingsLight ? .light : .dark
+    }
 
     /// Чаты телефона без связи с ПК: один уже был на ПК, второй ещё не дошёл.
     static let localChats: [LocalChat] = {
@@ -152,6 +160,29 @@ enum PreviewScene: String, CaseIterable {
         }
     }
 
+    /// «Настройки → Компьютер»: сервисы, нагрузка и две задачи.
+    static let overview: SystemOverview = {
+        var value = SystemOverview()
+        value.services = [.init(name: "Модели чата", online: true), .init(name: "ComfyUI", online: true),
+                          .init(name: "Переводчик", online: false), .init(name: "Веб-поиск", online: true)]
+        value.cpuPercent = 18
+        value.ramUsedMB = 21_400
+        value.ramTotalMB = 65_400
+        value.gpus = [.init(name: "NVIDIA GeForce RTX 4090", usedMB: 17_800, totalMB: 24_564, utilization: 62)]
+        value.loadedModels = ["gemma-26b-qat"]
+        value.tasks = [SystemTask(kind: "chat", id: "7", title: "Как устроен WAL в SQLite", phase: "Генерация ответа", progress: nil),
+                       SystemTask(kind: "image", id: "j1", title: "Маяк на скале в шторм, масло", phase: "Генерация изображения…", progress: 40)]
+        value.gpuBusy = true
+        return value
+    }()
+
+    /// Лента последних фото в меню «+» (снимки).
+    static let stripThumbs: [String: UIImage] = [
+        "a": sample(warm.0, warm.1, size: CGSize(width: 300, height: 300)),
+        "b": sample(cold.0, cold.1, size: CGSize(width: 300, height: 300)),
+        "c": sample(warm.1, cold.0, size: CGSize(width: 300, height: 300)),
+    ]
+
     private static let warm = (UIColor(red: 0.86, green: 0.48, blue: 0.3, alpha: 1), UIColor(red: 0.2, green: 0.13, blue: 0.3, alpha: 1))
     private static let cold = (UIColor(red: 0.2, green: 0.5, blue: 0.62, alpha: 1), UIColor(red: 0.07, green: 0.1, blue: 0.2, alpha: 1))
 
@@ -186,15 +217,22 @@ enum PreviewScene: String, CaseIterable {
 
     static let user = User(id: 1, username: "demo", avatar: nil, displayName: "Демо")
 
-    static let chats: [ChatSummary] = [
-        ChatSummary(id: "1", title: "План поездки на выходные", pinned: true),
-        ChatSummary(id: "2", title: "Разбор ошибки в скрипте резервного копирования"),
-        ChatSummary(id: "3", title: "Идеи для обложки альбома"),
-        ChatSummary(id: "4", title: "Сравнение локальных моделей"),
-        ChatSummary(id: "5", title: "Перевод письма на английский"),
-        ChatSummary(id: "6", title: "Рецепт плова"),
-        ChatSummary(id: "7", title: "Как устроен WAL в SQLite"),
-    ]
+    static let chats: [ChatSummary] = {
+        let now = Date().timeIntervalSince1970 * 1000
+        let minute = 60_000.0, hour = 60 * minute, day = 24 * hour
+        return [
+            ChatSummary(id: "1", title: "План поездки на выходные", pinned: true, updatedAt: now - 3 * day),
+            ChatSummary(id: "7", title: "Как устроен WAL в SQLite", updatedAt: now - 2 * minute),
+            ChatSummary(id: "2", title: "Разбор ошибки в скрипте резервного копирования", updatedAt: now - 5 * hour),
+            ChatSummary(id: "3", title: "Идеи для обложки альбома", updatedAt: now - 1 * day - hour),
+            ChatSummary(id: "4", title: "Сравнение локальных моделей", updatedAt: now - 4 * day),
+            ChatSummary(id: "5", title: "Перевод письма на английский", updatedAt: now - 9 * day),
+            ChatSummary(id: "6", title: "Рецепт плова", updatedAt: now - 20 * day),
+            ChatSummary(id: "8", title: "Подбор видеокарты для локальных моделей", updatedAt: now - 33 * day),
+            ChatSummary(id: "9", title: "Конспект статьи про RAG", updatedAt: now - 40 * day),
+            ChatSummary(id: "10", title: "Тренировки на неделю", updatedAt: now - 70 * day),
+        ]
+    }()
 
     static let modelOptions: [ModelOption] = [
         ModelOption(id: "gemma-26b-qat", name: "Gemma 26B QAT", group: .local, loaded: true),

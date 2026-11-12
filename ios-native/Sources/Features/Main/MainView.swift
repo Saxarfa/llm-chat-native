@@ -38,6 +38,8 @@ struct MainView: View {
                 Group {
                     if model.screen == .studio {
                         StudioScreen(onMenu: { setOpen(!isOpen) })
+                    } else if model.screen == .recents {
+                        RecentsScreen(onMenu: { setOpen(!isOpen) })
                     } else {
                         ChatScreen(onMenu: { setOpen(!isOpen) })
                     }

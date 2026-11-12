@@ -29,9 +29,8 @@ struct KnowledgeSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Theme.surface)
+        .presentationBackground(Theme.sheet)
         .presentationCornerRadius(28)
-        .preferredColorScheme(.dark)
         .task(id: model.knowledgeRevision) {
             failed = !(await model.loadLibraries())
             loaded = true
@@ -475,9 +474,8 @@ private struct NoteEditor: View {
         .padding(.horizontal, 16)
         .padding(.bottom, 16)
         .presentationDetents([.large])
-        .presentationBackground(Theme.surface)
+        .presentationBackground(Theme.sheet)
         .presentationCornerRadius(28)
-        .preferredColorScheme(.dark)
     }
 }
 

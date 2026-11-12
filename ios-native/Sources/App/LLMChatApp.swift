@@ -24,7 +24,6 @@ struct LLMChatApp: App {
         WindowGroup {
             RootView()
                 .environment(model)
-                .preferredColorScheme(.dark)
                 .tint(Theme.ink)
                 .task { await model.bootstrap() }
         }
@@ -57,6 +56,9 @@ struct RootView: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: model.phase)
+        .onChange(of: model.appearance, initial: true) { _, appearance in
+            appearance.apply()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { model.resumed() }
         }

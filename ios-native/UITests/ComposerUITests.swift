@@ -40,18 +40,20 @@ final class ComposerUITests: XCTestCase {
         let plus = element(app, "composer.tools")
         XCTAssertTrue(plus.waitForExistence(timeout: 10))
         plus.tap()
-        XCTAssertTrue(element(app, "tools.photo").waitForExistence(timeout: 5), "плитка «Фото»")
-        XCTAssertTrue(element(app, "tools.file").exists, "плитка «Файл»")
-        XCTAssertTrue(app.staticTexts["Веб-поиск"].exists)
+        XCTAssertTrue(element(app, "tools.photo").waitForExistence(timeout: 5), "кнопка «Фото» в заголовке")
+        XCTAssertTrue(element(app, "tools.camera").exists, "плитка «Камера»")
+        XCTAssertTrue(element(app, "tools.file").exists, "строка «Добавить файлы»")
+        XCTAssertTrue(app.staticTexts["Добавление в чат"].exists)
         XCTAssertTrue(app.switches.matching(NSPredicate(format: "label CONTAINS %@", "Память")).firstMatch.exists)
         sleep(1)
         snap("ui-c1-tools")
 
-        // Поиск — для этого чата: выбор сразу отмечается.
+        // Поиск — для этого чата: выбор из меню сразу виден в строке.
+        element(app, "tools.search").tap()
         let always = app.buttons["Всегда"].firstMatch
-        XCTAssertTrue(always.exists)
+        XCTAssertTrue(always.waitForExistence(timeout: 3))
         always.tap()
-        XCTAssertTrue(always.isSelected, "«Всегда» выбрано")
+        XCTAssertTrue(app.staticTexts["Всегда"].waitForExistence(timeout: 3), "в строке поиска — «Всегда»")
 
         element(app, "tools.knowledge").tap()
         XCTAssertTrue(app.staticTexts["Использовать базу знаний"].waitForExistence(timeout: 5), "экран баз знаний")
@@ -93,11 +95,14 @@ final class ComposerUITests: XCTestCase {
         snap("ui-c4-context")
     }
 
-    /// Кнопка в шапке открывает «Настройки модели»: значения сохраняются за моделью.
+    /// «⋯» в шапке открывает «Настройки модели»: значения сохраняются за моделью.
     func testModelSettingsFromHeader() {
         let app = launch("thread")
+        let more = app.buttons["Ещё"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap()
         let button = app.buttons["Настройки модели"].firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 10))
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
         button.tap()
         XCTAssertTrue(app.staticTexts["Настройки модели"].waitForExistence(timeout: 5))
         XCTAssertFalse(text(app, contains: "только для этого чата").exists, "надписей про временные настройки нет")

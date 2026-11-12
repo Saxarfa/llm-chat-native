@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Шторка выбора модели: группы «Локальные / AI Studio / Подписка», отметка у выбранной.
+/// Шторка «Выбор модели», как в приложении Claude: группы карточками, у модели — описание,
+/// у выбранной — синяя галочка.
 struct ModelPickerSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -8,21 +9,25 @@ struct ModelPickerSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Модель")
-                    .font(.system(size: 20, weight: .semibold))
+            ZStack {
+                Text("Выбор модели")
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.ink)
-                Spacer()
-                if model.modelsLoading {
-                    ProgressView().controlSize(.small).tint(Theme.muted)
+                HStack {
+                    CircleIconButton(symbol: "xmark", label: "Закрыть") { dismiss() }
+                    Spacer()
+                    if model.modelsLoading {
+                        ProgressView().controlSize(.small).tint(Theme.muted)
+                            .padding(.trailing, 12)
+                    }
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 26)
-            .padding(.bottom, 10)
+            .padding(.horizontal, 12)
+            .padding(.top, 14)
+            .padding(.bottom, 6)
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: 6) {
                     if model.models.isEmpty {
                         emptyState
                             .padding(.vertical, 24)
@@ -32,30 +37,32 @@ struct ModelPickerSheet: View {
                         // «На телефоне» видна всегда: из неё открывается окно моделей телефона.
                         if !items.isEmpty || group == .phone {
                             Text(group.title)
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.system(size: 14))
                                 .foregroundStyle(Theme.subtle)
-                                .padding(.horizontal, 12)
-                                .padding(.top, 14)
-                                .padding(.bottom, 6)
-                            ForEach(items) { item in
-                                row(item)
-                            }
-                            if group == .phone {
-                                managePhone
+                                .padding(.horizontal, 8)
+                                .padding(.top, 12)
+                            SettingsCard {
+                                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                    if index > 0 { CardDivider() }
+                                    row(item)
+                                }
+                                if group == .phone {
+                                    if !items.isEmpty { CardDivider() }
+                                    managePhone
+                                }
                             }
                         }
                     }
                 }
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Theme.surface)
+        .presentationBackground(Theme.sheet)
         .presentationCornerRadius(28)
-        .preferredColorScheme(.dark)
         .task { await model.refreshModels() }
         .sheet(isPresented: $showPhone) {
             PhoneModelsSheet { id in
@@ -80,22 +87,25 @@ struct ModelPickerSheet: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "iphone")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.muted)
-                    .frame(width: 22)
-                Text(model.phone.installed.isEmpty ? "Скачать модель на телефон…" : "Модели на телефоне…")
                     .font(.system(size: 16))
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 22)
+                Text(model.phone.installed.isEmpty ? "Скачать модель на телефон" : "Модели на телефоне")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
                 Spacer(minLength: 8)
                 if !model.phone.downloads.isEmpty {
                     ProgressView().controlSize(.small).tint(Theme.muted)
                 }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.subtle)
             }
-            .padding(.horizontal, 12)
-            .frame(minHeight: 48)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 52)
             .contentShape(Rectangle())
         }
-        .buttonStyle(PressScaleStyle())
+        .buttonStyle(RowPressStyle())
         .accessibilityIdentifier("phone.manage")
     }
 
@@ -123,6 +133,20 @@ struct ModelPickerSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// Описание под названием: из профиля модели на сайте, иначе — где она работает.
+    private func detail(_ item: ModelOption) -> String {
+        if let tagline = ChatConfig.text(ChatConfig.dict(model.settings.modelProfiles[item.id])["tagline"]),
+           !tagline.trimmingCharacters(in: .whitespaces).isEmpty {
+            return tagline
+        }
+        switch item.group {
+        case .local: return item.loaded ? "На компьютере · загружена в память" : "На компьютере"
+        case .phone: return "Работает на iPhone без компьютера"
+        case .studio: return ChatParameters.isNano(item.id) ? "AI Studio · создаёт изображения" : "AI Studio"
+        case .subscription: return "Подписка Google"
+        }
+    }
+
     private func row(_ item: ModelOption) -> some View {
         let selected = item.id == model.activeModelID
         return Button {
@@ -132,29 +156,26 @@ struct ModelPickerSheet: View {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.name)
-                        .font(.system(size: 17, weight: selected ? .semibold : .regular))
+                        .font(.system(size: 17))
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
-                    if item.loaded {
-                        Text("Загружена в память")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Theme.subtle)
-                    }
+                    Text(detail(item))
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.subtle)
+                        .lineLimit(1)
                 }
                 Spacer(minLength: 8)
                 if selected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
                 }
             }
-            .padding(.horizontal, 12)
-            .frame(minHeight: 52)
-            .background(selected ? Theme.fillActive : Color.clear,
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.horizontal, 16)
+            .frame(minHeight: 60)
             .contentShape(Rectangle())
         }
-        .buttonStyle(PressScaleStyle())
+        .buttonStyle(RowPressStyle())
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

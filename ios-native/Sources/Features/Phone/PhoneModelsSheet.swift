@@ -33,7 +33,7 @@ struct PhoneModelsSheet: View {
                 .padding(.bottom, 32)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(Theme.surface)
+            .background(Theme.sheet)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: String.self) { repo in
                 PhoneRepoView(repo: repo)
@@ -42,9 +42,8 @@ struct PhoneModelsSheet: View {
         .accessibilityIdentifier("phone.sheet")
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Theme.surface)
+        .presentationBackground(Theme.sheet)
         .presentationCornerRadius(28)
-        .preferredColorScheme(.dark)
         .task {
             if phone.results.isEmpty { await phone.search() }
         }
@@ -445,7 +444,7 @@ struct PhoneRepoView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 32)
         }
-        .background(Theme.surface)
+        .background(Theme.sheet)
         .toolbar(.hidden, for: .navigationBar)
         .task {
             if phone.files[repo] == nil { await phone.loadFiles(repo) }

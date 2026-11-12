@@ -99,7 +99,7 @@ private struct MarkdownBlockView: View {
         switch block.kind {
         case .heading(let level, let text):
             Text(InlineMarkdown.render(text, size: headingSize(level)))
-                .font(.system(size: headingSize(level), weight: .semibold))
+                .font(.system(size: headingSize(level), weight: .semibold, design: .serif))
                 .foregroundStyle(Theme.ink)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, level <= 2 ? 6 : 2)
@@ -113,7 +113,7 @@ private struct MarkdownBlockView: View {
                 ForEach(items) { item in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(item.marker)
-                            .font(.system(size: 17).monospacedDigit())
+                            .font(.system(size: 17, design: .serif).monospacedDigit())
                             .foregroundStyle(Theme.muted)
                             .frame(minWidth: 16, alignment: .trailing)
                         BodyText(text: item.text)
@@ -149,8 +149,9 @@ private struct BodyText: View {
     var color: Color = Theme.ink
 
     var body: some View {
+        // Текст ответа — шрифтом с засечками, как в приложении Claude.
         Text(InlineMarkdown.render(text))
-            .font(.system(size: 17))
+            .font(.system(size: 17, design: .serif))
             .foregroundStyle(color)
             .lineSpacing(5)
             .fixedSize(horizontal: false, vertical: true)

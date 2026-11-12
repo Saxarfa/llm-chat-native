@@ -490,6 +490,14 @@ extension AppModel {
         case "settings_updated":
             Task { await loadSettings() }
             return
+        case "user_profile_updated":
+            // Имя или фото поменяли на сайте.
+            let fresh = ChatConfig.dict(event["user"])
+            if !fresh.isEmpty, let data = try? JSONSerialization.data(withJSONObject: fresh),
+               let decoded = try? JSONDecoder().decode(User.self, from: data), decoded.id == user?.id {
+                user = decoded
+            }
+            return
         case "provider_models_updated", "model_runtime_updated":
             Task { await refreshModels() }
             return

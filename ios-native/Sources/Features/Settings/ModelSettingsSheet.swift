@@ -32,9 +32,8 @@ struct ModelSettingsSheet: View {
         .accessibilityIdentifier("model.settings")
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Theme.surface)
+        .presentationBackground(Theme.sheet)
         .presentationCornerRadius(28)
-        .preferredColorScheme(.dark)
         .settingsNotice()
     }
 }

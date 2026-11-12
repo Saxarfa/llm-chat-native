@@ -9,6 +9,8 @@ struct ChatScreen: View {
     @State private var draft = ""
     @State private var showParameters = false
     @State private var showBranches = false
+    @State private var renaming: ChatSummary?
+    @State private var deleting: ChatSummary?
 
     var body: some View {
         @Bindable var bound = model
@@ -63,6 +65,7 @@ struct ChatScreen: View {
         .sheet(isPresented: $showBranches) {
             BranchesSheet()
         }
+        .chatActions(renaming: $renaming, deleting: $deleting)
         .confirmationDialog(model.pendingDelete?.isUser == true ? "Удалить сообщение?" : "Удалить ответ?",
                             isPresented: Binding(get: { model.pendingDelete != nil },
                                                  set: { if !$0 { model.pendingDelete = nil } }),
@@ -83,46 +86,72 @@ struct ChatScreen: View {
         }
     }
 
-    private var branchesButton: some View {
-        CircleIconButton(symbol: "arrow.triangle.branch", label: "Ветки диалога: \(model.activeBranchName)") {
-            Keyboard.hide()
-            Haptics.tap()
-            showBranches = true
-        }
-    }
-
-    private var parametersButton: some View {
-        CircleIconButton(symbol: "slider.horizontal.3", label: "Настройки модели") {
-            Keyboard.hide()
-            Haptics.tap()
-            showParameters = true
-        }
-    }
-
+    /// Шапка как у Claude: слева меню, справа «Новый чат» и «⋯» в общей капсуле; названия чата нет.
     private var header: some View {
         HStack(spacing: 8) {
             CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: onMenu)
+            Spacer()
             if let chat = model.activeChat {
-                Text(chat.title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity)
-                if model.activeBranches.count > 1 {
-                    branchesButton
+                HStack(spacing: 0) {
+                    headerIcon("square.and.pencil", label: "Новый чат") {
+                        model.activeChatID = nil
+                    }
+                    Menu {
+                        Button {
+                            openParameters()
+                        } label: {
+                            Label("Настройки модели", systemImage: "slider.horizontal.3")
+                        }
+                        Button {
+                            Keyboard.hide()
+                            showBranches = true
+                        } label: {
+                            Label("Ветки диалога", systemImage: "arrow.triangle.branch")
+                        }
+                        Divider()
+                        ChatMenuItems(chat: chat, onRename: { renaming = chat }, onDelete: { deleting = chat })
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                            .frame(width: 44, height: 40)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Ещё")
+                    .accessibilityIdentifier("chat.more")
                 }
-                parametersButton
-                CircleIconButton(symbol: "square.and.pencil", label: "Новый чат") {
-                    model.activeChatID = nil
-                }
+                .padding(.horizontal, 2)
+                .background(Theme.fill, in: Capsule())
             } else {
-                Spacer()
-                parametersButton
+                CircleIconButton(symbol: "slider.horizontal.3", label: "Настройки модели") {
+                    openParameters()
+                }
             }
         }
         .padding(.horizontal, 12)
         .frame(height: 52)
         .background(Theme.canvas)
+    }
+
+    private func headerIcon(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Theme.ink)
+                .frame(width: 44, height: 40)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressScaleStyle())
+        .accessibilityLabel(label)
+    }
+
+    private func openParameters() {
+        Keyboard.hide()
+        Haptics.tap()
+        showParameters = true
     }
 
     private var welcome: some View {
@@ -159,6 +188,7 @@ struct ComposerBar: View {
     @State private var picked: [PhotosPickerItem] = []
     /// Черновик, отложенный на время правки старого сообщения.
     @State private var parkedDraft = ""
+    @State private var dictation = Dictation()
 
     private static let fileTypes: [UTType] = {
         var types: [UTType] = [.pdf, .png, .jpeg, .webP, .heic, .mpeg4Movie]
@@ -184,6 +214,9 @@ struct ComposerBar: View {
             if let error = model.sendError {
                 errorBanner(error)
             }
+            if let problem = dictation.problem {
+                errorBanner(problem) { dictation.problem = nil }
+            }
             ForEach(model.activeQueue) { item in
                 queuedRow(item)
             }
@@ -195,7 +228,7 @@ struct ComposerBar: View {
                     DraftAttachmentStrip()
                 }
 
-                TextField("", text: $text, prompt: Text("Сообщение").foregroundStyle(Theme.subtle), axis: .vertical)
+                TextField("", text: $text, prompt: Text(placeholder).foregroundStyle(Theme.subtle), axis: .vertical)
                     .lineLimit(1...8)
                     .font(.system(size: 17))
                     .foregroundStyle(Theme.ink)
@@ -220,6 +253,9 @@ struct ComposerBar: View {
                                 .transition(.scale.combined(with: .opacity))
                         }
                     } else {
+                        if model.editing == nil {
+                            micButton
+                        }
                         actionButton(symbol: model.editing == nil ? "arrow.up" : "checkmark",
                                      label: model.editing == nil ? "Отправить" : "Сохранить правку",
                                      active: canSend, action: submit)
@@ -230,9 +266,10 @@ struct ComposerBar: View {
                 }
             }
             .padding(10)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.line))
-            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Theme.line))
+            .shadow(color: .black.opacity(0.12), radius: 16, y: 4)
+            .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .onTapGesture { focused = true }
         }
         .padding(.horizontal, 12)
@@ -295,9 +332,9 @@ struct ComposerBar: View {
         }
     }
 
-    private func errorBanner(_ error: String) -> some View {
+    private func errorBanner(_ error: String, onClose: (() -> Void)? = nil) -> some View {
         Button {
-            model.sendError = nil
+            if let onClose { onClose() } else { model.sendError = nil }
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "exclamationmark.circle")
@@ -445,6 +482,30 @@ struct ComposerBar: View {
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
+    /// Подсказка в пустом поле, как у Claude: «Общайтесь с …» в новом чате, «Ответьте …» в начатом.
+    private var placeholder: String {
+        let name = model.activeModelName
+        return model.activeChatID == nil ? "Общайтесь с \(name)" : "Ответьте \(name)"
+    }
+
+    /// Уровень рассуждений рядом с названием модели: «Средний», «Рассуждения» или ничего.
+    private var reasoningLabel: String? {
+        let id = model.activeModelID
+        let config = model.modelConfig(id)
+        if PhoneModelID.isPhone(id) {
+            return (config["thinking"] as? Bool) == true ? "Рассуждения" : nil
+        }
+        switch ChatParameters.reasoning(id) {
+        case .toggle:
+            return (config["thinking"] as? Bool) ?? true ? "Рассуждения" : nil
+        case .levels(let levels):
+            let value = ChatConfig.text(config["reasoning_strength"]) ?? "high"
+            return levels.first { $0.value == value }?.label
+        case nil:
+            return nil
+        }
+    }
+
     private var modelButton: some View {
         Button {
             Keyboard.hide()
@@ -453,14 +514,17 @@ struct ComposerBar: View {
         } label: {
             HStack(spacing: 5) {
                 Text(model.activeModelName)
-                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Theme.ink.opacity(0.85))
                     .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
+                if let level = reasoningLabel {
+                    Text(level)
+                        .foregroundStyle(Theme.subtle)
+                        .lineLimit(1)
+                }
             }
-            .foregroundStyle(Theme.muted)
+            .font(.system(size: 14, weight: .medium))
             .padding(.horizontal, 12)
-            .frame(height: 36)
+            .frame(height: 34)
             .background(Theme.fill, in: Capsule())
             .frame(minHeight: 44)
             .contentShape(Rectangle())
@@ -468,6 +532,27 @@ struct ComposerBar: View {
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel("Модель: \(model.activeModelName)")
         .accessibilityHint("Выбрать модель")
+    }
+
+    /// Микрофон: диктовка в поле ввода (речь распознаёт iOS).
+    private var micButton: some View {
+        Button {
+            Task {
+                await dictation.toggle(current: text) { value in text = value }
+            }
+        } label: {
+            Image(systemName: dictation.active ? "waveform" : "mic")
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(dictation.active ? Theme.accent : Theme.muted)
+                .symbolEffect(.variableColor.iterative, isActive: dictation.active)
+                .frame(width: 36, height: 36)
+                .background(dictation.active ? Theme.accent.opacity(0.16) : Color.clear, in: Circle())
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressScaleStyle())
+        .accessibilityLabel(dictation.active ? "Остановить диктовку" : "Диктовка")
+        .accessibilityIdentifier("composer.mic")
     }
 
     private func actionButton(symbol: String, label: String, active: Bool, primary: Bool = true,
@@ -488,6 +573,7 @@ struct ComposerBar: View {
 
     private func submit() {
         guard canSend else { return }
+        dictation.stop()
         let message = text
         if model.activeLive != nil, model.editing == nil {
             // Модель ещё отвечает: вопрос уйдёт сразу после ответа.
@@ -550,7 +636,6 @@ private struct ContextDetails: View {
         .padding(16)
         .frame(width: 280, alignment: .leading)
         .background(Theme.surface)
-        .preferredColorScheme(.dark)
         .accessibilityIdentifier("context.details")
     }
 

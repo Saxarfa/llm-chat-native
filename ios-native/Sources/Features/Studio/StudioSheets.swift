@@ -25,7 +25,6 @@ struct StudioPanelSheet: View {
         .presentationDetents(detents)
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.canvas)
-        .preferredColorScheme(.dark)
     }
 }
 

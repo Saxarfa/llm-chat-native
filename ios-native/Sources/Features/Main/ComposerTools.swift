@@ -1,8 +1,9 @@
+import Photos
 import SwiftUI
 
-/// Меню «+» у поля ввода — как `ComposerTools.tsx` на сайте, но в виде шторки: сверху вложения
-/// плитками, ниже то, что меняет ответ. Поиск и базы знаний — для этого чата, рассуждения
-/// и память — для всех чатов с моделью.
+/// Меню «+» у поля ввода, как «Добавление в сессию» в приложении Claude: камера и лента
+/// последних фото, ниже — файлы и то, что меняет ответ. Поиск и базы знаний — для этого чата,
+/// рассуждения и память — для всех чатов с моделью.
 struct ComposerToolsSheet: View {
     enum Source {
         case camera, photo, file
@@ -17,44 +18,49 @@ struct ComposerToolsSheet: View {
         let id = model.activeModelID
         let onPhone = PhoneModelID.isPhone(id)
         let nano = ChatParameters.isNano(id)
-        let detents: Set<PresentationDetent> = onPhone ? [.height(250)] : nano ? [.height(150)] : [.fraction(0.66), .large]
+        let detents: Set<PresentationDetent> = onPhone ? [.height(420)] : nano ? [.height(330)] : [.fraction(0.72), .large]
 
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    tiles(onPhone: onPhone)
+                    PhotoStrip(enabled: !onPhone, onCamera: { pick(.camera) }, onLibrary: { pick(.photo) })
+                    if onPhone {
+                        SettingsNote(text: "Модель на телефоне понимает только текст.")
+                    }
+                    SettingsCard {
+                        ToolRow(title: "Добавить файлы", symbol: "doc.badge.plus", enabled: !onPhone) { pick(.file) }
+                            .accessibilityIdentifier("tools.file")
+                    }
                     if onPhone {
                         PhoneReasoning(modelID: id)
                     } else if !nano {
                         SettingsCard {
-                            SegmentRow(title: ChatParameters.usesGoogleSearch(id) ? "Google Search" : "Веб-поиск",
-                                       choices: ChatParameters.searchModes, selected: model.activeSearchMode) { value in
-                                Task { await model.setSearchMode(value) }
-                            }
-                            .accessibilityIdentifier("tools.search")
-                            if let reasoning = ChatParameters.reasoning(id) {
-                                CardDivider()
-                                ReasoningRow(modelID: id, reasoning: reasoning)
-                            }
+                            searchRow(id)
                             CardDivider()
+                            knowledgeRow
+                        }
+                        SettingsCard {
+                            if let reasoning = ChatParameters.reasoning(id) {
+                                ReasoningRow(modelID: id, reasoning: reasoning)
+                                CardDivider()
+                            }
                             ToggleRow(title: "Память",
                                       hint: model.memoryEnabled(id) ? "Модель помнит сохранённые факты о вас"
                                                                     : "Не читает и не меняет сохранённые факты",
                                       isOn: model.memoryEnabled(id)) { value in
                                 Task { await model.setModelValue("memoryEnabled", value, model: id) }
                             }
-                            CardDivider()
-                            knowledgeRow
                         }
                         SettingsNote(text: "Поиск и базы знаний — для этого чата. Рассуждения и память — для всех чатов с этой моделью.")
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 20)
+                .padding(.top, 4)
                 .padding(.bottom, 24)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .background(Theme.surface)
+            .background(Theme.sheet)
+            .safeAreaInset(edge: .top, spacing: 0) { header }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(isPresented: $knowledge) {
                 KnowledgeChoice()
@@ -63,51 +69,56 @@ struct ComposerToolsSheet: View {
         .accessibilityIdentifier("tools.sheet")
         .presentationDetents(detents)
         .presentationDragIndicator(.visible)
-        .presentationBackground(Theme.surface)
+        .presentationBackground(Theme.sheet)
         .presentationCornerRadius(28)
-        .preferredColorScheme(.dark)
         .settingsNotice()
     }
 
-    private func tiles(onPhone: Bool) -> some View {
-        HStack(spacing: 10) {
-            if UIImagePickerController.isSourceTypeAvailable(.camera) || model.preview != nil {
-                tile("Камера", symbol: "camera", source: .camera, enabled: !onPhone)
+    private var header: some View {
+        ZStack {
+            Text("Добавление в чат")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+            HStack {
+                CircleIconButton(symbol: "xmark", label: "Закрыть") { dismiss() }
+                Spacer()
+                Button("Фото") { pick(.photo) }
+                    .font(.system(size: 17))
+                    .foregroundStyle(Theme.ink)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .disabled(PhoneModelID.isPhone(model.activeModelID))
+                    .accessibilityIdentifier("tools.photo")
             }
-            tile("Фото", symbol: "photo.on.rectangle", source: .photo, enabled: !onPhone)
-            tile("Файл", symbol: "doc", source: .file, enabled: !onPhone)
         }
-        .overlay(alignment: .bottom) {
-            if onPhone {
-                Text("Модель на телефоне понимает только текст")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.subtle)
-                    .offset(y: 24)
-            }
-        }
-        .padding(.bottom, onPhone ? 24 : 0)
+        .padding(.horizontal, 12)
+        .padding(.top, 14)
+        .padding(.bottom, 8)
+        .background(Theme.sheet)
     }
 
-    private func tile(_ title: String, symbol: String, source: Source, enabled: Bool) -> some View {
-        Button {
-            Haptics.tap()
-            onPick(source)
-            dismiss()
-        } label: {
-            VStack(spacing: 6) {
-                Image(systemName: symbol)
-                    .font(.system(size: 20, weight: .regular))
-                Text(title)
-                    .font(.system(size: 14))
+    private func pick(_ source: Source) {
+        Haptics.tap()
+        onPick(source)
+        dismiss()
+    }
+
+    /// «Веб-поиск» — значение справа, выбор из меню.
+    private func searchRow(_ id: String) -> some View {
+        let title = ChatParameters.usesGoogleSearch(id) ? "Google Search" : "Веб-поиск"
+        let current = ChatParameters.searchModes.first { $0.value == model.activeSearchMode }?.label ?? "Авто"
+        return Menu {
+            Picker(title, selection: Binding(get: { model.activeSearchMode }, set: { value in
+                Haptics.tap()
+                Task { await model.setSearchMode(value) }
+            })) {
+                ForEach(ChatParameters.searchModes) { choice in
+                    Text(choice.label).tag(choice.value)
+                }
             }
-            .foregroundStyle(enabled ? Theme.ink : Theme.subtle)
-            .frame(maxWidth: .infinity, minHeight: 76)
-            .background(Theme.fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        } label: {
+            ToolRowLabel(title: title, symbol: "globe", value: current, chevron: "chevron.up.chevron.down")
         }
-        .buttonStyle(PressScaleStyle())
-        .disabled(!enabled)
-        .accessibilityIdentifier("tools.\(source)")
+        .accessibilityIdentifier("tools.search")
     }
 
     private var knowledgeRow: some View {
@@ -118,24 +129,212 @@ struct ComposerToolsSheet: View {
             Haptics.tap()
             knowledge = true
         } label: {
-            HStack(spacing: 12) {
-                Text("Базы знаний")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Theme.ink)
-                Spacer(minLength: 8)
-                Text(value)
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.muted)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.subtle)
-            }
-            .padding(.horizontal, 16)
-            .frame(minHeight: 52)
-            .contentShape(Rectangle())
+            ToolRowLabel(title: "Базы знаний", symbol: "books.vertical", value: value)
         }
         .buttonStyle(RowPressStyle())
         .accessibilityIdentifier("tools.knowledge")
+    }
+}
+
+/// Строка меню: значок, название, справа значение и стрелка.
+struct ToolRowLabel: View {
+    let title: String
+    let symbol: String
+    var value: String?
+    var chevron: String? = "chevron.right"
+    var enabled = true
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 17))
+                .foregroundStyle(enabled ? Theme.ink : Theme.subtle)
+                .frame(width: 24)
+            Text(title)
+                .font(.system(size: 17))
+                .foregroundStyle(enabled ? Theme.ink : Theme.subtle)
+            Spacer(minLength: 8)
+            if let value {
+                Text(value)
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.subtle)
+                    .lineLimit(1)
+            }
+            if let chevron {
+                Image(systemName: chevron)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.subtle)
+            }
+        }
+        .padding(.horizontal, 16)
+        .frame(minHeight: 54)
+        .contentShape(Rectangle())
+    }
+}
+
+/// Строка-действие без значения справа.
+struct ToolRow: View {
+    let title: String
+    let symbol: String
+    var enabled = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ToolRowLabel(title: title, symbol: symbol, chevron: nil, enabled: enabled)
+        }
+        .buttonStyle(RowPressStyle())
+        .disabled(!enabled)
+    }
+}
+
+/// Плитка «Камера» и лента последних снимков из «Фото»: нажатие сразу прикрепляет снимок
+/// (отмечается галочкой). Без доступа к «Фото» — плитка, открывающая системный выбор.
+private struct PhotoStrip: View {
+    @Environment(AppModel.self) private var model
+    let enabled: Bool
+    let onCamera: () -> Void
+    let onLibrary: () -> Void
+    @State private var assets: [PHAsset] = []
+    @State private var thumbs: [String: UIImage] = [:]
+    @State private var added: Set<String> = []
+    @State private var allowed = true
+    @State private var loading: String?
+
+    private static let side: CGFloat = 108
+    private static let manager = PHCachingImageManager()
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                if UIImagePickerController.isSourceTypeAvailable(.camera) || model.preview != nil {
+                    tile("Камера", symbol: "camera", action: onCamera)
+                        .accessibilityIdentifier("tools.camera")
+                }
+                if !allowed || (assets.isEmpty && thumbs.isEmpty) {
+                    tile("Фото", symbol: "photo.on.rectangle", action: onLibrary)
+                }
+                if model.preview != nil {
+                    ForEach(Array(thumbs.keys.sorted()), id: \.self) { key in
+                        thumb(key: key, image: thumbs[key]) {}
+                    }
+                } else {
+                    ForEach(assets, id: \.localIdentifier) { asset in
+                        thumb(key: asset.localIdentifier, image: thumbs[asset.localIdentifier]) { add(asset) }
+                            .task { load(asset) }
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .padding(.horizontal, -16)
+        .modifier(DrawerFreeZone())
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.45)
+        .task { await fetch() }
+        .accessibilityIdentifier("tools.strip")
+    }
+
+    private func tile(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: symbol)
+                    .font(.system(size: 20))
+                Text(title)
+                    .font(.system(size: 15))
+            }
+            .foregroundStyle(Theme.ink)
+            .frame(width: Self.side, height: Self.side)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(PressScaleStyle())
+    }
+
+    private func thumb(key: String, image: UIImage?, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            ZStack(alignment: .topTrailing) {
+                Group {
+                    if let image {
+                        Image(uiImage: image).resizable().scaledToFill()
+                    } else {
+                        Theme.card
+                    }
+                }
+                .frame(width: Self.side, height: Self.side)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                if added.contains(key) || loading == key {
+                    Group {
+                        if loading == key {
+                            ProgressView().controlSize(.small).tint(.white)
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 22))
+                                .foregroundStyle(.white, Theme.accent)
+                        }
+                    }
+                    .padding(8)
+                }
+            }
+        }
+        .buttonStyle(PressScaleStyle())
+        .disabled(added.contains(key) || loading != nil)
+        .accessibilityLabel("Прикрепить фото")
+    }
+
+    private func fetch() async {
+        if model.preview != nil {
+            thumbs = PreviewScene.stripThumbs
+            return
+        }
+        var status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        if status == .notDetermined {
+            status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        }
+        allowed = status == .authorized || status == .limited
+        guard allowed else { return }
+        let options = PHFetchOptions()
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        options.fetchLimit = 24
+        let result = PHAsset.fetchAssets(with: .image, options: options)
+        var list: [PHAsset] = []
+        result.enumerateObjects { asset, _, _ in list.append(asset) }
+        assets = list
+    }
+
+    private func load(_ asset: PHAsset) {
+        guard thumbs[asset.localIdentifier] == nil else { return }
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .opportunistic
+        options.isNetworkAccessAllowed = true
+        let size = CGSize(width: Self.side * 3, height: Self.side * 3)
+        Self.manager.requestImage(for: asset, targetSize: size, contentMode: .aspectFill, options: options) { image, _ in
+            guard let image else { return }
+            DispatchQueue.main.async { thumbs[asset.localIdentifier] = image }
+        }
+    }
+
+    private func add(_ asset: PHAsset) {
+        Haptics.tap()
+        let key = asset.localIdentifier
+        loading = key
+        let options = PHImageRequestOptions()
+        options.isNetworkAccessAllowed = true
+        options.deliveryMode = .highQualityFormat
+        PHImageManager.default().requestImageDataAndOrientation(for: asset, options: options) { data, _, _, _ in
+            DispatchQueue.main.async {
+                guard let data else {
+                    loading = nil
+                    model.sendError = "Не удалось загрузить фото из галереи."
+                    return
+                }
+                Task {
+                    await model.addPhotoData(data)
+                    loading = nil
+                    added.insert(key)
+                }
+            }
+        }
     }
 }
 
@@ -220,7 +419,7 @@ private struct KnowledgeChoice: View {
                 .padding(.bottom, 24)
             }
         }
-        .background(Theme.surface)
+        .background(Theme.sheet)
         .toolbar(.hidden, for: .navigationBar)
     }
 }

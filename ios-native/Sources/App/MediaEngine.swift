@@ -21,6 +21,14 @@ extension AppModel {
         }
     }
 
+    /// Снимок из ленты последних фото в меню «+».
+    func addPhotoData(_ data: Data) async {
+        guard hasRoomForAttachment() else { return }
+        attachmentsBusy = true
+        defer { attachmentsBusy = false }
+        await addPrepared { try AttachmentPrep.image(data: data, name: "Фото") }
+    }
+
     /// Снимок с камеры.
     func addCamera(_ image: UIImage) async {
         guard hasRoomForAttachment() else { return }

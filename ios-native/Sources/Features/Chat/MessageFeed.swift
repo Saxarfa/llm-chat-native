@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 import UIKit
 
@@ -70,6 +71,11 @@ struct MessageFeed: View {
                                 }
                                 if let live {
                                     LiveAnswerView(live: live)
+                                } else if let last = model.thread.last, !last.isUser {
+                                    Text("\(last.model.isEmpty ? "Модель" : ChatConfig.modelName(last.model, profiles: model.settings.modelProfiles)) — это ИИ, который может ошибаться.")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Theme.subtle)
+                                        .padding(.top, -10)
                                 }
                                 Color.clear
                                     .frame(height: 1)
@@ -227,7 +233,7 @@ private struct UserMessageView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 11)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(Theme.fillActive, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                     .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .contextMenu {
                         Button {
@@ -278,19 +284,21 @@ private struct AssistantMessageView: View {
                 ArtView(art: art)
             }
             if !message.text.isEmpty || !message.arts.isEmpty {
-                HStack(spacing: 4) {
+                // Как под ответом у Claude: скопировать, поделиться, прочитать вслух, ответить заново.
+                HStack(spacing: 0) {
                     if !message.text.isEmpty {
                         CopyButton(text: message.text, label: "Скопировать ответ")
+                        ShareLink(item: message.text) {
+                            AnswerIcon(symbol: "square.and.arrow.up")
+                        }
+                        .accessibilityLabel("Поделиться")
+                        ReadAloudButton(id: message.id, text: message.text)
                     }
                     if canRegenerate {
                         Button {
                             Task { await model.regenerate(message) }
                         } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(Theme.muted)
-                                .frame(width: 44, height: 40)
-                                .contentShape(Rectangle())
+                            AnswerIcon(symbol: "arrow.clockwise")
                         }
                         .buttonStyle(PressScaleStyle())
                         .disabled(model.branchBusy)
@@ -302,18 +310,93 @@ private struct AssistantMessageView: View {
                     if canRegenerate {
                         AnswerMoreMenu(message: message)
                     }
-                    if !message.model.isEmpty {
-                        Text(ChatConfig.modelName(message.model, profiles: model.settings.modelProfiles))
-                            .font(.system(size: 13))
-                            .foregroundStyle(Theme.subtle)
-                            .lineLimit(1)
-                    }
                 }
                 .padding(.leading, -13)
                 .padding(.top, -6)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Значок в ряду под ответом.
+private struct AnswerIcon: View {
+    let symbol: String
+    var active = false
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 15, weight: .regular))
+            .foregroundStyle(active ? Theme.accent : Theme.muted)
+            .frame(width: 42, height: 40)
+            .contentShape(Rectangle())
+    }
+}
+
+/// «Прочитать вслух»: голос iOS; повторное нажатие — стоп.
+private struct ReadAloudButton: View {
+    let id: String
+    let text: String
+    var body: some View {
+        let reader = ReadAloud.shared
+        let speaking = reader.speakingID == id
+        Button {
+            Haptics.tap()
+            reader.toggle(id: id, text: text)
+        } label: {
+            AnswerIcon(symbol: speaking ? "stop.circle" : "play", active: speaking)
+        }
+        .buttonStyle(PressScaleStyle())
+        .accessibilityLabel(speaking ? "Остановить чтение" : "Прочитать вслух")
+    }
+}
+
+/// Чтение ответа вслух. Одно на приложение: новый ответ останавливает предыдущий.
+@MainActor
+@Observable
+final class ReadAloud: NSObject, AVSpeechSynthesizerDelegate {
+    static let shared = ReadAloud()
+
+    private(set) var speakingID: String?
+    @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
+
+    override init() {
+        super.init()
+        synthesizer.delegate = self
+    }
+
+    func toggle(id: String, text: String) {
+        let same = speakingID == id
+        synthesizer.stopSpeaking(at: .immediate)
+        speakingID = nil
+        guard !same else { return }
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        let utterance = AVSpeechUtterance(string: Self.plain(text))
+        utterance.voice = AVSpeechSynthesisVoice(language: "ru-RU")
+        speakingID = id
+        synthesizer.speak(utterance)
+    }
+
+    /// Без разметки Markdown: голос не должен читать звёздочки и решётки.
+    nonisolated static func plain(_ text: String) -> String {
+        var result = text
+        for mark in ["```", "**", "__", "`", "#", "*", ">", "|"] {
+            result = result.replacingOccurrences(of: mark, with: mark == "|" ? ", " : "")
+        }
+        return result
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        Task { @MainActor in self.finished() }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        Task { @MainActor in self.finished() }
+    }
+
+    private func finished() {
+        if !synthesizer.isSpeaking { speakingID = nil }
     }
 }
 
@@ -358,6 +441,9 @@ private struct AnswerMoreMenu: View {
 
     var body: some View {
         Menu {
+            if !message.model.isEmpty {
+                Text("Ответила: " + ChatConfig.modelName(message.model, profiles: model.settings.modelProfiles))
+            }
             Button {
                 Task { await model.forkBranch(at: message) }
             } label: {
@@ -369,11 +455,7 @@ private struct AnswerMoreMenu: View {
                 Label("Удалить ответ", systemImage: "trash")
             }
         } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Theme.muted)
-                .frame(width: 44, height: 40)
-                .contentShape(Rectangle())
+            AnswerIcon(symbol: "ellipsis")
         }
         .disabled(model.branchBusy)
         .accessibilityLabel("Ещё действия с ответом")

@@ -254,7 +254,7 @@ private struct ProgressBar: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.12))
+                Capsule().fill(Theme.fillActive)
                 if let value {
                     Capsule().fill(Theme.ink)
                         .frame(width: max(6, geo.size.width * value))

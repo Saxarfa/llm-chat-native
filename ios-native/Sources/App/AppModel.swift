@@ -3,7 +3,7 @@ import Observation
 
 /// Состояние приложения: адрес ПК, вход, список диалогов.
 enum MainScreen: Equatable {
-    case chat, studio
+    case chat, studio, recents
 }
 
 @MainActor
@@ -90,6 +90,22 @@ final class AppModel {
     var knowledgeLibraries: [KnowledgeLibrary] = []
     /// Что открыто справа от шторки: чат или студия картинок.
     var screen: MainScreen = .chat
+    /// Экран «Недавние» открыт кнопкой поиска в шторке: сразу ставим курсор в поиск.
+    var focusRecentsSearch = false
+    /// Тема (Настройки → Внешний вид). В режиме снимков не сохраняется.
+    var appearance: Appearance = .dark {
+        didSet {
+            guard preview == nil else { return }
+            UserDefaults.standard.set(appearance.rawValue, forKey: Appearance.key)
+        }
+    }
+    /// Тактильный отклик (Настройки → Приложение).
+    var haptics = true {
+        didSet {
+            guard preview == nil else { return }
+            UserDefaults.standard.set(haptics, forKey: Haptics.key)
+        }
+    }
     /// Студия картинок; своё наблюдаемое состояние.
     @ObservationIgnored let studio = StudioModel()
     /// Модели на самом iPhone (этап 8); своё наблюдаемое состояние.
@@ -136,6 +152,8 @@ final class AppModel {
         store = PhoneStore(folder: preview == nil ? PhoneStore.defaultFolder : nil)
         studio.app = self
         phone.app = self
+        appearance = preview?.appearance ?? Appearance.saved
+        haptics = preview == nil ? Haptics.enabled : true
     }
 
     /// Модели для выбора: с ПК и с самого телефона.
@@ -310,7 +328,8 @@ final class AppModel {
             phase = .ready
         case .chat, .sidebar, .thread, .threadTop, .streaming, .models, .media, .parameters, .nano, .settings,
              .branches, .memory, .knowledge, .omni, .studio, .studioSettings, .studioHistory, .studioArt,
-             .phoneModels, .phoneChat, .phoneSettings, .phoneParameters, .tools, .queue:
+             .phoneModels, .phoneChat, .phoneSettings, .phoneParameters, .tools, .queue,
+             .recents, .light, .settingsLight, .computer, .modelProfile:
             user = PreviewScene.user
             chats = PreviewScene.chats
             models = PreviewScene.modelOptions
@@ -334,7 +353,8 @@ final class AppModel {
                 threadChatID = "3"
                 draftAttachments = PreviewScene.mediaDraft()
             }
-            if [.thread, .threadTop, .streaming, .tools, .queue].contains(scene) {
+            if scene == .recents { screen = .recents }
+            if [.thread, .threadTop, .streaming, .tools, .queue, .light].contains(scene) {
                 activeChatID = "7"
                 thread = scene == .streaming || scene == .queue ? Array(PreviewScene.feed.prefix(3)) : PreviewScene.feed
                 threadState = .loaded
@@ -347,7 +367,7 @@ final class AppModel {
             if scene == .queue {
                 queued["7"] = [QueuedMessage(text: "А что взять из еды на два дня?", attachments: [])]
             }
-            if scene == .tools || scene == .thread {
+            if scene == .tools || scene == .thread || scene == .light {
                 contextUsage["7"] = ContextUsage(used: 9_840, capacity: 32_768, estimated: false)
             }
             if scene == .queue {

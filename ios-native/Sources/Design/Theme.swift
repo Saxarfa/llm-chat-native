@@ -1,26 +1,84 @@
 import SwiftUI
 import UIKit
 
-/// Цвета классической тёмной темы сайта (`frontend/src/theme.css`, тёмные значения по умолчанию).
+/// Цвета приложения: тёмные — классическая тёмная тема сайта, светлые — светлая (`frontend/src/theme.css`).
+/// Каждый цвет сам меняется вместе с темой (светлая, тёмная или как в системе — см. `Appearance`).
 enum Theme {
-    static let canvas = Color(hex: 0x151515)
-    static let surface = Color(hex: 0x20201F)
-    static let rail = Color(hex: 0x111111)
-    static let ink = Color(hex: 0xE8E6DF)
-    static let muted = Color(hex: 0xA3A29A)
-    static let subtle = Color(hex: 0x7D7C76)
-    static let line = Color.white.opacity(0.075)
-    static let fill = Color.white.opacity(0.06)
-    static let fillActive = Color.white.opacity(0.11)
-    static let buttonPrimary = Color(hex: 0xD6D4C9)
-    static let buttonPrimaryText = Color(hex: 0x151513)
-    static let danger = Color(hex: 0xD5968A)
+    static let canvas = dynamic(dark: 0x151515, light: 0xF7F5F0)
+    static let surface = dynamic(dark: 0x20201F, light: 0xFFFDF8)
+    static let rail = dynamic(dark: 0x111111, light: 0xEEEBE3)
+    static let ink = dynamic(dark: 0xE8E6DF, light: 0x302E28)
+    static let muted = dynamic(dark: 0xA3A29A, light: 0x686256)
+    static let subtle = dynamic(dark: 0x7D7C76, light: 0x857D6E)
+    static let line = dynamic(UIColor.white.withAlphaComponent(0.075), UIColor(hex: 0x514832, alpha: 0.11))
+    static let fill = dynamic(UIColor.white.withAlphaComponent(0.06), UIColor(hex: 0x514832, alpha: 0.06))
+    static let fillActive = dynamic(UIColor.white.withAlphaComponent(0.11), UIColor(hex: 0x514832, alpha: 0.11))
+    static let buttonPrimary = dynamic(dark: 0xF2F0EA, light: 0x34382F)
+    static let buttonPrimaryText = dynamic(dark: 0x151513, light: 0xFFFDF7)
+    static let danger = dynamic(dark: 0xD5968A, light: 0xB4513F)
+    /// Синий акцент, как в настройках iOS: переключатели, галочки выбора, выбранная плитка.
+    static let accent = dynamic(dark: 0x4A8DF0, light: 0x2F6FDB)
+    /// Поднятая карточка в шторках (группы строк в настройках, меню «+»).
+    static let card = dynamic(dark: 0x2A2A28, light: 0xFFFFFF)
+    /// Подложка шторок: в тёмной теме как карточка в настройках Claude, в светлой — тёплый серый.
+    static let sheet = dynamic(dark: 0x1C1C1B, light: 0xF2F0EA)
+
+    private static func dynamic(dark: UInt32, light: UInt32) -> Color {
+        dynamic(UIColor(hex: dark), UIColor(hex: light))
+    }
+
+    private static func dynamic(_ dark: UIColor, _ light: UIColor) -> Color {
+        Color(uiColor: UIColor { $0.userInterfaceStyle == .light ? light : dark })
+    }
 
     static let spring = Animation.spring(response: 0.36, dampingFraction: 0.86)
 
     /// Засечки — только для логотипа и приветствия.
     static func display(_ size: CGFloat) -> Font {
         .system(size: size, weight: .regular, design: .serif)
+    }
+}
+
+extension UIColor {
+    convenience init(hex: UInt32, alpha: CGFloat = 1) {
+        self.init(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+                  blue: CGFloat(hex & 0xFF) / 255, alpha: alpha)
+    }
+}
+
+/// Тема приложения: выбирается в «Настройки → Внешний вид», хранится на телефоне.
+enum Appearance: String, CaseIterable {
+    case light, dark, system
+
+    static let key = "appearance"
+
+    var title: String {
+        switch self {
+        case .light: return "Светлая"
+        case .dark: return "Тёмная"
+        case .system: return "Системная"
+        }
+    }
+
+    var style: UIUserInterfaceStyle {
+        switch self {
+        case .light: return .light
+        case .dark: return .dark
+        case .system: return .unspecified
+        }
+    }
+
+    static var saved: Appearance {
+        Appearance(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .dark
+    }
+
+    /// Тема всего окна — вместе с ним и все шторки поверх.
+    @MainActor
+    func apply() {
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windows = (scene as? UIWindowScene)?.windows else { continue }
+            for window in windows { window.overrideUserInterfaceStyle = style }
+        }
     }
 }
 
@@ -37,21 +95,44 @@ extension Color {
 }
 
 enum Haptics {
+    static let key = "haptics"
+
+    /// «Настройки → Тактильный отклик».
+    static var enabled: Bool {
+        UserDefaults.standard.object(forKey: key) as? Bool ?? true
+    }
+
     static func tap() {
+        guard enabled else { return }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     static func success() {
+        guard enabled else { return }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     static func error() {
+        guard enabled else { return }
         UINotificationFeedbackGenerator().notificationOccurred(.error)
     }
 
     /// Лёгкий щелчок шага ползунка.
     static func selection() {
+        guard enabled else { return }
         UISelectionFeedbackGenerator().selectionChanged()
+    }
+}
+
+/// Свайп от левого края возвращает назад и там, где вместо системной кнопки «Назад» — своя круглая.
+extension UINavigationController: UIGestureRecognizerDelegate {
+    override open func viewDidLoad() {
+        super.viewDidLoad()
+        interactivePopGestureRecognizer?.delegate = self
+    }
+
+    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        viewControllers.count > 1
     }
 }
 

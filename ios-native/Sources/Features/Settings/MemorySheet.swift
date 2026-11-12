@@ -3,6 +3,8 @@ import SwiftUI
 /// «Память» — факты о пользователе, которые модель видит во всех чатах (`user_memory.py`).
 struct MemorySheet: View {
     @Environment(AppModel.self) private var model
+    /// Открыта разделом внутри настроек: заголовок даёт сама навигация.
+    var embedded = false
     @State private var snapshot: MemorySnapshot?
     @State private var failure: String?
     @State private var notice: String?
@@ -15,7 +17,9 @@ struct MemorySheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SheetHeader(title: "Память", subtitle: snapshot.map { factCount($0.facts.count) }, busy: busy)
+            if !embedded {
+                SheetHeader(title: "Память", subtitle: snapshot.map { factCount($0.facts.count) }, busy: busy)
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     if let snapshot {
@@ -37,9 +41,8 @@ struct MemorySheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Theme.surface)
+        .presentationBackground(Theme.sheet)
         .presentationCornerRadius(28)
-        .preferredColorScheme(.dark)
         .task(id: model.memoryRevision) { await load() }
         .alert("Изменить факт", isPresented: Binding(get: { editing != nil }, set: { if !$0 { editing = nil } })) {
             TextField("Факт", text: $editText, axis: .vertical)
