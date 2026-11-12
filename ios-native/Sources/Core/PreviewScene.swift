@@ -26,16 +26,7 @@ enum PreviewScene: String, CaseIterable {
         let messages: [[String: Any]] = [
             ["id": "user_1", "role": "user", "content": "Составь список вещей в поход на два дня", "timestamp": 1_700_000_100_000],
             ["id": "asst_1", "role": "assistant", "model": model, "timestamp": 1_700_000_160_000,
-             "content": "**Основное:**
-- рюкзак 40–50 л
-- палатка и спальник
-- коврик
-
-**Еда и вода:**
-- 2 л воды и фильтр
-- горелка, газ, котелок
-
-**Одежда:** термобельё, флис, дождевик."],
+             "content": "**Основное:**\n- рюкзак 40–50 л\n- палатка и спальник\n- коврик\n\n**Еда и вода:**\n- 2 л воды и фильтр\n- горелка, газ, котелок\n\n**Одежда:** термобельё, флис, дождевик."],
         ]
         return [
             LocalChat(id: "local_1", title: "Список вещей в поход", model: model, messages: messages, overrides: [:],
