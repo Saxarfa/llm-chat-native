@@ -9,6 +9,10 @@ struct MainView: View {
     @State private var isOpen: Bool
     @State private var dragX: CGFloat = 0
     @State private var axis: DragAxis?
+    /// Сразу после свайпа нажатия в меню не принимаются — палец ещё «едет».
+    @State private var settling = false
+    /// Сбрасывается сам, даже если жест отменила система (например, перехватила прокрутка).
+    @GestureState private var dragging = false
 
     init(startOpen: Bool = false) {
         _isOpen = State(initialValue: startOpen)
@@ -27,7 +31,8 @@ struct MainView: View {
                     .frame(width: width)
                     .offset(x: (progress - 1) * width * 0.22)
                     .opacity(0.35 + 0.65 * progress)
-                    .allowsHitTesting(isOpen)
+                    .allowsHitTesting(isOpen && !swiping)
+                    .scrollDisabled(swiping)
                     .accessibilityHidden(!isOpen)
 
                 Group {
@@ -38,6 +43,8 @@ struct MainView: View {
                     }
                 }
                     .frame(width: geo.size.width)
+                    // Пока меню тянут вбок, лента не листается вверх-вниз.
+                    .scrollDisabled(swiping)
                     .background(Theme.canvas.ignoresSafeArea())
                     .overlay {
                         Color.black.opacity(0.45 * progress)
@@ -49,7 +56,24 @@ struct MainView: View {
                     .accessibilityHidden(isOpen)
             }
             .simultaneousGesture(drag(width: width))
+            .onChange(of: dragging) { _, active in
+                guard !active else { return }
+                // Жест отменён без onEnded — возвращаем меню на место.
+                DispatchQueue.main.async {
+                    if axis != nil {
+                        axis = nil
+                        setOpen(isOpen)
+                    }
+                }
+            }
         }
+    }
+
+    private var swiping: Bool { axis == .horizontal || settling }
+
+    private func settle() {
+        settling = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { settling = false }
     }
 
     private func setOpen(_ open: Bool) {
@@ -67,6 +91,7 @@ struct MainView: View {
     /// Жест принимается только если начался горизонтально — вертикальный скролл не перехватывается.
     private func drag(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 14, coordinateSpace: .global)
+            .updating($dragging) { _, state, _ in state = true }
             .onChanged { value in
                 if axis == nil {
                     // Палец листает код, таблицу или ленту студии — закрытое меню не трогаем.
@@ -84,6 +109,7 @@ struct MainView: View {
                 let wasHorizontal = axis == .horizontal
                 axis = nil
                 guard wasHorizontal else { return }
+                settle()
                 let projected = (isOpen ? width : 0) + value.predictedEndTranslation.width
                 setOpen(projected > width / 2)
             }

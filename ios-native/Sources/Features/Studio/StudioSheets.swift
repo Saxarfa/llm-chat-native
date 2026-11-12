@@ -695,7 +695,7 @@ private struct StudioDetailsPanel: View {
                                 .frame(maxWidth: .infinity, minHeight: 50)
                         }
                         .disabled(studio.deleting)
-                        SettingsNote(text: "Увеличение и оживление в видео появятся в следующем обновлении.")
+                        SettingsNote(text: "Увеличение и правка арта появятся позже.")
                     }
                     .padding(.horizontal, 16)
                 }

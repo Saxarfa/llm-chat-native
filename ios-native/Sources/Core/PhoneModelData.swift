@@ -194,3 +194,75 @@ struct PhoneSampling: Equatable {
         stop = ((config["stop"] as? [Any]) ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty }
     }
 }
+
+/// Промпт для моделей, чей шаблон llama.cpp без Jinja не знает.
+/// Gemma 4: `<|turn>роль\n…<turn|>\n`, ответ модели — роль `model` (сверено с шаблоном из её GGUF).
+enum PhoneChatFormat {
+    static func render(template: String?, messages: [(role: String, content: String)]) -> String? {
+        guard let template, template.contains("<|turn>") else { return nil }
+        var rest = messages[...]
+        var out = ""
+        if let first = rest.first, first.role == "system" {
+            out += "<|turn>system\n\(first.content.trimmingCharacters(in: .whitespacesAndNewlines))<turn|>\n"
+            rest = rest.dropFirst()
+        }
+        for message in rest {
+            let role = message.role == "assistant" ? "model" : message.role
+            out += "<|turn>\(role)\n\(message.content.trimmingCharacters(in: .whitespacesAndNewlines))<turn|>\n"
+        }
+        return out + "<|turn>model\n"
+    }
+
+    /// Метки границ реплик у распространённых шаблонов: если модель их пишет, ответ закончен.
+    static let turnMarkers = ["<|im_end|>", "<|im_start|>", "<end_of_turn>", "<start_of_turn>",
+                              "<turn|>", "<|turn>", "<|eot_id|>", "<|start_header_id|>",
+                              "<|end|>", "<|endoftext|>", "</s>"]
+
+    /// Старый ответ без хвоста, где модель продолжала писать за собеседника (до 0.8.1).
+    static func clean(_ text: String) -> String {
+        guard let cut = turnMarkers.compactMap({ text.range(of: $0)?.lowerBound }).min() else { return text }
+        return String(text[..<cut])
+    }
+}
+
+/// Ищет стоп-строки в потоке кусков: придерживает хвост, который может оказаться началом
+/// стоп-строки, чтобы её части не успели попасть на экран.
+struct StopScanner {
+    let stops: [String]
+    private var held = ""
+    private(set) var stopped = false
+
+    init(stops: [String]) {
+        self.stops = stops.filter { !$0.isEmpty }
+    }
+
+    /// Возвращает текст, который уже можно показать.
+    mutating func feed(_ text: String) -> String {
+        guard !stopped else { return "" }
+        held += text
+        if let cut = stops.compactMap({ held.range(of: $0)?.lowerBound }).min() {
+            stopped = true
+            let out = String(held[..<cut])
+            held = ""
+            return out
+        }
+        // Самый длинный хвост, совпадающий с началом какой-нибудь стоп-строки, придерживаем.
+        var keep = 0
+        for stop in stops {
+            var length = min(stop.count - 1, held.count)
+            while length > keep {
+                if stop.hasPrefix(held.suffix(length)) { keep = length; break }
+                length -= 1
+            }
+        }
+        let out = String(held.dropLast(keep))
+        held = String(held.suffix(keep))
+        return out
+    }
+
+    /// Остаток в конце ответа.
+    mutating func flush() -> String {
+        defer { held = "" }
+        return stopped ? "" : held
+    }
+}

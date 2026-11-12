@@ -69,7 +69,7 @@ extension AppModel {
             guard let role = message["role"] as? String, role == "user" || role == "assistant",
                   let content = message["content"] as? String,
                   !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
-            prompt.append((role: role, content: content))
+            prompt.append((role: role, content: role == "assistant" ? PhoneChatFormat.clean(content) : content))
         }
 
         phone.generating = true

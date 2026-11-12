@@ -189,29 +189,34 @@ final class LlamaRunner: @unchecked Sendable {
         let started = Date()
         let limit = sampling.maxTokens > 0 ? sampling.maxTokens : contextSize - tokens.count
         var pending: [UInt8] = []
-        var produced = ""
+        // Стоп-строки из параметров и метки конца реплики: модель, начавшая писать
+        // `<|im_end|>` или следующую реплику пользователя, свой ответ уже закончила.
+        var scanner = StopScanner(stops: sampling.stop + PhoneChatFormat.turnMarkers)
         var used = tokens.count
         while result.tokens < limit, used < contextSize {
             if isCancelled { break }
             var token = llama_sampler_sample(sampler, context, -1)
             if llama_vocab_is_eog(vocab, token) { break }
+            // Служебный токен границы реплики, который llama.cpp не считает концом.
+            let special = String(decoding: piece(token, special: true), as: UTF8.self)
+            if PhoneChatFormat.turnMarkers.contains(special) { break }
             result.tokens += 1
             pending += piece(token)
-            if let text = String(bytes: pending, encoding: .utf8) {
+            var text: String?
+            if let decoded = String(bytes: pending, encoding: .utf8) {
+                text = decoded
+            } else if pending.count > 8 {
+                // Не UTF-8 даже после нескольких токенов — показываем как есть.
+                text = String(decoding: pending, as: UTF8.self)
+            }
+            if let text {
                 pending = []
-                produced += text
-                if let stop = sampling.stop.first(where: { produced.hasSuffix($0) }) {
-                    // Стоп-строку не показываем: отдаём только то, что было до неё.
-                    let keep = String(text.dropLast(min(text.count, stop.count)))
-                    if !keep.isEmpty { emit(keep) }
+                let visible = scanner.feed(text)
+                if !visible.isEmpty { emit(visible) }
+                if scanner.stopped {
                     result.seconds = Date().timeIntervalSince(started)
                     return result
                 }
-                emit(text)
-            } else if pending.count > 8 {
-                // Не UTF-8 даже после нескольких токенов — показываем как есть.
-                emit(String(decoding: pending, as: UTF8.self))
-                pending = []
             }
             let status = llama_decode(context, llama_batch_get_one(&token, 1))
             guard status == 0 else {
@@ -220,6 +225,8 @@ final class LlamaRunner: @unchecked Sendable {
             }
             used += 1
         }
+        let rest = scanner.flush()
+        if !rest.isEmpty { emit(rest) }
         result.stoppedByLimit = result.tokens >= limit || used >= contextSize
         result.seconds = Date().timeIntervalSince(started)
         return result
@@ -246,8 +253,10 @@ final class LlamaRunner: @unchecked Sendable {
 
     // MARK: - Текст и токены
 
-    /// Промпт по шаблону чата из самой модели; незнакомый шаблон — ChatML.
+    /// Промпт по шаблону чата из самой модели (Gemma 4 — своим кодом, её шаблон только Jinja);
+    /// незнакомый шаблон — ChatML.
     private func prompt(_ messages: [(role: String, content: String)]) -> String {
+        if let custom = PhoneChatFormat.render(template: template, messages: messages) { return custom }
         let roles = messages.map { strdup($0.role) }
         let contents = messages.map { strdup($0.content) }
         defer {
