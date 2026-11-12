@@ -14,30 +14,52 @@ final class ComposerTests: XCTestCase {
         sliding.slidingWindow = 100
         sliding.slidingPattern = [true, false]
         // Слой с окном хранит 100 + 512 токенов, а не 1000.
-        XCTAssertEqual(sliding.kvBytes(context: 1000), 2 * 128 * 2 * 612 + 512_000)
+        let expected: Int64 = 313_344 + 512_000
+        XCTAssertEqual(sliding.kvBytes(context: 1000), expected)
         XCTAssertNil(GGUFInfo(architecture: "llama").kvBytes(context: 1000))
         let fromEmbedding = GGUFInfo(layers: 1, heads: 4, kvHeads: [], embedding: 256)
-        XCTAssertEqual(fromEmbedding.kvBytes(context: 10), 4 * 128 * 2 * 10)
+        XCTAssertEqual(fromEmbedding.kvBytes(context: 10), 10_240)
     }
 
     func testHeaderReadsPerLayerHeads() {
-        func u32(_ value: UInt32) -> Data { withUnsafeBytes(of: value.littleEndian) { Data($0) } }
-        func u64(_ value: UInt64) -> Data { withUnsafeBytes(of: value.littleEndian) { Data($0) } }
-        func string(_ text: String) -> Data { u64(UInt64(text.utf8.count)) + Data(text.utf8) }
-        func pair(_ key: String, _ type: UInt32, _ value: Data) -> Data { string(key) + u32(type) + value }
-        var data = Data("GGUF".utf8) + u32(3) + u64(0) + u64(6)
-        data += pair("general.architecture", 8, string("gemma4"))
-        data += pair("gemma4.block_count", 4, u32(2))
-        data += pair("gemma4.attention.head_count_kv", 9, u32(4) + u64(2) + u32(1) + u32(2))
-        data += pair("gemma4.attention.key_length", 4, u32(64))
-        data += pair("gemma4.attention.sliding_window", 4, u32(100))
-        data += pair("gemma4.attention.sliding_window_pattern", 9, u32(7) + u64(2) + Data([1, 0]))
+        var data = Data("GGUF".utf8)
+        func u32(_ value: UInt32) { withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) } }
+        func u64(_ value: UInt64) { withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) } }
+        func string(_ text: String) {
+            u64(UInt64(text.utf8.count))
+            data.append(contentsOf: Array(text.utf8))
+        }
+        func key(_ name: String, _ type: UInt32) {
+            string(name)
+            u32(type)
+        }
+        u32(3)
+        u64(0)
+        u64(6)
+        key("general.architecture", 8)
+        string("gemma4")
+        key("gemma4.block_count", 4)
+        u32(2)
+        key("gemma4.attention.head_count_kv", 9)
+        u32(4)
+        u64(2)
+        u32(1)
+        u32(2)
+        key("gemma4.attention.key_length", 4)
+        u32(64)
+        key("gemma4.attention.sliding_window", 4)
+        u32(100)
+        key("gemma4.attention.sliding_window_pattern", 9)
+        u32(7)
+        u64(2)
+        data.append(contentsOf: [1, 0] as [UInt8])
         let info = GGUFInfo.parse(data)
         XCTAssertEqual(info?.layers, 2)
         XCTAssertEqual(info?.kvHeads, [1, 2])
         XCTAssertEqual(info?.slidingPattern, [true, false])
         // Слой 0: 1 голова, окно 612 токенов; слой 1: 2 головы, весь контекст.
-        XCTAssertEqual(info?.kvBytes(context: 1000), Int64(1 * 128 * 2 * 612 + 2 * 128 * 2 * 1000))
+        let expected: Int64 = 156_672 + 512_000
+        XCTAssertEqual(info?.kvBytes(context: 1000), expected)
     }
 
     func testMemoryUsesHeaderEstimate() {
