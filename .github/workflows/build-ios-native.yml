@@ -28,10 +28,11 @@ jobs:
           unzip -q "$RUNNER_TEMP/llama.zip" -d "$RUNNER_TEMP/llama"
           framework=$(find "$RUNNER_TEMP/llama" -maxdepth 4 -type d -name llama.xcframework | head -n 1)
           test -n "$framework"
-          mkdir -p ios-native/Frameworks
-          rm -rf ios-native/Frameworks/llama.xcframework
-          cp -R "$framework" ios-native/Frameworks/
-          ls ios-native/Frameworks/llama.xcframework
+          # В релизе есть только слои ios-arm64 и macOS (симулятора нет) — берём слой устройства;
+          # project.yml подключает его лишь при сборке под iphoneos, в симуляторе движок — заглушка.
+          rm -rf ios-native/Frameworks && mkdir -p ios-native/Frameworks/iphoneos
+          cp -R "$framework/ios-arm64/llama.framework" ios-native/Frameworks/iphoneos/
+          ls ios-native/Frameworks/iphoneos/llama.framework
       - name: Generate Xcode project
         working-directory: ios-native
         run: |
@@ -66,6 +67,9 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")" = app.llmchat.native
           test -n "$(/usr/libexec/PlistBuddy -c 'Print :NSLocalNetworkUsageDescription' "$app/Info.plist")"
           test -f "$app/LLMChat"
+          # Движок моделей на телефоне: фреймворк внутри и бинарник с ним действительно скомпонован.
+          test -f "$app/Frameworks/llama.framework/llama"
+          otool -L "$app/LLMChat" | grep -q 'llama.framework/llama'
           test ! -e "$app/_CodeSignature"
           test -z "$(find "$app" -name '*.appex' -o -name '*.mobileprovision')"
           mkdir -p build/package/Payload

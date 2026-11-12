@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(llama)
 import llama
+#endif
 
 /// Ошибка движка на телефоне — текст сразу для пользователя.
 struct PhoneEngineError: LocalizedError {
@@ -17,6 +19,7 @@ struct PhoneRunStats: Equatable {
     var tokensPerSecond: Double { seconds > 0 ? Double(tokens) / seconds : 0 }
 }
 
+#if canImport(llama)
 /// Обёртка над C API llama.cpp (релиз зафиксирован в workflow). Все вызовы — в своей
 /// последовательной очереди: llama.cpp не потокобезопасен, а главный поток занят интерфейсом.
 final class LlamaRunner: @unchecked Sendable {
@@ -301,3 +304,26 @@ final class LlamaRunner: @unchecked Sendable {
         return buffer.prefix(Int(count)).map { UInt8(bitPattern: $0) }
     }
 }
+#else
+/// Симулятор: в релизе llama.cpp нет слоя для него, движок не подключается.
+/// Режим снимков отвечает заготовленным текстом и сюда не обращается.
+final class LlamaRunner: @unchecked Sendable {
+    private(set) var loadedPath: String?
+    private(set) var contextSize = 0
+
+    private static let unavailable = PhoneEngineError(message: "В симуляторе движка llama.cpp нет — модели на телефоне работают только на iPhone.")
+
+    func load(path: String, context wanted: Int) async throws -> Int {
+        throw Self.unavailable
+    }
+
+    func unload() async {}
+
+    func cancel() {}
+
+    func stream(messages: [(role: String, content: String)], sampling: PhoneSampling,
+                stats: @escaping @Sendable (PhoneRunStats) -> Void) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { $0.finish(throwing: Self.unavailable) }
+    }
+}
+#endif

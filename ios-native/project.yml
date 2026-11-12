@@ -26,16 +26,25 @@ targets:
     sources:
       - path: Sources
       - path: Resources
-    dependencies:
-      # llama.cpp для моделей на телефоне: workflow скачивает готовый xcframework из релиза.
-      - framework: Frameworks/llama.xcframework
-        embed: true
+    # llama.cpp для моделей на телефоне: workflow кладёт слой устройства из релиза в
+    # Frameworks/iphoneos. Слоя симулятора в релизе нет — там движок не подключается (заглушка в коде).
+    postBuildScripts:
+      - name: Embed llama.framework (device)
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ "$PLATFORM_NAME" = "iphoneos" ]; then
+            mkdir -p "$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH"
+            rsync -a --delete "$PROJECT_DIR/Frameworks/iphoneos/llama.framework" "$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH/"
+          fi
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.llmchat.native
         PRODUCT_NAME: LLMChat
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: "NO"
+        ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+        "FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]": "$(inherited) $(PROJECT_DIR)/Frameworks/iphoneos"
+        "OTHER_LDFLAGS[sdk=iphoneos*]": "$(inherited) -framework llama"
     info:
       path: Info.plist
       properties:
