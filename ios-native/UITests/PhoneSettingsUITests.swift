@@ -1,7 +1,7 @@
 import XCTest
 
 /// Этап 8.2: настройки модели телефона (ползунки с вводом числа, рассуждения, контекст),
-/// «Параметры чата» для неё и работа без ПК — в режиме снимков, без сети и llama.cpp.
+/// «Настройки модели» из чата и работа без ПК — в режиме снимков, без сети и llama.cpp.
 final class PhoneSettingsUITests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
@@ -75,12 +75,13 @@ final class PhoneSettingsUITests: XCTestCase {
         snap("ui-s3-after")
     }
 
-    /// «Параметры чата» модели телефона: рассуждения есть, веб-поиска и баз знаний нет.
+    /// «Настройки модели» из чата с моделью телефона: рассуждения и контекст есть, веб-поиска и баз знаний нет.
     func testChatParametersOnPhone() {
         let app = launch("phoneParameters")
-        XCTAssertTrue(app.staticTexts["Параметры чата"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Настройки модели"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.switches.matching(NSPredicate(format: "label CONTAINS %@", "Рассуждения")).firstMatch
             .waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Контекст"].exists, "размер контекста — тоже настройка модели")
         XCTAssertFalse(app.staticTexts["Веб-поиск"].exists, "веб-поиск модели телефона недоступен")
         XCTAssertFalse(text(app, contains: "Базы знаний").exists)
         XCTAssertTrue(element(app, "param.temperature.field").exists, "у температуры есть поле ввода")

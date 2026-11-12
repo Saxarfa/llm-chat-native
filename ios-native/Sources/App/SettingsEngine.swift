@@ -1,7 +1,12 @@
 import Foundation
 
-/// Параметры чата и общие настройки аккаунта. Повторяет `saveOverrides`, `saveReasoning`,
+/// Настройки моделей, параметры чата и общие настройки аккаунта. Повторяет `saveOverrides`,
 /// `saveSettings` и `saveProfile` из `frontend/src/store.ts`.
+///
+/// В отличие от сайта, параметры модели в приложении не бывают «только для этого чата»:
+/// всё сохраняется за моделью (`model_configs`), старые правки отдельных чатов
+/// (`overrides[model]`) не учитываются и убираются из чата при следующей правке.
+/// У чата свои только веб-поиск (`searchMode`) и базы знаний (`knowledge`).
 extension AppModel {
     /// Параметры открытого чата (или нового — до первой отправки).
     var activeOverrides: [String: Any] {
@@ -9,14 +14,19 @@ extension AppModel {
         return chatMeta[id]?.overrides ?? [:]
     }
 
-    /// Итоговые параметры активной модели: профиль, сохранённое для модели и правки чата.
+    /// Итоговые параметры активной модели.
     var activeConfig: [String: Any] {
-        ChatConfig.config(model: activeModelID, settings: settings, overrides: activeOverrides)
+        modelConfig(activeModelID)
     }
 
-    /// Параметры, изменённые именно в этом чате.
-    var activeChatChanges: [String: Any] {
-        ChatConfig.dict(activeOverrides[activeModelID])
+    /// Итоговые параметры модели: общие умолчания, умолчания модели, профиль и её настройки.
+    func modelConfig(_ id: String) -> [String: Any] {
+        ChatConfig.config(model: id, settings: settings, overrides: [:])
+    }
+
+    /// Что пользователь поменял в настройках модели (без сброшенных `null`).
+    func savedModelValues(_ id: String) -> [String: Any] {
+        ChatConfig.dict(settings.modelConfigs[id]).filter { !($0.value is NSNull) }
     }
 
     /// Сохраняет параметры чата целиком. Экран меняется сразу; при ошибке — откат.
@@ -39,41 +49,51 @@ extension AppModel {
         }
     }
 
-    /// Один параметр активной модели в этом чате; `nil` — вернуть значение профиля.
-    func setParameter(_ key: String, _ value: Any?) async {
-        let model = activeModelID
-        if let value, ChatParameters.reasoningKeys.contains(key) {
-            var patch: [String: Any] = [key: value]
-            // У AI Studio выбор уровня включает рассуждения.
-            if model.hasPrefix("aistudio/"), key == "reasoning_strength" { patch["thinking"] = true }
-            await saveReasoning(model: model, patch: patch)
-            return
-        }
+    /// Один параметр модели для всех её чатов; `nil` — вернуть значение по умолчанию.
+    func setModelValue(_ key: String, _ value: Any?, model chosen: String? = nil) async {
+        let model = chosen ?? activeModelID
+        var patch: [String: Any] = [key: value ?? NSNull()]
+        // У AI Studio выбор уровня включает рассуждения.
+        if value != nil, model.hasPrefix("aistudio/"), key == "reasoning_strength" { patch["thinking"] = true }
+        await saveModelConfig(model: model, patch: patch)
+        await dropChatValues(Array(patch.keys), model: model)
+    }
+
+    /// Возвращает значения по умолчанию для этих параметров модели.
+    func resetModelValues(_ keys: [String], model: String) async {
+        let saved = savedModelValues(model)
+        let patch = Dictionary(uniqueKeysWithValues: keys.filter { saved[$0] != nil }.map { ($0, NSNull() as Any) })
+        if !patch.isEmpty { await saveModelConfig(model: model, patch: patch) }
+        await dropChatValues(keys, model: model)
+    }
+
+    /// Старые правки «только для этого чата» больше не действуют: убираем их из открытого чата,
+    /// чтобы и сайт показывал в нём настройки модели.
+    private func dropChatValues(_ keys: [String], model: String) async {
         var all = activeOverrides
         var values = ChatConfig.dict(all[model])
-        if let value { values[key] = value } else { values.removeValue(forKey: key) }
-        all[model] = values
+        let thinking = keys.contains("thinking") && all["thinking"] != nil
+        guard thinking || keys.contains(where: { values[$0] != nil }) else { return }
+        for key in keys { values.removeValue(forKey: key) }
+        if thinking { all.removeValue(forKey: "thinking") }
+        if values.isEmpty { all.removeValue(forKey: model) } else { all[model] = values }
         await saveOverrides(all)
     }
 
-    /// Рассуждения запоминаются и для модели, и для этого чата.
-    private func saveReasoning(model: String, patch: [String: Any]) async {
-        var all = activeOverrides
-        all[model] = ChatConfig.dict(all[model]).merging(patch) { _, new in new }
-        guard activeChatID != nil else {
-            draftOverrides = all
-            return
-        }
-        await saveOverrides(all)
-        await saveModelConfig(model: model, patch: patch)
+    /// Веб-поиск этого чата: «disabled», «auto» или «forced».
+    var activeSearchMode: String {
+        ChatConfig.text(activeOverrides["searchMode"]) ?? ChatConfig.text(settings.shared["searchMode"]) ?? "auto"
     }
 
-    /// Убирает правки этого чата: снова действуют параметры профиля модели.
-    func resetChatParameters() async {
+    func setSearchMode(_ mode: String) async {
         var all = activeOverrides
-        all.removeValue(forKey: activeModelID)
-        all.removeValue(forKey: "thinking")
+        all["searchMode"] = mode
         await saveOverrides(all)
+    }
+
+    /// Память модели: может ли модель читать и менять сохранённые факты (для всех её чатов).
+    func memoryEnabled(_ model: String) -> Bool {
+        (ChatConfig.dict(settings.modelConfigs[model])["memoryEnabled"] as? Bool) != false
     }
 
     // MARK: - Настройки аккаунта

@@ -67,10 +67,14 @@ final class AppModel {
     var viewer: ViewerItem?
     /// Своё сообщение, которое сейчас правится в поле ввода.
     var editing: FeedMessage?
-    /// Параметры открытых чатов (их меняет окно «Параметры чата»).
+    /// Параметры открытых чатов: веб-поиск и базы знаний (меню «+» у поля ввода), ветка.
     var chatMeta: [String: ChatMeta] = [:]
     /// Параметры нового чата до первой отправки.
     var draftOverrides: [String: Any] = [:]
+    /// Сколько контекста модели занимает чат (по id чата).
+    var contextUsage: [String: ContextUsage] = [:]
+    /// Вопросы, отправленные, пока модель ещё отвечала (по id чата).
+    var queued: [String: [QueuedMessage]] = [:]
     /// Описание моделей картинок AI Studio: соотношения сторон, размеры, возможности.
     var imageCatalog: [String: [String: Any]] = [:]
     /// Ошибка сохранения параметров или настроек.
@@ -306,7 +310,7 @@ final class AppModel {
             phase = .ready
         case .chat, .sidebar, .thread, .threadTop, .streaming, .models, .media, .parameters, .nano, .settings,
              .branches, .memory, .knowledge, .omni, .studio, .studioSettings, .studioHistory, .studioArt,
-             .phoneModels, .phoneChat, .phoneSettings, .phoneParameters:
+             .phoneModels, .phoneChat, .phoneSettings, .phoneParameters, .tools, .queue:
             user = PreviewScene.user
             chats = PreviewScene.chats
             models = PreviewScene.modelOptions
@@ -316,7 +320,8 @@ final class AppModel {
                 thread = PreviewScene.feed
                 threadState = .loaded
                 threadChatID = "7"
-                chatMeta["7"] = ChatMeta(overrides: ["gemma-26b-qat": ["temperature": 0.9]], branch: "main")
+                chatMeta["7"] = ChatMeta(overrides: [:], branch: "main")
+                settings.modelConfigs["gemma-26b-qat"] = ["temperature": 0.9]
             }
             if scene == .nano {
                 draftModel = "aistudio/gemini-3.1-flash-image"
@@ -329,14 +334,24 @@ final class AppModel {
                 threadChatID = "3"
                 draftAttachments = PreviewScene.mediaDraft()
             }
-            if scene == .thread || scene == .threadTop || scene == .streaming {
+            if [.thread, .threadTop, .streaming, .tools, .queue].contains(scene) {
                 activeChatID = "7"
-                thread = scene == .streaming ? Array(PreviewScene.feed.prefix(3)) : PreviewScene.feed
+                thread = scene == .streaming || scene == .queue ? Array(PreviewScene.feed.prefix(3)) : PreviewScene.feed
                 threadState = .loaded
                 threadChatID = "7"
+                chatMeta["7"] = ChatMeta(overrides: ["searchMode": "auto"], branch: "main")
             }
-            if scene == .streaming {
+            if scene == .streaming || scene == .queue {
                 lives["7"] = PreviewScene.live
+            }
+            if scene == .queue {
+                queued["7"] = [QueuedMessage(text: "А что взять из еды на два дня?", attachments: [])]
+            }
+            if scene == .tools || scene == .thread {
+                contextUsage["7"] = ContextUsage(used: 9_840, capacity: 32_768, estimated: false)
+            }
+            if scene == .queue {
+                contextUsage["7"] = ContextUsage(used: 23_310, capacity: 32_768, estimated: false)
             }
             if scene == .branches {
                 activeChatID = "7"
@@ -353,8 +368,12 @@ final class AppModel {
                 threadState = .loaded
                 threadChatID = "3"
             }
-            if scene == .parameters || scene == .knowledge {
+            if scene == .parameters || scene == .knowledge || scene == .tools {
                 knowledgeLibraries = PreviewScene.libraries
+            }
+            if scene == .tools {
+                chatMeta["7"]?.overrides["knowledge"] = ["enabled": true, "collections": ["l1"], "strict": false] as [String: Any]
+                settings.modelConfigs["gemma-26b-qat"] = ["thinking": true]
             }
             if [.studio, .studioSettings, .studioHistory, .studioArt].contains(scene) {
                 screen = .studio

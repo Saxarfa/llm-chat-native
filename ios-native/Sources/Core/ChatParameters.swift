@@ -52,7 +52,7 @@ enum ChatParameters {
     /// Главные параметры показываются сразу, остальные — в «Расширенных».
     static let mainKeys: Set<String> = ["temperature", "max_tokens"]
 
-    /// Ключи рассуждений сохраняются ещё и для модели (как `saveReasoning` на сайте).
+    /// Ключи рассуждений.
     static let reasoningKeys: Set<String> = ["thinking", "reasoning_effort", "reasoning_strength"]
 
     static let searchModes: [Choice] = [

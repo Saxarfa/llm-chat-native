@@ -20,6 +20,7 @@ final class PhoneModels {
         var received: Int64 = 0
         var total: Int64 = 0
         var state: State = .preparing
+        var meter = TransferMeter()
         var id: String { file }
         var progress: Double { total > 0 ? min(1, Double(received) / Double(total)) : 0 }
     }
@@ -140,8 +141,19 @@ final class PhoneModels {
 
     var diskUsed: Int64 { installed.reduce(0) { $0 + $1.size } }
 
-    func fit(_ size: Int64, context: Int = PhoneModels.context) -> PhoneMemory.Fit {
-        PhoneMemory.fit(fileSize: size, available: availableMemory, context: context)
+    /// Хватит ли памяти. `file` — уже скачанная модель: тогда кэш контекста считается по её заголовку.
+    func fit(_ size: Int64, context: Int = PhoneModels.context, file: String? = nil) -> PhoneMemory.Fit {
+        PhoneMemory.fit(fileSize: size, available: availableMemory, context: context, kv: kv(file, context: context))
+    }
+
+    /// Сколько памяти нужно скачанной модели с таким контекстом.
+    func needed(_ size: Int64, context: Int, file: String?) -> Int64 {
+        PhoneMemory.needed(fileSize: size, context: context, kv: kv(file, context: context))
+    }
+
+    private func kv(_ file: String?, context: Int) -> Int64? {
+        guard let file else { return nil }
+        return infos[file]?.kvBytes(context: context)
     }
 
     // MARK: - Сведения о модели
@@ -324,6 +336,7 @@ final class PhoneModels {
         item.received = received
         if total > 0 { item.total = total }
         item.state = .running
+        item.meter.add(bytes: received, at: Date().timeIntervalSince1970)
         downloads[file] = item
     }
 
@@ -397,12 +410,18 @@ final class PhoneModels {
             throw PhoneEngineError(message: "Модели «\(PhoneModelNames.title(file))» нет на этом телефоне. Скачайте её в окне «Модели на телефоне».")
         }
         await unload()
-        if fit(model.size, context: wanted) == .tooBig {
-            throw PhoneEngineError(message: "Модели нужно около \(PhoneMemory.gigabytes(PhoneMemory.needed(fileSize: model.size, context: wanted))) памяти, а свободно \(PhoneMemory.gigabytes(availableMemory)). Выберите модель поменьше, квантование ниже или контекст меньше (Модели на телефоне → Настройки).")
-        }
+        if infos[file] == nil { await loadInfo(file) }
+        // Оценка памяти только предупреждает: модель грузится всегда (веса читаются с диска
+        // по мере надобности, и оценка бывает с запасом). Не хватит — iOS закроет приложение.
+        let tooBig = fit(model.size, context: wanted, file: file) == .tooBig
         loading = true
         defer { loading = false }
-        contextSize = try await runner.load(path: Self.path(of: file).path, context: wanted)
+        do {
+            contextSize = try await runner.load(path: Self.path(of: file).path, context: wanted)
+        } catch {
+            guard tooBig else { throw error }
+            throw PhoneEngineError(message: "Модель не загрузилась — похоже, не хватило памяти: нужно около \(PhoneMemory.gigabytes(needed(model.size, context: wanted, file: file))), свободно \(PhoneMemory.gigabytes(availableMemory)). Уменьшите контекст в настройках модели или выберите квантование ниже.")
+        }
         loadedFile = file
         loadedWanted = wanted
     }
@@ -439,7 +458,8 @@ final class PhoneModels {
         results = PreviewScene.phoneRepos
         files = [PreviewScene.phoneRepos[0].id: PreviewScene.phoneFiles]
         downloads = ["gemma-3-4b-it-Q4_K_M.gguf": Download(file: "gemma-3-4b-it-Q4_K_M.gguf", repo: "unsloth/gemma-3-4b-it-GGUF",
-                                                            received: 1_120_000_000, total: 2_490_000_000, state: .running)]
+                                                            received: 1_120_000_000, total: 2_490_000_000, state: .running,
+                                                            meter: TransferMeter(bytesPerSecond: 12_500_000))]
     }
 
     func reset() {

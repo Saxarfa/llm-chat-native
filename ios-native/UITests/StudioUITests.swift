@@ -86,7 +86,7 @@ final class StudioUITests: XCTestCase {
         sleep(1)
         snap("ui-02-studio")
         app.buttons["Вернуться в чат"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["Параметры чата"].firstMatch.waitForExistence(timeout: 5)
+        XCTAssertTrue(app.buttons["Настройки модели"].firstMatch.waitForExistence(timeout: 5)
             || app.buttons["Новый чат"].firstMatch.waitForExistence(timeout: 5))
     }
 

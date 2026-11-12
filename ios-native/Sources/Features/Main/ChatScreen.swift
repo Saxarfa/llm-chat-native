@@ -58,7 +58,7 @@ struct ChatScreen: View {
             }
         }
         .sheet(isPresented: $showParameters) {
-            ChatParametersSheet()
+            ModelSettingsSheet()
         }
         .sheet(isPresented: $showBranches) {
             BranchesSheet()
@@ -92,7 +92,7 @@ struct ChatScreen: View {
     }
 
     private var parametersButton: some View {
-        CircleIconButton(symbol: "slider.horizontal.3", label: "Параметры чата") {
+        CircleIconButton(symbol: "slider.horizontal.3", label: "Настройки модели") {
             Keyboard.hide()
             Haptics.tap()
             showParameters = true
@@ -142,7 +142,8 @@ struct ChatScreen: View {
 }
 
 /// Поле ввода. Прикреплено к нижней безопасной зоне, поэтому поднимается вместе с клавиатурой.
-/// Слева — вложения и выбор модели, справа — отправка; пока модель отвечает, вместо отправки «Стоп».
+/// Слева — меню «+» и выбор модели, справа — отправка; пока модель отвечает — «Стоп», а набранный
+/// вопрос встаёт в очередь. Тонкая линия внизу — сколько контекста модели занято.
 struct ComposerBar: View {
     @Environment(AppModel.self) private var model
     @Binding var text: String
@@ -151,6 +152,10 @@ struct ComposerBar: View {
     @State private var showPhotos = false
     @State private var showCamera = false
     @State private var showFiles = false
+    @State private var showTools = false
+    @State private var showContext = false
+    /// Что выбрали в меню «+»: открывается, когда меню закрылось.
+    @State private var pendingSource: ComposerToolsSheet.Source?
     @State private var picked: [PhotosPickerItem] = []
     /// Черновик, отложенный на время правки старого сообщения.
     @State private var parkedDraft = ""
@@ -179,6 +184,9 @@ struct ComposerBar: View {
             if let error = model.sendError {
                 errorBanner(error)
             }
+            ForEach(model.activeQueue) { item in
+                queuedRow(item)
+            }
 
             VStack(alignment: .leading, spacing: 10) {
                 if model.editing != nil {
@@ -203,14 +211,22 @@ struct ComposerBar: View {
                     modelButton
                     Spacer(minLength: 8)
                     if live != nil {
-                        actionButton(symbol: "stop.fill", label: "Остановить ответ", active: live?.stopping != true) {
+                        actionButton(symbol: "stop.fill", label: "Остановить ответ", active: live?.stopping != true,
+                                     primary: !(model.editing == nil && hasText)) {
                             Task { await model.stop() }
+                        }
+                        if model.editing == nil && hasText {
+                            actionButton(symbol: "arrow.up", label: "Добавить в очередь", active: canSend, action: submit)
+                                .transition(.scale.combined(with: .opacity))
                         }
                     } else {
                         actionButton(symbol: model.editing == nil ? "arrow.up" : "checkmark",
                                      label: model.editing == nil ? "Отправить" : "Сохранить правку",
                                      active: canSend, action: submit)
                     }
+                }
+                if let usage = model.activeContext, let fraction = usage.fraction {
+                    contextLine(usage, fraction: fraction)
                 }
             }
             .padding(10)
@@ -225,8 +241,31 @@ struct ComposerBar: View {
         .background(Theme.canvas)
         .animation(.easeOut(duration: 0.18), value: model.sendError)
         .animation(.easeOut(duration: 0.18), value: model.draftAttachments)
+        .animation(.easeOut(duration: 0.18), value: model.activeQueue)
         .sheet(isPresented: $showModels) {
             ModelPickerSheet()
+        }
+        .sheet(isPresented: $showTools, onDismiss: openPending) {
+            ComposerToolsSheet { source in pendingSource = source }
+        }
+        .photosPicker(isPresented: $showPhotos, selection: $picked, maxSelectionCount: AttachmentPrep.limit,
+                      matching: .images)
+        .fileImporter(isPresented: $showFiles, allowedContentTypes: Self.fileTypes,
+                      allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result {
+                Task { await model.addFiles(urls) }
+            }
+        }
+        // Модель дописала ответ (или открыт другой чат) — уходит следующий вопрос из очереди.
+        .onChange(of: model.activeLive == nil) { _, idle in
+            if idle { model.runQueue() }
+        }
+        .onChange(of: model.activeChatID) { _, _ in model.runQueue() }
+        // Контекст пересчитывается, когда меняется переписка, модель или закончился ответ.
+        .task(id: contextKey) {
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+            await model.measureContext()
         }
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker { image in
@@ -237,6 +276,7 @@ struct ComposerBar: View {
         }
         .onAppear {
             if model.preview == .models || model.preview == .phoneModels || model.preview == .phoneSettings { showModels = true }
+            if model.preview == .tools { showTools = true }
         }
         .onChange(of: model.editing) { _, message in
             if let message {
@@ -302,24 +342,10 @@ struct ComposerBar: View {
     }
 
     private var attachButton: some View {
-        Menu {
-            Button {
-                showPhotos = true
-            } label: {
-                Label("Фото", systemImage: "photo.on.rectangle")
-            }
-            if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                Button {
-                    showCamera = true
-                } label: {
-                    Label("Камера", systemImage: "camera")
-                }
-            }
-            Button {
-                showFiles = true
-            } label: {
-                Label("Файл", systemImage: "doc")
-            }
+        Button {
+            Keyboard.hide()
+            Haptics.tap()
+            showTools = true
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16, weight: .medium))
@@ -329,16 +355,94 @@ struct ComposerBar: View {
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
-        .menuOrder(.fixed)
-        .accessibilityLabel("Прикрепить")
-        .photosPicker(isPresented: $showPhotos, selection: $picked, maxSelectionCount: AttachmentPrep.limit,
-                      matching: .images)
-        .fileImporter(isPresented: $showFiles, allowedContentTypes: Self.fileTypes,
-                      allowsMultipleSelection: true) { result in
-            if case .success(let urls) = result {
-                Task { await model.addFiles(urls) }
-            }
+        .buttonStyle(PressScaleStyle())
+        .accessibilityLabel("Вложения и инструменты")
+        .accessibilityIdentifier("composer.tools")
+    }
+
+    private func openPending() {
+        guard let source = pendingSource else { return }
+        pendingSource = nil
+        switch source {
+        case .camera: showCamera = true
+        case .photo: showPhotos = true
+        case .file: showFiles = true
         }
+    }
+
+    private var contextKey: String {
+        "\(model.activeChatID ?? "")|\(model.activeModelID)|\(model.thread.count)|\(model.activeLive == nil)|\(model.activeBranchName)"
+    }
+
+    /// Линия по низу капсулы: занятая часть контекста. Нажатие — подробности.
+    private func contextLine(_ usage: ContextUsage, fraction: Double) -> some View {
+        Button {
+            Haptics.tap()
+            showContext = true
+        } label: {
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.line)
+                    Capsule().fill(fraction >= 0.9 ? Theme.danger : Theme.subtle)
+                        .frame(width: max(2, geometry.size.width * fraction))
+                }
+                .frame(height: 2)
+                .frame(maxHeight: .infinity, alignment: .center)
+            }
+            .frame(height: 12)
+            .padding(.horizontal, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.top, -6)
+        .padding(.bottom, -4)
+        .accessibilityLabel("Контекст модели: \(Int((fraction * 100).rounded()))%")
+        .accessibilityIdentifier("composer.context")
+        .popover(isPresented: $showContext, arrowEdge: .bottom) {
+            ContextDetails(usage: usage)
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    /// Вопрос в очереди над полем ввода: отменить или (если не ушёл) повторить.
+    private func queuedRow(_ item: QueuedMessage) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: item.failed ? "exclamationmark.circle" : "clock")
+                .font(.system(size: 13, weight: .medium))
+            Text(item.failed ? "Не ушло: «\(item.text)»" : "В очереди: «\(item.text)»")
+                .font(.system(size: 14))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if item.failed {
+                Button {
+                    model.retryQueued(item)
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 36, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Повторить")
+            }
+            Button {
+                model.cancelQueued(item)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 36, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Убрать из очереди")
+        }
+        .foregroundStyle(item.failed ? Theme.danger : Theme.muted)
+        .padding(.leading, 14)
+        .padding(.trailing, 4)
+        .frame(minHeight: 40)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.line))
+        .accessibilityIdentifier("composer.queued")
+        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     private var modelButton: some View {
@@ -366,13 +470,14 @@ struct ComposerBar: View {
         .accessibilityHint("Выбрать модель")
     }
 
-    private func actionButton(symbol: String, label: String, active: Bool, action: @escaping () -> Void) -> some View {
+    private func actionButton(symbol: String, label: String, active: Bool, primary: Bool = true,
+                              action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: symbol == "stop.fill" ? 13 : 16, weight: .semibold))
-                .foregroundStyle(Theme.buttonPrimaryText)
+                .foregroundStyle(primary ? Theme.buttonPrimaryText : Theme.ink)
                 .frame(width: 36, height: 36)
-                .background(Theme.buttonPrimary.opacity(active ? 1 : 0.25), in: Circle())
+                .background(primary ? Theme.buttonPrimary.opacity(active ? 1 : 0.25) : Theme.fill, in: Circle())
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
@@ -384,6 +489,13 @@ struct ComposerBar: View {
     private func submit() {
         guard canSend else { return }
         let message = text
+        if model.activeLive != nil, model.editing == nil {
+            // Модель ещё отвечает: вопрос уйдёт сразу после ответа.
+            model.enqueue(message.trimmingCharacters(in: .whitespacesAndNewlines), attachments: model.draftAttachments)
+            text = ""
+            model.draftAttachments = []
+            return
+        }
         if let editing = model.editing {
             // Сначала закрываем правку (в поле вернётся отложенный черновик), потом отправляем.
             model.editing = nil
@@ -404,5 +516,59 @@ struct ComposerBar: View {
                 if model.draftAttachments.isEmpty { model.draftAttachments = files }
             }
         }
+    }
+}
+
+/// Подробности контекста — как всплывающее окно индикатора на сайте.
+private struct ContextDetails: View {
+    let usage: ContextUsage
+
+    var body: some View {
+        let approx = usage.estimated ? "≈ " : ""
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Контекст модели")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+            HStack(spacing: 24) {
+                number("Использовано", approx + Self.format(usage.used))
+                number("Свободно", usage.capacity.map { approx + Self.format(max(0, $0 - usage.used)) } ?? "—")
+            }
+            HStack {
+                Text("Лимит контекста")
+                Spacer()
+                Text(usage.capacity.map(Self.format) ?? "Неизвестен")
+                    .monospacedDigit()
+            }
+            .font(.system(size: 13))
+            .foregroundStyle(Theme.muted)
+            Text(usage.estimated ? "Оценка по длине переписки и инструкции."
+                                 : "Токены запроса по токенизатору модели, включая инструкции и инструменты.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.subtle)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(width: 280, alignment: .leading)
+        .background(Theme.surface)
+        .preferredColorScheme(.dark)
+        .accessibilityIdentifier("context.details")
+    }
+
+    private func number(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.subtle)
+            Text(value)
+                .font(.system(size: 17, weight: .semibold).monospacedDigit())
+                .foregroundStyle(Theme.ink)
+        }
+    }
+
+    static func format(_ value: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = "\u{00A0}"
+        return formatter.string(from: NSNumber(value: value)) ?? String(value)
     }
 }

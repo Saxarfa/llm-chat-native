@@ -9,7 +9,7 @@ enum PreviewScene: String, CaseIterable {
     case streaming, models
     /// Картинки в ленте и вложения в поле ввода.
     case media
-    /// «Параметры чата» текстовой модели и Nano Banana; настройки приложения.
+    /// «Настройки модели» текстовой модели и Nano Banana; настройки приложения.
     case parameters, nano, settings
     /// Этап 6: ветки и варианты ответа, память, базы знаний, видео Omni.
     case branches, memory, knowledge, omni
@@ -17,8 +17,11 @@ enum PreviewScene: String, CaseIterable {
     case studio, studioSettings, studioHistory, studioArt
     /// Этап 8: окно «Модели на телефоне» и чат с моделью телефона.
     case phoneModels, phoneChat
-    /// Этап 8.2: настройки модели телефона, «Параметры чата» для неё, работа без ПК.
+    /// Этап 8.2: настройки модели телефона (из «Моделей на телефоне» и из чата), работа без ПК.
     case phoneSettings, phoneParameters, phoneOffline
+    /// 0.10: меню «+» у поля ввода (вложения, поиск, рассуждения, память, базы знаний);
+    /// вопрос в очереди, пока модель отвечает, и линия контекста.
+    case tools, queue
 
     /// Чаты телефона без связи с ПК: один уже был на ПК, второй ещё не дошёл.
     static let localChats: [LocalChat] = {

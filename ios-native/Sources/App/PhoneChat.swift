@@ -65,7 +65,7 @@ extension AppModel {
         // Вопрос — сразу на ПК: чат появится в списке и на сайте, ответ допишется следом.
         _ = await savePhoneChat(id, model: model)
 
-        let config = ChatConfig.config(model: model, settings: settings, overrides: chatMeta[id]?.overrides ?? [:])
+        let config = modelConfig(model)
         let system = (ChatConfig.present(config["systemPrompt"]) as? String) ?? ChatConfig.defaultPrompt
         var prompt: [(role: String, content: String)] = []
         if !system.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { prompt.append((role: "system", content: system)) }

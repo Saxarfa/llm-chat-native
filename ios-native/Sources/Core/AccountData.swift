@@ -136,10 +136,15 @@ struct KnowledgeSelection: Equatable {
 }
 
 enum Plural {
-    enum Noun { case document, chunk }
+    enum Noun { case document, chunk, library }
 
     static func knowledge(_ count: Int, _ noun: Noun) -> String {
-        let forms = noun == .document ? ["документ", "документа", "документов"] : ["фрагмент", "фрагмента", "фрагментов"]
+        let forms: [String]
+        switch noun {
+        case .document: forms = ["документ", "документа", "документов"]
+        case .chunk: forms = ["фрагмент", "фрагмента", "фрагментов"]
+        case .library: forms = ["база", "базы", "баз"]
+        }
         let tail = count % 100
         let form = (11...14).contains(tail) ? forms[2]
             : count % 10 == 1 ? forms[0]

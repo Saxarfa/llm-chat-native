@@ -7,8 +7,50 @@ struct GGUFInfo: Equatable, Sendable {
     var chatTemplate: String?
     /// Обучающий контекст (`<arch>.context_length`).
     var trainContext: Int?
+    /// Устройство внимания — для оценки памяти под контекст (кэш ключей и значений).
+    var layers: Int?
+    var heads: Int?
+    /// Головы ключей/значений: одно число на все слои или по слою.
+    var kvHeads: [Int] = []
+    var keyLength: Int?
+    var valueLength: Int?
+    var embedding: Int?
+    /// Скользящее окно внимания и какие слои им пользуются (`true` — окно).
+    var slidingWindow: Int?
+    var slidingPattern: [Bool] = []
 
     var thinking: PhoneThinking { PhoneThinking.kind(template: chatTemplate) }
+
+    /// Сколько байт займёт кэш ключей и значений (f16) при таком контексте. Слои со скользящим
+    /// окном llama.cpp хранит только на ширину окна. `nil` — в заголовке не хватает сведений.
+    func kvBytes(context: Int) -> Int64? {
+        guard let layers, layers > 0 else { return nil }
+        var headDim = keyLength
+        if headDim == nil, let embedding, let heads, heads > 0 { headDim = embedding / heads }
+        guard let key = headDim, key > 0 else { return nil }
+        let value = valueLength ?? key
+        var total: Int64 = 0
+        for layer in 0..<layers {
+            let count: Int
+            if kvHeads.count == layers { count = kvHeads[layer] }
+            else if let first = kvHeads.first { count = first }
+            else if let heads { count = heads }
+            else { return nil }
+            var tokens = context
+            if let window = slidingWindow, window > 0, isSliding(layer) {
+                tokens = min(context, window + 512)
+            }
+            total += Int64(count) * Int64(key + value) * 2 * Int64(tokens)
+        }
+        return total
+    }
+
+    private func isSliding(_ layer: Int) -> Bool {
+        if slidingPattern.count == layers { return slidingPattern[layer] }
+        // Gemma 3: пять слоёв с окном, шестой — полный.
+        if architecture == "gemma3" { return (layer + 1) % 6 != 0 }
+        return false
+    }
 
     static func read(url: URL) -> GGUFInfo? {
         guard let data = try? Data(contentsOf: url, options: .alwaysMapped) else { return nil }
@@ -22,6 +64,12 @@ struct GGUFInfo: Equatable, Sendable {
               reader.u64() != nil, let count = reader.u64() else { return nil }
         var info = GGUFInfo()
         var contexts: [String: Int] = [:]
+        var numbers: [String: Int] = [:]
+        var lists: [String: [Int]] = [:]
+        var flags: [String: [Bool]] = [:]
+        let wanted = [".block_count", ".attention.head_count", ".attention.head_count_kv", ".attention.key_length",
+                      ".attention.value_length", ".embedding_length", ".attention.sliding_window",
+                      ".attention.sliding_window_pattern"]
         for _ in 0..<min(count, 100_000) {
             guard let key = reader.string(), let type = reader.u32() else { return nil }
             switch key {
@@ -34,12 +82,50 @@ struct GGUFInfo: Equatable, Sendable {
             case _ where key.hasSuffix(".context_length") && [4, 5, 10, 11].contains(type):
                 guard let value = reader.integer(type: type) else { return nil }
                 contexts[key] = value
+            case _ where wanted.contains(where: { key.hasSuffix($0) }) && [4, 5, 10, 11].contains(type):
+                guard let value = reader.integer(type: type) else { return nil }
+                numbers[key] = value
+            case _ where wanted.contains(where: { key.hasSuffix($0) }) && type == 9:
+                guard let element = reader.u32(), let count = reader.u64(), count < 10_000 else { return nil }
+                if element == 7 {
+                    var values: [Bool] = []
+                    for _ in 0..<count {
+                        guard let byte = reader.bytes(1) else { return nil }
+                        values.append(byte.first != 0)
+                    }
+                    flags[key] = values
+                } else if [4, 5, 10, 11].contains(element) {
+                    var values: [Int] = []
+                    for _ in 0..<count {
+                        guard let value = reader.integer(type: element) else { return nil }
+                        values.append(value)
+                    }
+                    lists[key] = values
+                } else {
+                    guard let size = Reader.size(element), reader.bytes(Int(count) * size) != nil else { return nil }
+                }
             default:
                 guard reader.skip(type: type) else { return nil }
             }
         }
         if let arch = info.architecture { info.trainContext = contexts[arch + ".context_length"] }
         if info.trainContext == nil { info.trainContext = contexts.values.first }
+        let prefix = (info.architecture ?? "") + "."
+        func number(_ suffix: String) -> Int? {
+            numbers[prefix + suffix] ?? numbers.first { $0.key.hasSuffix("." + suffix) }?.value
+        }
+        info.layers = number("block_count")
+        info.heads = number("attention.head_count")
+        info.keyLength = number("attention.key_length")
+        info.valueLength = number("attention.value_length")
+        info.embedding = number("embedding_length")
+        info.slidingWindow = number("attention.sliding_window")
+        if let list = lists[prefix + "attention.head_count_kv"] {
+            info.kvHeads = list
+        } else if let single = number("attention.head_count_kv") {
+            info.kvHeads = [single]
+        }
+        info.slidingPattern = flags[prefix + "attention.sliding_window_pattern"] ?? []
         return info
     }
 

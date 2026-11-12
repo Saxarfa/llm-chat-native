@@ -278,7 +278,9 @@ enum ChatConfig {
                         attachments: [[String: Any]] = []) -> [String: Any] {
         let over = overrides ?? [:]
         let shared = settings.shared
-        var values = config(model: model, settings: settings, overrides: over)
+        // Параметры модели в приложении общие для всех её чатов: правки отдельного чата
+        // (`overrides[model]`, их ставит только сайт) не учитываются.
+        var values = config(model: model, settings: settings, overrides: [:])
 
         // Адрес самого сайта означает «модель по умолчанию на сервере» — как пустая строка.
         var endpoint = (shared["endpoint"] as? String) ?? ""

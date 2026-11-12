@@ -115,10 +115,11 @@ enum PhoneModelNames {
 }
 
 enum PhoneMemory {
-    /// Сколько памяти нужно модели: веса целиком плюс запас на контекст и буферы Metal.
-    static func needed(fileSize: Int64, context: Int = 4096) -> Int64 {
-        let kvAndBuffers = Int64(context) * 160_000 + 300_000_000
-        return fileSize + kvAndBuffers
+    /// Сколько памяти нужно модели: веса целиком, кэш контекста и буферы Metal.
+    /// `kv` — точный размер кэша из заголовка GGUF (`GGUFInfo.kvBytes`); без него — грубая оценка.
+    static func needed(fileSize: Int64, context: Int = 4096, kv: Int64? = nil) -> Int64 {
+        let cache = kv ?? Int64(context) * 160_000
+        return fileSize + cache + 400_000_000
     }
 
     enum Fit: Equatable {
@@ -127,9 +128,9 @@ enum PhoneMemory {
 
     /// `available` — сколько ещё может занять приложение (`os_proc_available_memory`),
     /// плюс то, что уже занимает загруженная модель.
-    static func fit(fileSize: Int64, available: Int64, context: Int = 4096) -> Fit {
+    static func fit(fileSize: Int64, available: Int64, context: Int = 4096, kv: Int64? = nil) -> Fit {
         guard available > 0 else { return .tight }
-        let need = needed(fileSize: fileSize, context: context)
+        let need = needed(fileSize: fileSize, context: context, kv: kv)
         if need <= available * 85 / 100 { return .fits }
         if need <= available { return .tight }
         return .tooBig
@@ -140,6 +141,71 @@ enum PhoneMemory {
         if value >= 10 { return String(format: "%.0f ГБ", value) }
         if value >= 1 { return String(format: "%.1f ГБ", value).replacingOccurrences(of: ".", with: ",") }
         return String(format: "%.0f МБ", value * 1000)
+    }
+}
+
+/// Скорость загрузки: сглаженная за последние секунды, чтобы цифра не прыгала.
+struct TransferMeter: Equatable {
+    private(set) var bytesPerSecond: Double
+    private var lastBytes: Int64 = 0
+    private var lastTime: TimeInterval = 0
+    /// Когда байты прибавлялись в последний раз.
+    private var changedAt: TimeInterval = 0
+
+    init(bytesPerSecond: Double = 0) {
+        self.bytesPerSecond = bytesPerSecond
+    }
+
+    mutating func add(bytes: Int64, at time: TimeInterval) {
+        if lastTime == 0 || bytes < lastBytes {
+            lastBytes = bytes
+            lastTime = time
+            changedAt = time
+            return
+        }
+        if bytes > lastBytes { changedAt = time }
+        let elapsed = time - lastTime
+        guard elapsed >= 0.5 else { return }
+        let rate = Double(bytes - lastBytes) / elapsed
+        bytesPerSecond = bytesPerSecond == 0 ? rate : bytesPerSecond * 0.7 + rate * 0.3
+        lastBytes = bytes
+        lastTime = time
+    }
+
+    /// Данные давно не приходят: скорость и время уже неправда.
+    func stalled(at time: TimeInterval) -> Bool {
+        changedAt > 0 && time - changedAt > 5
+    }
+
+    /// Строка под полосой загрузки.
+    func line(received: Int64, total: Int64, at time: TimeInterval) -> String {
+        var parts = ["\(PhoneMemory.gigabytes(received)) из \(PhoneMemory.gigabytes(total))"]
+        if stalled(at: time) {
+            parts.append("нет данных…")
+        } else if bytesPerSecond > 0 {
+            parts.append(Self.speed(bytesPerSecond))
+            if total > received { parts.append("осталось " + Self.remaining(Double(total - received) / bytesPerSecond)) }
+        } else if total > 0 {
+            parts.append("\(Int(Double(received) / Double(total) * 100))%")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    static func speed(_ bytesPerSecond: Double) -> String {
+        let megabytes = bytesPerSecond / 1_000_000
+        if megabytes >= 100 { return String(format: "%.0f МБ/с", megabytes) }
+        if megabytes >= 1 { return String(format: "%.1f МБ/с", megabytes).replacingOccurrences(of: ".", with: ",") }
+        return String(format: "%.0f КБ/с", bytesPerSecond / 1000)
+    }
+
+    static func remaining(_ seconds: Double) -> String {
+        guard seconds.isFinite, seconds > 0 else { return "—" }
+        if seconds < 60 { return "~\(max(1, Int(seconds.rounded()))) с" }
+        let minutes = Int((seconds / 60).rounded())
+        if minutes < 60 { return "~\(minutes) мин" }
+        let hours = minutes / 60
+        let rest = minutes % 60
+        return rest == 0 ? "~\(hours) ч" : "~\(hours) ч \(rest) мин"
     }
 }
 

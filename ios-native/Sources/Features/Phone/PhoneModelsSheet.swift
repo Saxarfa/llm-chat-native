@@ -71,7 +71,7 @@ struct PhoneModelsSheet: View {
             Text("«\(item.name)» освободит место. Чаты с ней на ПК останутся.")
         }
         .sheet(item: $configuring) { item in
-            PhoneModelSettingsSheet(item: item)
+            ModelSettingsSheet(modelID: item.chatID)
                 .environment(model)
         }
         .task {
@@ -118,7 +118,7 @@ struct PhoneModelsSheet: View {
                     HStack(spacing: 6) {
                         Text([item.quant, PhoneMemory.gigabytes(item.size), loaded ? "в памяти" : nil]
                             .compactMap { $0 }.joined(separator: " · "))
-                        FitBadge(fit: phone.fit(item.size))
+                        FitBadge(fit: phone.fit(item.size, context: phone.wantedContext(item.file), file: item.file))
                     }
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.subtle)
@@ -169,6 +169,8 @@ struct PhoneModelsSheet: View {
         .padding(.trailing, 6)
         .padding(.vertical, 8)
         .frame(minHeight: 56)
+        // Заголовок файла нужен для честной оценки памяти под контекст.
+        .task { await phone.loadInfo(item.file) }
     }
 
     // MARK: - Загрузки
@@ -331,9 +333,14 @@ private struct DownloadRow: View {
                 Text("Готовлю загрузку…").font(.system(size: 13)).foregroundStyle(Theme.subtle)
             case .running:
                 ProgressView(value: item.progress).tint(Theme.buttonPrimary)
-                Text("\(PhoneMemory.gigabytes(item.received)) из \(PhoneMemory.gigabytes(item.total)) · \(Int(item.progress * 100))%")
-                    .font(.system(size: 13).monospacedDigit())
-                    .foregroundStyle(Theme.subtle)
+                // Раз в секунду: если данные перестали приходить, вместо скорости — «нет данных».
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(item.meter.line(received: item.received, total: item.total,
+                                         at: context.date.timeIntervalSince1970))
+                        .font(.system(size: 13).monospacedDigit())
+                        .foregroundStyle(Theme.subtle)
+                        .accessibilityIdentifier("phone.download.speed")
+                }
             case .failed(let message):
                 Text(message)
                     .font(.system(size: 14))
@@ -370,7 +377,7 @@ struct FitBadge: View {
         switch fit {
         case .fits: return "Влезет"
         case .tight: return "Впритык"
-        case .tooBig: return "Не влезет"
+        case .tooBig: return "Может не хватить"
         }
     }
 
