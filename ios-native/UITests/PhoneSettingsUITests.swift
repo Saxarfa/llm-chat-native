@@ -109,9 +109,14 @@ final class PhoneSettingsUITests: XCTestCase {
         sleep(1)
         snap("ui-o2-offline-answer")
 
+        // Сначала убрать клавиатуру: иначе первое нажатие на «Меню» уходит на неё.
+        if app.keyboards.firstMatch.exists {
+            text(app, contains: "Работаю прямо на телефоне").tap()
+            _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 3)
+        }
         app.buttons["Меню"].firstMatch.tap()
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Перевод письма")).firstMatch
-            .waitForExistence(timeout: 5), "в шторке чаты телефона")
+        let other = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Перевод письма")).firstMatch
+        XCTAssertTrue(other.waitForExistence(timeout: 5), "в шторке чаты телефона")
         sleep(1)
         snap("ui-o3-offline-sidebar")
     }
