@@ -42,7 +42,7 @@ final class PhoneModelsUITests: XCTestCase {
         sleep(1)
         snap("ui-p1-models")
         XCTAssertEqual(app.buttons.matching(identifier: "phone.installed").count, 3)
-        XCTAssertTrue(app.staticTexts["Не влезет"].exists, "модель на 7,3 ГБ должна быть помечена как не влезающая")
+        XCTAssertTrue(app.staticTexts["Может не хватить"].exists, "у модели на 7,3 ГБ — предупреждение о памяти, а не запрет")
         XCTAssertTrue(element(app, "phone.download").exists, "идущая загрузка видна в окне")
 
         let repo = app.buttons.matching(identifier: "phone.repo").firstMatch

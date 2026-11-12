@@ -137,15 +137,17 @@ final class ComposerTests: XCTestCase {
     // MARK: - Капсула
 
     @MainActor
-    func testQueue() {
+    func testQueue() async {
         let app = AppModel(preview: .streaming)
+        await app.bootstrap()
         XCTAssertNotNil(app.activeLive)
         app.enqueue("Второй вопрос", attachments: [])
         app.enqueue("Третий", attachments: [])
         XCTAssertEqual(app.activeQueue.map(\.text), ["Второй вопрос", "Третий"])
         app.runQueue()
         XCTAssertEqual(app.activeQueue.count, 2, "пока модель отвечает, очередь ждёт")
-        app.cancelQueued(app.activeQueue[0])
+        guard let first = app.activeQueue.first else { return }
+        app.cancelQueued(first)
         XCTAssertEqual(app.activeQueue.map(\.text), ["Третий"])
     }
 
