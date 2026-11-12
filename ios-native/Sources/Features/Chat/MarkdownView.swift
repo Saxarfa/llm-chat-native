@@ -37,9 +37,34 @@ enum InlineMarkdown {
 /// Боковое меню сверяется с ним и не открывается, пока палец листает такой блок.
 enum HorizontalScrollGuard {
     static var lastTouch = Date.distantPast
+    /// Экранные рамки горизонтальных лент (чипы и лента артов в студии):
+    /// жест, начатый внутри, листает ленту, а не открывает меню.
+    static var zones: [UUID: CGRect] = [:]
 
     static var isActive: Bool {
         Date().timeIntervalSince(lastTouch) < 0.35
+    }
+
+    static func covers(_ point: CGPoint) -> Bool {
+        zones.values.contains { $0.contains(point) }
+    }
+}
+
+/// Отмечает горизонтальную ленту как зону, где свайп вправо не открывает боковое меню.
+struct DrawerFreeZone: ViewModifier {
+    @State private var id = UUID()
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                GeometryReader { geo in
+                    let frame = geo.frame(in: .global)
+                    Color.clear
+                        .onAppear { HorizontalScrollGuard.zones[id] = frame }
+                        .onChange(of: frame) { _, value in HorizontalScrollGuard.zones[id] = value }
+                }
+            )
+            .onDisappear { HorizontalScrollGuard.zones[id] = nil }
     }
 }
 

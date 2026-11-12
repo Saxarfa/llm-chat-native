@@ -10,8 +10,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.7"
-    CURRENT_PROJECT_VERSION: "10"
+    MARKETING_VERSION: "0.7.1"
+    CURRENT_PROJECT_VERSION: "11"
     TARGETED_DEVICE_FAMILY: "1"
     CODE_SIGN_STYLE: Manual
     DEVELOPMENT_TEAM: ""
@@ -21,6 +21,7 @@ targets:
     platform: iOS
     scheme:
       testTargets:
+        - LLMChatTests
         - LLMChatUITests
     sources:
       - path: Sources
@@ -67,3 +68,17 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.llmchat.native.uitests
         GENERATE_INFOPLIST_FILE: "YES"
         TEST_TARGET_NAME: LLMChat
+  # Проверки логики без интерфейса (разбор ответов сервера) — тоже только в workflow.
+  LLMChatTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: LLMChat
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.llmchat.native.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/LLMChat.app/LLMChat
+        BUNDLE_LOADER: $(TEST_HOST)

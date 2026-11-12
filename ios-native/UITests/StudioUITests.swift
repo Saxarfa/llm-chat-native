@@ -46,6 +46,26 @@ final class StudioUITests: XCTestCase {
         wait(for: [done], timeout: timeout)
     }
 
+    /// Сетка истории: квадратные ячейки в три колонки, без наложений (в 0.7 миниатюры раздувались).
+    private func checkHistoryGrid(_ app: XCUIApplication) {
+        let cells = app.buttons.matching(identifier: "studio.history.cell")
+        XCTAssertGreaterThanOrEqual(cells.count, 3)
+        let column = (app.windows.firstMatch.frame.width - 32) / 3 + 1
+        var frames: [CGRect] = []
+        for index in 0..<min(cells.count, 6) {
+            let frame = cells.element(boundBy: index).frame
+            XCTAssertLessThanOrEqual(frame.width, column, "ячейка \(index) шире колонки: \(frame)")
+            XCTAssertEqual(frame.width, frame.height, accuracy: 2, "ячейка \(index) не квадратная: \(frame)")
+            frames.append(frame)
+        }
+        for a in frames.indices {
+            for b in frames.indices where b > a {
+                XCTAssertFalse(frames[a].insetBy(dx: 1, dy: 1).intersects(frames[b]),
+                               "ячейки \(a) и \(b) наложились: \(frames[a]) / \(frames[b])")
+            }
+        }
+    }
+
     private func closeSheet(_ app: XCUIApplication) {
         app.swipeDown(velocity: .fast)
         sleep(1)
@@ -77,9 +97,15 @@ final class StudioUITests: XCTestCase {
         XCTAssertTrue(prompt.waitForExistence(timeout: 10))
         prompt.tap()
         prompt.typeText(", дракон в облаках")
+        // Пока набирается промпт, сцены нет, а последний арт — миниатюрой в строке чипов (как на сайте).
+        XCTAssertTrue(element(app, "studio.thumb").waitForExistence(timeout: 3))
+        sleep(1)
+        XCTAssertFalse(element(app, "studio.canvas").exists, "сцена должна прятаться на время набора")
         snap("ui-03-typing")
         let done = app.buttons["Скрыть клавиатуру"].firstMatch
-        if done.exists { done.tap() }
+        XCTAssertTrue(done.isHittable, "«Готово» должна быть видна без прокрутки ленты")
+        done.tap()
+        XCTAssertTrue(element(app, "studio.canvas").waitForExistence(timeout: 3))
 
         let create = element(app, "studio.create")
         XCTAssertTrue(create.isEnabled)
@@ -96,6 +122,13 @@ final class StudioUITests: XCTestCase {
         let app = launch("studio")
         let format = element(app, "studio.format")
         XCTAssertTrue(format.waitForExistence(timeout: 10))
+
+        // Свайп вправо по ленте артов листает её, а не вытягивает боковое меню.
+        let strip = element(app, "studio.filmstrip")
+        XCTAssertTrue(strip.waitForExistence(timeout: 5))
+        strip.swipeRight()
+        sleep(1)
+        XCTAssertFalse(element(app, "sidebar.studio").exists, "свайп по ленте артов открыл меню")
 
         format.tap()
         XCTAssertTrue(app.staticTexts["Формат изображения"].waitForExistence(timeout: 5))
@@ -119,6 +152,7 @@ final class StudioUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["История артов"].waitForExistence(timeout: 5))
         sleep(1)
         snap("ui-09-history")
+        checkHistoryGrid(app)
         closeSheet(app)
 
         element(app, "studio.details").tap()

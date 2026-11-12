@@ -577,7 +577,7 @@ private struct StudioHistoryPanel: View {
             done()
         } label: {
             StudioThumb(id: job.id)
-                .aspectRatio(1, contentMode: .fill)
+                .aspectRatio(1, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(alignment: .topTrailing) {
                     if job.favorite {
@@ -596,6 +596,7 @@ private struct StudioHistoryPanel: View {
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel("Арт: \(job.prompt.prefix(60))")
+        .accessibilityIdentifier("studio.history.cell")
         .contextMenu {
             Button("На весь экран", systemImage: "arrow.up.left.and.arrow.down.right") { onOpenArt(job.id) }
             Button(job.favorite ? "Убрать из избранного" : "В избранное", systemImage: job.favorite ? "star.slash" : "star") {

@@ -19,25 +19,33 @@ struct StudioScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            StudioStage(onOpen: openArt, onDetails: { panel = .details })
-                .contentShape(Rectangle())
-                .onTapGesture { typing = false }
-            if !studio.completed.isEmpty {
-                StudioFilmstrip()
-                    .padding(.top, 10)
+            // Пока набирается промпт, сцена и лента убираются, а поле растягивается до клавиатуры —
+            // как на сайте (`data-prompt-focus` в `MobileImageStudio.css`). Иначе арт сжимался в полоску.
+            if !typing {
+                VStack(spacing: 0) {
+                    StudioStage(onOpen: openArt, onDetails: { panel = .details })
+                        .contentShape(Rectangle())
+                        .onTapGesture { typing = false }
+                    if !studio.completed.isEmpty {
+                        StudioFilmstrip()
+                            .padding(.top, 10)
+                    }
+                    if let undo = studio.undo {
+                        UndoBar(undo: undo)
+                            .padding(.top, 8)
+                            .transition(.opacity)
+                    }
+                }
+                .animation(.easeOut(duration: 0.2), value: studio.undo)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.opacity)
             }
-            if let undo = studio.undo {
-                UndoBar(undo: undo)
-                    .padding(.top, 8)
-                    .transition(.opacity)
-            }
+            StudioComposer(typing: $typing, onPanel: { open($0) }, onOpenArt: openArt)
+                .frame(maxHeight: typing ? .infinity : nil, alignment: .top)
         }
-        .animation(.easeOut(duration: 0.2), value: studio.undo)
+        .animation(.easeOut(duration: 0.2), value: typing)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .safeAreaInset(edge: .top, spacing: 0) { header }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            StudioComposer(typing: $typing, onPanel: { open($0) })
-        }
         .background(Theme.canvas.ignoresSafeArea())
         .task { await studio.run() }
         .sheet(item: $panel) { kind in
@@ -292,6 +300,7 @@ private struct StudioFilmstrip: View {
             .padding(.horizontal, 16)
         }
         .frame(height: 60)
+        .modifier(DrawerFreeZone())
         .accessibilityIdentifier("studio.filmstrip")
     }
 }
@@ -303,17 +312,19 @@ struct StudioThumb: View {
     @State private var image: UIImage?
 
     var body: some View {
-        ZStack {
-            Theme.surface
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .transition(.opacity)
+        // Размер задаёт подложка, картинка лишь заполняет её поверх — иначе `scaledToFill`
+        // раздувает ячейку до размера самой картинки (миниатюры в истории наезжали друг на друга).
+        Theme.surface
+            .overlay {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .transition(.opacity)
+                }
             }
-        }
-        .clipped()
-        .task(id: id) {
+            .clipped()
+            .task(id: id) {
             if image == nil { image = ImageStore.image("art:\(id):t") }
             if image == nil {
                 let loaded = await model.studio.thumbnail(id)
@@ -380,13 +391,17 @@ private struct StudioComposer: View {
     @Environment(AppModel.self) private var model
     var typing: FocusState<Bool>.Binding
     let onPanel: (StudioPanel) -> Void
+    let onOpenArt: () -> Void
 
     private var studio: StudioModel { model.studio }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            chips
+            chipRow
             prompt
+            if typing.wrappedValue {
+                Spacer(minLength: 0)
+            }
             HStack(spacing: 10) {
                 loopButton
                 createButton
@@ -409,6 +424,20 @@ private struct StudioComposer: View {
     private var chips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                // Сцена спрятана, пока набирается промпт, — последний арт остаётся под рукой (как на сайте).
+                if typing.wrappedValue, let job = studio.selected {
+                    Button(action: onOpenArt) {
+                        StudioThumb(id: job.id)
+                            .frame(width: 36, height: 36)
+                            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Theme.line))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressScaleStyle())
+                    .accessibilityLabel("Открыть последний арт на весь экран")
+                    .accessibilityIdentifier("studio.thumb")
+                }
                 Chip(title: StudioModels.name(studio.draft.model), symbol: "chevron.down") { onPanel(.model) }
                     .accessibilityIdentifier("studio.model")
                 Chip(title: formatName, leading: ratioIcon, symbol: nil) { onPanel(.format) }
@@ -429,24 +458,36 @@ private struct StudioComposer: View {
                 .buttonStyle(PressScaleStyle())
                 .accessibilityLabel("Настройки генерации")
                 .accessibilityIdentifier("studio.settings")
-                if typing.wrappedValue {
-                    Button {
-                        typing.wrappedValue = false
-                    } label: {
-                        Label("Готово", systemImage: "checkmark")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Theme.ink)
-                            .padding(.horizontal, 12)
-                            .frame(height: 36)
-                            .background(Theme.fill, in: Capsule())
-                            .frame(minHeight: 44)
-                    }
-                    .buttonStyle(PressScaleStyle())
-                    .accessibilityLabel("Скрыть клавиатуру")
-                }
             }
         }
-        .scrollClipDisabled()
+        // Пока набирается промпт, справа стоит «Готово» — ленту под ним обрезаем.
+        .scrollClipDisabled(!typing.wrappedValue)
+        .modifier(DrawerFreeZone())
+    }
+
+    private var chipRow: some View {
+        HStack(spacing: 8) {
+            chips
+            if typing.wrappedValue {
+                // Вне прокрутки, чтобы не уезжать за край экрана (в 0.7 её не было видно).
+                Button {
+                    typing.wrappedValue = false
+                } label: {
+                    Label("Готово", systemImage: "checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                        .padding(.horizontal, 12)
+                        .frame(height: 36)
+                        .background(Theme.fill, in: Capsule())
+                        .overlay(Capsule().strokeBorder(Theme.line))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressScaleStyle())
+                .fixedSize()
+                .accessibilityLabel("Скрыть клавиатуру")
+            }
+        }
     }
 
     private var formatName: String {
@@ -470,7 +511,7 @@ private struct StudioComposer: View {
             get: { studio.draft.prompt },
             set: { value in studio.edit { $0.prompt = String(value.prefix(16000)) } }
         ), axis: .vertical)
-            .lineLimit(2...6)
+            .lineLimit(typing.wrappedValue ? 4...7 : 2...6)
             .font(.system(size: 17))
             .foregroundStyle(Theme.ink)
             .focused(typing)

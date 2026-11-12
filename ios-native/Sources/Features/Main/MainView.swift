@@ -66,11 +66,12 @@ struct MainView: View {
 
     /// Жест принимается только если начался горизонтально — вертикальный скролл не перехватывается.
     private func drag(width: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 14)
+        DragGesture(minimumDistance: 14, coordinateSpace: .global)
             .onChanged { value in
                 if axis == nil {
-                    // Палец листает код или таблицу — закрытое меню не трогаем.
-                    let scrollingBlock = !isOpen && HorizontalScrollGuard.isActive
+                    // Палец листает код, таблицу или ленту студии — закрытое меню не трогаем.
+                    let scrollingBlock = !isOpen && (HorizontalScrollGuard.isActive
+                        || HorizontalScrollGuard.covers(value.startLocation))
                     let horizontal = !scrollingBlock
                         && abs(value.translation.width) > abs(value.translation.height) * 1.3
                     axis = horizontal ? .horizontal : .vertical

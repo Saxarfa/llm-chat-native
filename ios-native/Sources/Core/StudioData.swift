@@ -304,7 +304,11 @@ enum StudioModels {
 /// Сервер присылает числа то строкой, то числом.
 enum StudioValue {
     static func double(_ raw: Any?) -> Double? {
-        if let number = raw as? NSNumber, !(raw is Bool) { return number.doubleValue }
+        if let number = raw as? NSNumber {
+            // `raw is Bool` истинно и для чисел 0 и 1 из JSONSerialization — так CLIP 0 терялся.
+            // Настоящие true/false отличаем по типу CFBoolean.
+            return CFGetTypeID(number) == CFBooleanGetTypeID() ? nil : number.doubleValue
+        }
         if let text = raw as? String { return Double(text) }
         return nil
     }
