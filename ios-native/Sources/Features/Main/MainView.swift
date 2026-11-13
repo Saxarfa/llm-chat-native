@@ -33,7 +33,8 @@ struct MainView: View {
                     .scrollDisabled(swiping)
                     .accessibilityHidden(!isOpen)
 
-                ZStack {
+                // Group, не ZStack: с отдельным контейнером капсула и поиск не поднимались над клавиатурой (0.14).
+                Group {
                     // Смена раздела (чат, студия, «Недавние») — мягкое проявление, а не резкая подмена.
                     if model.screen == .studio {
                         StudioScreen(onMenu: { setOpen(!isOpen) })
