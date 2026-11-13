@@ -84,6 +84,7 @@ struct MainView: View {
 
     private func settle() {
         settling = true
+        DrawerSwipe.lastMove = Date()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { settling = false }
     }
 
@@ -114,6 +115,7 @@ struct MainView: View {
                     if horizontal { Keyboard.hide() }
                 }
                 guard axis == .horizontal else { return }
+                DrawerSwipe.lastMove = Date()
                 dragX = value.translation.width
             }
             .onEnded { value in
@@ -124,6 +126,17 @@ struct MainView: View {
                 let projected = (isOpen ? width : 0) + value.predictedEndTranslation.width
                 setOpen(projected > width / 2)
             }
+    }
+}
+
+/// Свайп шторки. Лента едет вместе с пальцем, поэтому палец, начавший свайп на картинке,
+/// отпускается внутри неё же — и кнопка картинки срабатывала. Кнопки, открывающие что-то
+/// на весь экран, спрашивают `blocksTaps` и в это время ничего не делают.
+enum DrawerSwipe {
+    static var lastMove = Date.distantPast
+
+    static var blocksTaps: Bool {
+        Date().timeIntervalSince(lastMove) < 0.4
     }
 }
 

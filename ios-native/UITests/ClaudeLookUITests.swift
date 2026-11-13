@@ -140,4 +140,17 @@ final class ClaudeLookUITests: XCTestCase {
         sleep(1)
         snap("ui-l6-header-menu")
     }
+
+    /// Выбор модели как у Claude: аватарки и главная карточка, «Другие модели» отдельной страницей.
+    func testModelPickerPages() {
+        let app = launch("models")
+        let other = element(app, "picker.other")
+        XCTAssertTrue(other.waitForExistence(timeout: 10))
+        sleep(1)
+        snap("ui-m1-picker")
+        other.tap()
+        XCTAssertTrue(element(app, "phone.manage").waitForExistence(timeout: 5), "модели телефона — во «Других моделях»")
+        sleep(1)
+        snap("ui-m2-other")
+    }
 }

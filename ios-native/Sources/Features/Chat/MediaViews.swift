@@ -13,6 +13,7 @@ struct AttachmentThumb: View {
 
     var body: some View {
         Button {
+            guard !DrawerSwipe.blocksTaps else { return }
             Keyboard.hide()
             model.viewer = ViewerItem(source: .attachment(item.id))
         } label: {
@@ -77,6 +78,7 @@ struct ArtView: View {
             VideoArtView(art: art)
         } else if art.ready {
             Button {
+                guard !DrawerSwipe.blocksTaps else { return }
                 if image != nil {
                     Keyboard.hide()
                     model.viewer = ViewerItem(source: .art(art.id))
@@ -160,6 +162,7 @@ private struct VideoArtView: View {
     var body: some View {
         if art.ready {
             Button {
+                guard !DrawerSwipe.blocksTaps else { return }
                 Task { await open() }
             } label: {
                 tile {
@@ -407,21 +410,39 @@ struct DraftAttachmentStrip: View {
 }
 
 /// Просмотр на весь экран: увеличение щипком и двойным нажатием, сохранение в «Фото».
+/// Фон — размытый (сам арт, растянутый и размытый, поверх размытого чата), а не чёрный;
+/// смахивание вверх или вниз закрывает, как в «Фото». Открытый из студии просмотр
+/// сам переключается на новый арт, когда генерация закончилась.
 struct ImageViewer: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let item: ViewerItem
+    var followsStudio = false
     @State private var image: UIImage?
+    @State private var backdrop: UIImage?
     @State private var loading = true
     @State private var note: String?
     @State private var saving = false
+    /// Какой арт показан сейчас (при слежении за студией меняется).
+    @State private var shownArt: String?
+    @State private var drag: CGSize = .zero
+    @State private var closing = false
+
+    /// 0 — на месте, 1 — утащили далеко: фон и кнопки тают.
+    private var progress: CGFloat { min(1, abs(drag.height) / 320) }
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            background
+                .opacity(1 - progress * 0.85)
+                .ignoresSafeArea()
             if let image {
-                ZoomableImage(image: image)
+                ZoomableImage(image: image,
+                              onDrag: { value in if !closing { drag = value } },
+                              onEnd: finishDrag)
                     .ignoresSafeArea()
+                    .scaleEffect(1 - progress * 0.14)
+                    .offset(drag)
             } else if !loading {
                 Text("Не удалось открыть изображение.")
                     .font(.system(size: 16))
@@ -444,6 +465,7 @@ struct ImageViewer: View {
             }
             .padding(.horizontal, 12)
             .frame(height: 52)
+            .opacity(1 - min(1, progress * 2.5))
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let note {
@@ -459,20 +481,63 @@ struct ImageViewer: View {
         }
         .animation(.easeOut(duration: 0.2), value: note)
         .preferredColorScheme(.dark)
+        // Прозрачная подложка показа: под размытием виден чат, а при смахивании — он сам.
+        .presentationBackground(.clear)
         .task { await load() }
+        .onChange(of: model.studio.completed.first?.id) { _, newest in
+            guard followsStudio, let newest, newest != shownArt, !closing else { return }
+            Task { await show(art: newest) }
+        }
+    }
+
+    /// Размытый фон: системное размытие того, что под просмотром, и поверх — сам арт,
+    /// сильно размытый и притемнённый (так фон не чёрный, даже если система подложку не убрала).
+    private var background: some View {
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial)
+            if let backdrop {
+                Image(uiImage: backdrop)
+                    .resizable()
+                    .scaledToFill()
+                    .blur(radius: 40, opaque: true)
+                    .opacity(0.6)
+                    .transition(.opacity)
+            }
+            Color.black.opacity(0.42)
+        }
+        .animation(.easeOut(duration: 0.3), value: backdrop)
+    }
+
+    private func finishDrag(velocity: CGFloat, distance: CGFloat) {
+        guard !closing else { return }
+        if abs(distance) > 110 || abs(velocity) > 900 {
+            closing = true
+            Haptics.tap()
+            let away: CGFloat = (distance == 0 ? velocity : distance) < 0 ? -1200 : 1200
+            withAnimation(.easeOut(duration: 0.22)) { drag = CGSize(width: drag.width, height: away) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                var quiet = Transaction()
+                quiet.disablesAnimations = true
+                withTransaction(quiet) { dismiss() }
+            }
+        } else {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { drag = .zero }
+        }
     }
 
     private func load() async {
         switch item.source {
         case .attachment(let key):
-            image = await Task.detached(priority: .userInitiated) {
+            let loaded = await Task.detached(priority: .userInitiated) {
                 ImageStore.attachmentImage(key, thumb: false)
             }.value
+            set(loaded)
         case .art(let id):
+            shownArt = id
             // Сначала то, что уже есть в ленте, затем оригинал.
-            image = await model.artImage(id, preview: true)
+            set(await model.artImage(id, preview: true))
             if let original = await model.artImage(id, preview: false) {
-                image = original
+                if shownArt == id { set(original) }
             } else if image != nil {
                 show("Оригинал недоступен — показана уменьшенная копия.")
             }
@@ -480,6 +545,25 @@ struct ImageViewer: View {
             break
         }
         loading = false
+    }
+
+    /// Новый арт студии на месте прежнего: сначала уменьшенная копия, потом оригинал.
+    private func show(art id: String) async {
+        guard let preview = await model.artImage(id, preview: true) else { return }
+        shownArt = id
+        Haptics.selection()
+        set(preview)
+        if let original = await model.artImage(id, preview: false), shownArt == id { set(original) }
+    }
+
+    private func set(_ picture: UIImage?) {
+        image = picture
+        guard let picture else { return }
+        // Для фона хватает крошечной копии — размытие дешёвое.
+        let side: CGFloat = 48
+        let scale = side / max(picture.size.width, picture.size.height, 1)
+        backdrop = picture.preparingThumbnail(of: CGSize(width: max(1, picture.size.width * scale),
+                                                         height: max(1, picture.size.height * scale))) ?? picture
     }
 
     private func save() async {
@@ -513,9 +597,12 @@ struct ImageViewer: View {
     }
 }
 
-/// Картинка в системной прокрутке с увеличением.
+/// Картинка в системной прокрутке с увеличением. Пока картинка не увеличена, вертикальное
+/// движение пальца тащит её (`onDrag`), а отпускание сообщает скорость и расстояние (`onEnd`).
 private struct ZoomableImage: UIViewRepresentable {
     let image: UIImage
+    var onDrag: (CGSize) -> Void = { _ in }
+    var onEnd: (_ velocity: CGFloat, _ distance: CGFloat) -> Void = { _, _ in }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -542,20 +629,41 @@ private struct ZoomableImage: UIViewRepresentable {
             view.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor),
         ])
         context.coordinator.imageView = view
+        context.coordinator.shownSize = image.size
 
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.doubleTap(_:)))
         tap.numberOfTapsRequired = 2
         scroll.addGestureRecognizer(tap)
+
+        let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pan(_:)))
+        pan.delegate = context.coordinator
+        pan.maximumNumberOfTouches = 1
+        scroll.addGestureRecognizer(pan)
         return scroll
     }
 
     func updateUIView(_ scroll: UIScrollView, context: Context) {
+        context.coordinator.onDrag = onDrag
+        context.coordinator.onEnd = onEnd
         guard let view = context.coordinator.imageView, view.image !== image else { return }
-        view.image = image
+        // Другая картинка (новый арт студии) — сброс увеличения и плавная смена;
+        // тот же арт в лучшем качестве — просто подмена.
+        let replacing = context.coordinator.shownSize.width / max(context.coordinator.shownSize.height, 1)
+            != image.size.width / max(image.size.height, 1) || context.coordinator.swapping
+        context.coordinator.swapping = false
+        if replacing { scroll.setZoomScale(1, animated: false) }
+        context.coordinator.shownSize = image.size
+        UIView.transition(with: view, duration: 0.25, options: .transitionCrossDissolve) {
+            view.image = image
+        }
     }
 
-    final class Coordinator: NSObject, UIScrollViewDelegate {
+    final class Coordinator: NSObject, UIScrollViewDelegate, UIGestureRecognizerDelegate {
         weak var imageView: UIImageView?
+        var shownSize: CGSize = .zero
+        var swapping = false
+        var onDrag: (CGSize) -> Void = { _ in }
+        var onEnd: (CGFloat, CGFloat) -> Void = { _, _ in }
 
         func viewForZooming(in scrollView: UIScrollView) -> UIView? { imageView }
 
@@ -569,6 +677,35 @@ private struct ZoomableImage: UIViewRepresentable {
             let size = CGSize(width: scroll.bounds.width / 2.5, height: scroll.bounds.height / 2.5)
             scroll.zoom(to: CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2,
                                    width: size.width, height: size.height), animated: true)
+        }
+
+        /// Смахивание — только у неувеличенной картинки и только по вертикали.
+        func gestureRecognizerShouldBegin(_ gesture: UIGestureRecognizer) -> Bool {
+            guard let pan = gesture as? UIPanGestureRecognizer,
+                  let scroll = pan.view as? UIScrollView,
+                  pan !== scroll.panGestureRecognizer else { return true }
+            guard scroll.zoomScale <= scroll.minimumZoomScale + 0.01 else { return false }
+            let velocity = pan.velocity(in: scroll)
+            return abs(velocity.y) > abs(velocity.x) * 1.2
+        }
+
+        func gestureRecognizer(_ gesture: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            guard let scroll = gesture.view as? UIScrollView else { return false }
+            return other === scroll.panGestureRecognizer
+        }
+
+        @objc func pan(_ gesture: UIPanGestureRecognizer) {
+            // В координатах окна: сам вид едет за пальцем, его координаты не годятся.
+            let shift = gesture.translation(in: nil)
+            switch gesture.state {
+            case .changed:
+                onDrag(CGSize(width: shift.x * 0.35, height: shift.y))
+            case .ended, .cancelled, .failed:
+                onEnd(gesture.velocity(in: nil).y, shift.y)
+            default:
+                break
+            }
         }
     }
 }

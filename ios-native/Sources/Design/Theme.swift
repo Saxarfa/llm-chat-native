@@ -26,6 +26,12 @@ enum Theme {
     static let bubble = dynamic(dark: 0x272725, light: 0xEBE8E0)
     /// Коралловая «Отправить», когда есть что отправлять, — как в приложении Claude.
     static let send = Color(hex: 0xC6613F)
+    /// Капсула ввода (замер со снимков Claude на iPhone): строка #2A2A2A с каймой #363636,
+    /// карточка с клавиатурой чуть темнее — #242424; круглые кнопки и чип модели — #363636.
+    static let capsule = dynamic(dark: 0x2A2A2A, light: 0xFFFDF8)
+    static let capsuleOpen = dynamic(dark: 0x242424, light: 0xFFFDF8)
+    static let capsuleLine = dynamic(UIColor(hex: 0x363636), UIColor(hex: 0x514832, alpha: 0.13))
+    static let capsuleControl = dynamic(UIColor(hex: 0x363636), UIColor(hex: 0x514832, alpha: 0.08))
 
     private static func dynamic(dark: UInt32, light: UInt32) -> Color {
         dynamic(UIColor(hex: dark), UIColor(hex: light))
@@ -47,6 +53,21 @@ enum Theme {
             .init(color: color.opacity(0.72), location: 0.78),
             .init(color: color.opacity(0), location: 1),
         ], startPoint: edge, endPoint: edge == .top ? .bottom : .top)
+    }
+
+    /// Размытие под плавающей шапкой (или над нижними кнопками), как в шторке Claude:
+    /// у края — размытие с тонировкой цветом фона, к середине экрана оно плавно сходит на нет.
+    static func edgeBlur(_ tint: Color, from edge: UnitPoint) -> some View {
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial)
+            tint.opacity(0.6)
+        }
+        .mask(LinearGradient(stops: [
+            .init(color: .black, location: 0),
+            .init(color: .black, location: 0.5),
+            .init(color: .black.opacity(0.6), location: 0.78),
+            .init(color: .clear, location: 1),
+        ], startPoint: edge, endPoint: edge == .top ? .bottom : .top))
     }
 
     /// Засечки — только для логотипа и приветствия.

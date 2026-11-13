@@ -16,15 +16,17 @@ struct ChatScreen: View {
         @Bindable var bound = model
         Group {
             if model.activeChatID == nil {
-                ScrollView {
-                    welcome
-                        .padding(.horizontal, 24)
-                        .frame(maxWidth: .infinity)
-                        .containerRelativeFrame(.vertical, alignment: .center)
-                }
-                .scrollDismissesKeyboard(.interactively)
-                .scrollBounceBehavior(.basedOnSize)
-                .transition(.opacity)
+                // Без прокрутки: приветствие стоит по центру свободного места и вместе с ним
+                // плавно поднимается за клавиатурой и опускается обратно, как у Claude
+                // (внутри ScrollView с containerRelativeFrame оно прыгало). Смахивание вниз убирает клавиатуру.
+                welcome
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(DragGesture(minimumDistance: 12).onEnded { value in
+                        if value.translation.height > 30 { Keyboard.hide() }
+                    })
+                    .transition(.opacity)
             } else {
                 MessageFeed()
                     // Свой экземпляр ленты на каждый чат: позиция прокрутки не переносится.
@@ -233,8 +235,8 @@ struct ComposerBar: View {
     var body: some View {
         let live = model.activeLive
         let expanded = self.expanded
-        // Строка-капсула стоит чуть ниже безопасной зоны, у самой полосы «домой», как у Claude.
-        let resting: CGFloat = Screen.bottomInset > 0 ? -4 : 8
+        // Низ строки-капсулы — ровно по безопасной зоне, как у Claude (замер: 34 pt от низа экрана).
+        let resting: CGFloat = Screen.bottomInset > 0 ? 0 : 8
         VStack(spacing: 8) {
             if let error = model.sendError {
                 errorBanner(error)
@@ -316,8 +318,11 @@ struct ComposerBar: View {
         }
     }
 
+    // Размеры сняты со снимков приложения Claude на этом же iPhone (3 px = 1 pt):
+    // строка — высота 50, кнопки 36 с полем 7–8; карточка с клавиатурой — высота 96,
+    // текст 16 pt сверху (поле 16), ряд кнопок 36 снизу (поле 7).
     private func card(live: AppModel.LiveState?, expanded: Bool) -> some View {
-        let shape = RoundedRectangle(cornerRadius: expanded ? 26 : 23, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: expanded ? 26 : 25, style: .continuous)
         return VStack(alignment: .leading, spacing: 0) {
             if model.editing != nil {
                 editBanner
@@ -330,29 +335,34 @@ struct ComposerBar: View {
             }
             // Одно и то же поле в обоих видах (меняются только отступы) — фокус не теряется.
             ZStack(alignment: .bottom) {
-                TextField("", text: $text, prompt: Text(placeholder).foregroundStyle(Theme.subtle), axis: .vertical)
+                TextField("", text: $text, prompt: Text(placeholder).foregroundStyle(Theme.muted), axis: .vertical)
                     .lineLimit(expanded ? 1...8 : 1...1)
                     .font(.system(size: 16))
                     .foregroundStyle(Theme.ink)
                     .focused($focused)
-                    .padding(.leading, expanded ? 12 : 49)
-                    .padding(.trailing, expanded ? 12 : 86)
-                    .padding(.top, expanded ? 15 : 12.5)
-                    .padding(.bottom, expanded ? 54 : 12.5)
+                    // Пока поле не в фокусе, текст подсказки не ловит касания: иначе палец «таскал»
+                    // её вверх-вниз (внутренняя прокрутка поля). Нажатие ловит подложка карточки.
+                    .allowsHitTesting(focused)
+                    .padding(.leading, expanded ? 13 : 58)
+                    .padding(.trailing, expanded ? 13 : 96)
+                    .padding(.top, expanded ? 16 : 15.5)
+                    .padding(.bottom, expanded ? 61 : 15.5)
                     .accessibilityIdentifier("chat.input")
                 controls(live: live, expanded: expanded)
             }
         }
-        .background(Theme.surface, in: shape)
-        .overlay(shape.strokeBorder(Theme.line))
+        // Подложка ставит фокус. Она под кнопками, поэтому нажатие «Отправить» не возвращает клавиатуру.
+        .background {
+            shape.fill(expanded ? Theme.capsuleOpen : Theme.capsule)
+                .onTapGesture { focused = true }
+        }
+        .overlay(shape.strokeBorder(Theme.capsuleLine).allowsHitTesting(false))
         .overlay(alignment: .bottom) {
             if expanded, let usage = model.activeContext, let fraction = usage.fraction {
                 contextLine(usage, fraction: fraction)
             }
         }
         .shadow(color: .black.opacity(0.14), radius: 14, y: 4)
-        .contentShape(shape)
-        .onTapGesture { focused = true }
     }
 
     /// Нижний ряд: «+», модель (только в карточке), микрофон и «Отправить» / «Стоп».
@@ -385,7 +395,7 @@ struct ComposerBar: View {
                             style: canSend ? .send : .idle, active: canSend, action: submit)
             }
         }
-        .padding(.horizontal, 7)
+        .padding(.horizontal, 8)
         .padding(.bottom, 7)
     }
 
@@ -442,11 +452,11 @@ struct ComposerBar: View {
             showTools = true
         } label: {
             Image(systemName: "plus")
-                .font(.system(size: 14, weight: .regular))
-                .foregroundStyle(Theme.ink.opacity(0.82))
-                .frame(width: 31, height: 31)
-                .background(Theme.fill, in: Circle())
-                .modifier(ControlHit(size: 31))
+                .font(.system(size: 17, weight: .light))
+                .foregroundStyle(Theme.ink.opacity(0.9))
+                .frame(width: 36, height: 36)
+                .background(Theme.capsuleControl, in: Circle())
+                .modifier(ControlHit(size: 36))
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel("Вложения и инструменты")
@@ -537,10 +547,11 @@ struct ComposerBar: View {
         .transition(.opacity)
     }
 
-    /// Подсказка в пустом поле, как у Claude: «Общайтесь с …» в новом чате, «Ответьте …» в начатом.
+    /// Подсказка в пустом поле. Без имени модели: «Ответьте Gemini 4 Hydrogen» читалось криво
+    /// (замечание пользователя 13.11.2026); модель и так видна на чипе.
     private var placeholder: String {
-        let name = model.activeModelName
-        return model.activeChatID == nil ? "Общайтесь с \(name)" : "Ответьте \(name)"
+        if model.editing != nil { return "Исправьте сообщение" }
+        return model.activeChatID == nil ? "Спросите что-нибудь" : "Напишите сообщение"
     }
 
     /// Уровень рассуждений рядом с названием модели: «Средний», «Рассуждения» или ничего.
@@ -583,21 +594,21 @@ struct ComposerBar: View {
     }
 
     private func chip(level: String?) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             Text(model.activeModelName)
-                .fontWeight(.semibold)
-                .foregroundStyle(Theme.ink.opacity(0.9))
+                .fontWeight(.medium)
+                .foregroundStyle(Theme.ink)
                 .lineLimit(1)
             if let level {
                 Text(level)
-                    .foregroundStyle(Theme.subtle)
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(1)
             }
         }
-        .font(.system(size: 12))
-        .padding(.horizontal, 12)
-        .frame(height: 31)
-        .background(Theme.fill, in: Capsule())
+        .font(.system(size: 14))
+        .padding(.horizontal, 16)
+        .frame(height: 36)
+        .background(Theme.capsuleControl, in: Capsule())
     }
 
     /// Микрофон: диктовка в поле ввода (речь распознаёт iOS).
@@ -608,12 +619,12 @@ struct ComposerBar: View {
             }
         } label: {
             Image(systemName: dictation.active ? "waveform" : "mic")
-                .font(.system(size: 14, weight: .regular))
-                .foregroundStyle(dictation.active ? Theme.accent : Theme.muted)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(dictation.active ? Theme.accent : Theme.ink.opacity(0.75))
                 .symbolEffect(.variableColor.iterative, isActive: dictation.active)
-                .frame(width: 31, height: 31)
-                .background(dictation.active ? Theme.accent.opacity(0.16) : Theme.fill, in: Circle())
-                .modifier(ControlHit(size: 31))
+                .frame(width: 36, height: 36)
+                .background(dictation.active ? Theme.accent.opacity(0.16) : Theme.capsuleControl, in: Circle())
+                .modifier(ControlHit(size: 36))
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel(dictation.active ? "Остановить диктовку" : "Диктовка")
@@ -628,15 +639,15 @@ struct ComposerBar: View {
     private func roundAction(symbol: String, label: String, style: ActionStyle, active: Bool,
                              action: @escaping () -> Void) -> some View {
         let ink: Color = style == .send ? .white : style == .stop ? Theme.ink : Theme.buttonPrimaryText.opacity(0.4)
-        let face: Color = style == .send ? Theme.send : style == .stop ? Theme.fillActive : Theme.buttonPrimary
+        let face: Color = style == .send ? Theme.send : style == .stop ? Theme.capsuleControl : Theme.buttonPrimary
         return Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: style == .stop ? 11 : 14, weight: style == .stop ? .bold : .medium))
+                .font(.system(size: style == .stop ? 12 : 16, weight: style == .stop ? .bold : .medium))
                 .foregroundStyle(ink)
-                .frame(width: 32, height: 32)
+                .frame(width: 36, height: 36)
                 .background(face, in: Circle())
                 .opacity(active || style == .idle ? 1 : 0.5)
-                .modifier(ControlHit(size: 32))
+                .modifier(ControlHit(size: 36))
         }
         .buttonStyle(PressScaleStyle())
         .disabled(!active)
@@ -648,6 +659,7 @@ struct ComposerBar: View {
         dictation.stop()
         // Как у Claude: после отправки клавиатура уходит, капсула сворачивается в строку.
         focused = false
+        Keyboard.hide()
         let message = text
         if model.activeLive != nil, model.editing == nil {
             // Модель ещё отвечает: вопрос уйдёт сразу после ответа.

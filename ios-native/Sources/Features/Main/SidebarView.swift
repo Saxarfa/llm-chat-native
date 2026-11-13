@@ -54,9 +54,10 @@ struct SidebarView: View {
             .frame(height: 44)
             .padding(.top, -6)
             .padding(.bottom, 4)
+            // Под шапкой список размывается, как в шторке Claude (было простое затемнение).
             .background(alignment: .top) {
-                Theme.fade(Theme.rail, from: .top)
-                    .padding(.bottom, -16)
+                Theme.edgeBlur(Theme.rail, from: .top)
+                    .padding(.bottom, -20)
                     .ignoresSafeArea(edges: .top)
                     .allowsHitTesting(false)
             }
@@ -65,7 +66,7 @@ struct SidebarView: View {
             footer
                 .padding(.bottom, resting)
                 .background(alignment: .bottom) {
-                    Theme.fade(Theme.rail, from: .bottom)
+                    Theme.edgeBlur(Theme.rail, from: .bottom)
                         .padding(.top, -26)
                         .ignoresSafeArea(edges: .bottom)
                         .allowsHitTesting(false)

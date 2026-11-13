@@ -59,7 +59,8 @@ struct StudioScreen: View {
             .environment(model)
         }
         .fullScreenCover(item: $viewer) { item in
-            ImageViewer(item: item)
+            // Открыт арт студии, а генерация идёт: готовый новый арт сменяет показанный.
+            ImageViewer(item: item, followsStudio: true)
         }
         .onAppear(perform: openPreviewPanel)
     }
@@ -153,7 +154,7 @@ private struct StudioStage: View {
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .contentShape(Rectangle())
             .onTapGesture {
-                if studio.selected != nil { onOpen() }
+                if studio.selected != nil, !DrawerSwipe.blocksTaps { onOpen() }
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("studio.canvas")

@@ -181,4 +181,19 @@ final class StudioUITests: XCTestCase {
         snap("ui-11-viewer")
         app.buttons["Закрыть"].firstMatch.tap()
     }
+
+    /// Арт на весь экран: фон размыт, смахивание вниз закрывает просмотр (с 0.13).
+    func testViewerSwipeToClose() {
+        let app = launch("studioArt")
+        let close = app.buttons["Закрыть"].firstMatch
+        XCTAssertTrue(close.waitForExistence(timeout: 10))
+        sleep(1)
+        snap("ui-12-viewer-blur")
+        let window = app.windows.firstMatch
+        let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+        start.press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)))
+        wait(close, "exists == false", timeout: 5)
+        XCTAssertTrue(element(app, "studio.canvas").waitForExistence(timeout: 3), "после смахивания — снова студия")
+        snap("ui-13-viewer-closed")
+    }
 }
