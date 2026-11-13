@@ -57,36 +57,37 @@ enum Theme {
         ], startPoint: edge, endPoint: edge == .top ? .bottom : .top)
     }
 
-    /// Размытие под плавающей шапкой (или под капсулой и нижними кнопками), как у Claude
-    /// (запись экрана пользователя 13.11.2026): содержимое под краем не затемняется, а размывается —
-    /// сильнее всего у края, к середине экрана размытие сходит на нет. Лёгкая дымка цветом фона —
-    /// только у самой кромки (часы, полоса «домой»), чтобы их было видно поверх текста.
-    /// `solid` — доля высоты от края, где размытие полное.
+    /// Размытие под плавающей шапкой и под нижними кнопками, как у Claude (запись экрана
+    /// пользователя 13.11.2026): содержимое под краем не затемняется, а слегка размывается —
+    /// у края заметнее, к середине экрана сходит на нет. Только SwiftUI:
+    /// слой UIKit с фильтром `variableBlur` (первая сборка 0.14) ломал подъём экрана над
+    /// клавиатурой — капсула ввода оставалась под ней. `solid` — доля высоты с полным размытием.
     static func edgeBlur(_ tint: Color, from edge: UnitPoint, solid: CGFloat = 0.45) -> some View {
-        VariableBlur(radius: 12, edge: edge == .top ? .top : .bottom, solid: solid)
-            .overlay(LinearGradient(stops: [
-                .init(color: tint.opacity(0.5), location: 0),
-                .init(color: tint.opacity(0.16), location: 0.3),
-                .init(color: tint.opacity(0), location: 0.6),
-            ], startPoint: edge, endPoint: edge == .top ? .bottom : .top))
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+        let far: UnitPoint = edge == .top ? .bottom : .top
+        // Небольшое размытие (пользователь 13.11.2026: «сильно слишком, надо небольшое»):
+        // один тонкий материал, прозрачнее у края и быстро сходящий на нет.
+        return ZStack {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .opacity(0.7)
+                .mask(LinearGradient(stops: [
+                    .init(color: .black, location: 0),
+                    .init(color: .black.opacity(0.8), location: solid),
+                    .init(color: .clear, location: 1),
+                ], startPoint: edge, endPoint: far))
+            LinearGradient(stops: [
+                .init(color: tint.opacity(0.3), location: 0),
+                .init(color: tint.opacity(0.08), location: 0.3),
+                .init(color: tint.opacity(0), location: 0.55),
+            ], startPoint: edge, endPoint: far)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
-    /// Размытие под нижними кнопками (капсула ввода, поиск «Недавних»): системный материал
-    /// с маской-градиентом, без затемнения. Только SwiftUI: слой UIKit (`VariableBlur`) под
-    /// полем ввода и кнопками перехватывал нажатия «Отправить» (автотесты сборок 0.14 #7, #8).
+    /// То же размытие у нижнего края (капсула ввода, поиск «Недавних», кнопки шторки).
     static func bottomBlur(_ tint: Color, solid: CGFloat = 0.7) -> some View {
-        Rectangle()
-            .fill(.ultraThinMaterial)
-            .overlay(tint.opacity(0.18))
-            .mask(LinearGradient(stops: [
-                .init(color: .black, location: 0),
-                .init(color: .black, location: solid),
-                .init(color: .clear, location: 1),
-            ], startPoint: .bottom, endPoint: .top))
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+        edgeBlur(tint, from: .bottom, solid: solid)
     }
 
     /// Засечки — только для логотипа и приветствия.
