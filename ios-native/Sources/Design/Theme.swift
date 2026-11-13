@@ -62,31 +62,31 @@ enum Theme {
     /// у края заметнее, к середине экрана сходит на нет. Только SwiftUI:
     /// слой UIKit с фильтром `variableBlur` (первая сборка 0.14) ломал подъём экрана над
     /// клавиатурой — капсула ввода оставалась под ней. `solid` — доля высоты с полным размытием.
-    static func edgeBlur(_ tint: Color, from edge: UnitPoint, solid: CGFloat = 0.45) -> some View {
+    static func edgeBlur(_ tint: Color, from edge: UnitPoint, solid: CGFloat = 0.3) -> some View {
         let far: UnitPoint = edge == .top ? .bottom : .top
-        // Небольшое размытие (пользователь 13.11.2026: «сильно слишком, надо небольшое»):
-        // один тонкий материал, прозрачнее у края и быстро сходящий на нет.
+        // Как на снимке Claude (13.11.2026): размыта только кромка — под часами и под капсулой,
+        // текст рядом с кнопками почти чёткий. Один тонкий материал, быстро сходящий на нет.
         return ZStack {
             Rectangle()
                 .fill(.ultraThinMaterial)
-                .opacity(0.7)
+                .opacity(0.75)
                 .mask(LinearGradient(stops: [
                     .init(color: .black, location: 0),
-                    .init(color: .black.opacity(0.8), location: solid),
-                    .init(color: .clear, location: 1),
+                    .init(color: .black, location: solid),
+                    .init(color: .clear, location: min(1, solid + 0.3)),
                 ], startPoint: edge, endPoint: far))
             LinearGradient(stops: [
-                .init(color: tint.opacity(0.3), location: 0),
-                .init(color: tint.opacity(0.08), location: 0.3),
-                .init(color: tint.opacity(0), location: 0.55),
+                .init(color: tint.opacity(0.25), location: 0),
+                .init(color: tint.opacity(0), location: solid + 0.05),
             ], startPoint: edge, endPoint: far)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
-    /// То же размытие у нижнего края (капсула ввода, поиск «Недавних», кнопки шторки).
-    static func bottomBlur(_ tint: Color, solid: CGFloat = 0.7) -> some View {
+    /// То же у нижнего края (капсула ввода, поиск «Недавних», кнопки шторки): размыта только
+    /// полоса под капсулой у полосы «домой».
+    static func bottomBlur(_ tint: Color, solid: CGFloat = 0.22) -> some View {
         edgeBlur(tint, from: .bottom, solid: solid)
     }
 
