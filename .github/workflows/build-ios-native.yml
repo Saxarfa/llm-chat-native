@@ -81,6 +81,19 @@ jobs:
           name: LLM-Chat-native-unsigned
           path: build/LLM-Chat-native-unsigned.ipa
           if-no-files-found: error
+      - name: Keyboard tests first (fast check)
+        run: |
+          set -euo pipefail
+          device=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next(d["udid"] for group in json.load(sys.stdin)["devices"].values() for d in group if "iPhone" in d["name"]))')
+          xcrun simctl boot "$device" || true
+          xcrun simctl bootstatus "$device" -b
+          for domain in com.apple.Preferences com.apple.keyboard.preferences com.apple.keyboard.ContinuousPath; do
+            xcrun simctl spawn "$device" defaults write "$domain" DidShowContinuousPathIntroduction -bool true || true
+            xcrun simctl spawn "$device" defaults write "$domain" KeyboardContinuousPathEnabled -bool false || true
+          done
+          # Сначала — тесты капсулы над клавиатурой: ответ за минуты, а не после 14 минут снимков.
+          xcodebuild test -project ios-native/LLMChat.xcodeproj -scheme LLMChat -configuration Debug             -destination "platform=iOS Simulator,id=$device" -derivedDataPath build/uitest             -only-testing:LLMChatUITests/ComposerUITests/testQueue             -only-testing:LLMChatUITests/PhoneModelsUITests/testPhoneChat             -only-testing:LLMChatUITests/PhoneSettingsUITests/testOffline             CODE_SIGNING_ALLOWED=NO > build-quick.log 2>&1             || { grep -E 'error:|Test Case .* failed|hit point' build-quick.log | tail -n 30; exit 1; }
+          grep -E 'Test Case .*(passed|failed)' build-quick.log
       - name: Capture screens in simulator
         run: |
           set -euo pipefail
