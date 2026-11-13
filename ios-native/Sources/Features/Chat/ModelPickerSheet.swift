@@ -106,7 +106,7 @@ struct ModelPickerSheet: View {
         let id = model.activeModelID
         let config = model.modelConfig(id)
         if PhoneModelID.isPhone(id) {
-            guard model.phone.infos[PhoneModelID.file(of: id)]?.thinking?.canToggle == true else { return nil }
+            guard model.phone.infos[PhoneModelID.file(of: id)]?.thinking.canToggle == true else { return nil }
             return (config["thinking"] as? Bool) == true ? "Вкл." : "Выкл."
         }
         switch ChatParameters.reasoning(id) {
