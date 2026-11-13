@@ -32,12 +32,12 @@ private enum NextN {
     typealias EmbeddingsAt = @convention(c) (OpaquePointer?, Int32) -> UnsafeMutablePointer<Float>?
     typealias Other = @convention(c) (OpaquePointer?) -> OpaquePointer?
 
-    static let set: SetEmbeddings? = symbol("llama_set_embeddings_nextn")
+    static let enable: SetEmbeddings? = symbol("llama_set_embeddings_nextn")
     static let all: Embeddings? = symbol("llama_get_embeddings_nextn")
     static let at: EmbeddingsAt? = symbol("llama_get_embeddings_nextn_ith")
     static let other: Other? = symbol("llama_get_ctx_other")
 
-    static var available: Bool { set != nil && all != nil && at != nil }
+    static var available: Bool { enable != nil && all != nil && at != nil }
 
     private static func symbol<T>(_ name: String) -> T? {
         // RTLD_DEFAULT: искать во всех загруженных библиотеках.
@@ -195,8 +195,8 @@ final class LlamaRunner: @unchecked Sendable {
             llama_free(head)
             return
         }
-        NextN.set?(context, true, false)
-        NextN.set?(head, true, true)
+        NextN.enable?(context, true, false)
+        NextN.enable?(head, true, true)
         draft = head
         draftBatch = batch
         embd = Int(llama_model_n_embd_out(model))
