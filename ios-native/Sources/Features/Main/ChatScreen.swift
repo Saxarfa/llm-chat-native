@@ -263,7 +263,8 @@ struct ComposerBar: View {
         .padding(.bottom, focused ? 8 : (expanded ? 2 : resting))
         // Без подложки: лента уходит под капсулу и размывается к низу экрана.
         .background(alignment: .bottom) {
-            Theme.bottomBlur(Theme.canvas)
+            // Размытие здесь держало капсулу под клавиатурой (сборки 0.14 #7–#9, GitHub #1–#4) — внизу растворение.
+                Theme.fade(Theme.canvas, from: .bottom)
                 .padding(.top, -26)
                 .ignoresSafeArea(.container, edges: .bottom)
                 .allowsHitTesting(false)

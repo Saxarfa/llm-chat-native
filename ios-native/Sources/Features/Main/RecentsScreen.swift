@@ -125,7 +125,8 @@ struct RecentsScreen: View {
             .padding(.top, 6)
             .padding(.bottom, searching ? 8 : resting)
             .background(alignment: .bottom) {
-                Theme.bottomBlur(Theme.canvas)
+                // Размытие здесь держало капсулу под клавиатурой (сборки 0.14 #7–#9, GitHub #1–#4) — внизу растворение.
+                Theme.fade(Theme.canvas, from: .bottom)
                     .padding(.top, -26)
                     .ignoresSafeArea(.container, edges: .bottom)
                     .allowsHitTesting(false)
