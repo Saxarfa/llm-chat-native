@@ -93,7 +93,8 @@ extension AppModel {
         if !result.isEmpty || answers.contains(where: { $0 != nil }) {
             models = result
         }
-        if answers[2] != nil { imageCatalog = catalog }
+        // Список картинок AI Studio — во втором ответе (после удаления «Подписки»/Gemini Web их два).
+        if answers[1] != nil { imageCatalog = catalog }
     }
 
     func selectModel(_ id: String) async {
