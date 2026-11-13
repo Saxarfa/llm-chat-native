@@ -13,7 +13,7 @@ concurrency:
 jobs:
   build:
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - name: Fetch llama.cpp (iOS xcframework)
@@ -91,6 +91,12 @@ jobs:
           xcrun simctl boot "$device" || true
           xcrun simctl bootstatus "$device" -b
           xcrun simctl ui "$device" appearance dark || true
+          # Свежий симулятор при первой клавиатуре показывает подсказку «Speed up your typing…»
+          # поверх поля ввода — автотесты не могли нажать «Отправить» (сборка №1 на GitHub, 13.11.2026).
+          for domain in com.apple.Preferences com.apple.keyboard.preferences com.apple.keyboard.ContinuousPath; do
+            xcrun simctl spawn "$device" defaults write "$domain" DidShowContinuousPathIntroduction -bool true || true
+            xcrun simctl spawn "$device" defaults write "$domain" KeyboardContinuousPathEnabled -bool false || true
+          done
           xcrun simctl install "$device" build/simulator/Build/Products/Debug-iphonesimulator/LLMChat.app
           mkdir -p build/screens
           # Имена экранов — PreviewScene в ios-native/Sources/Core/PreviewScene.swift; данные вымышленные.

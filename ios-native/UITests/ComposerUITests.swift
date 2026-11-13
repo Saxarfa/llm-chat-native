@@ -70,6 +70,7 @@ final class ComposerUITests: XCTestCase {
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["Остановить ответ"].firstMatch.exists)
         input.tap()
+        app.skipKeyboardTip()
         input.typeText("А что с водой?")
         let queue = app.buttons["Добавить в очередь"].firstMatch
         XCTAssertTrue(queue.waitForExistence(timeout: 3), "рядом со «Стоп» — кнопка очереди")

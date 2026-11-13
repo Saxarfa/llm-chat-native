@@ -72,6 +72,7 @@ final class PhoneModelsUITests: XCTestCase {
         // Модель видна в карточке ввода — когда поле раскрыто.
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Модель: Qwen3")).firstMatch
             .waitForExistence(timeout: 5), "в чате выбрана модель телефона")
+        app.skipKeyboardTip()
         input.typeText("Ты работаешь без интернета?")
         app.buttons["Отправить"].firstMatch.tap()
         XCTAssertTrue(text(app, contains: "Работаю прямо на телефоне").waitForExistence(timeout: 8))

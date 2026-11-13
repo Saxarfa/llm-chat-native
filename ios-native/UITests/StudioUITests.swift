@@ -96,6 +96,7 @@ final class StudioUITests: XCTestCase {
         let prompt = element(app, "studio.prompt")
         XCTAssertTrue(prompt.waitForExistence(timeout: 10))
         prompt.tap()
+        app.skipKeyboardTip()
         prompt.typeText(", дракон в облаках")
         // Пока набирается промпт, сцены нет, а последний арт — миниатюрой в строке чипов (как на сайте).
         XCTAssertTrue(element(app, "studio.thumb").waitForExistence(timeout: 3))

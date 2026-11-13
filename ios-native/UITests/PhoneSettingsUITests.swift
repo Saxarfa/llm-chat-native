@@ -107,6 +107,7 @@ final class PhoneSettingsUITests: XCTestCase {
 
         let input = element(app, "chat.input")
         input.tap()
+        app.skipKeyboardTip()
         input.typeText("Что взять из еды?")
         app.buttons["Отправить"].firstMatch.tap()
         XCTAssertTrue(text(app, contains: "Работаю прямо на телефоне").waitForExistence(timeout: 8))

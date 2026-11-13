@@ -143,7 +143,9 @@ struct MessageFeed: View {
                                         .contentShape(Rectangle())
                                 }
                                 .buttonStyle(PressScaleStyle())
-                                .padding(.bottom, 4)
+                                // Выше края размытия над капсулой (оно заходит на 26 pt в ленту):
+                                // в этой полосе нажатие до кнопки не доходило.
+                                .padding(.bottom, 28)
                                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
                                 .accessibilityLabel("К последнему сообщению")
                                 .accessibilityIdentifier("feed.down")
@@ -240,7 +242,6 @@ private struct LiveAnswerView: View {
         .onChange(of: live.text.isEmpty) { _, empty in
             if !empty, thought == nil { thought = max(0, Int(Date().timeIntervalSince(started).rounded())) }
         }
-        .accessibilityElement(children: .combine)
     }
 }
 
