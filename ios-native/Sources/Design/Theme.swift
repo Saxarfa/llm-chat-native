@@ -69,6 +69,8 @@ enum Theme {
                 .init(color: tint.opacity(0.16), location: 0.3),
                 .init(color: tint.opacity(0), location: 0.6),
             ], startPoint: edge, endPoint: edge == .top ? .bottom : .top))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 
     /// Засечки — только для логотипа и приветствия.

@@ -14,6 +14,7 @@ struct VariableBlur: UIViewRepresentable {
     var solid: CGFloat = 0.4
 
     func makeUIView(context: Context) -> VariableBlurUIView {
+        // (скрыт и в SwiftUI — см. `accessibilityHidden` в `Theme.edgeBlur`)
         VariableBlurUIView(radius: radius, edge: edge, solid: solid)
     }
 
@@ -24,6 +25,10 @@ final class VariableBlurUIView: UIVisualEffectView {
     init(radius: CGFloat, edge: VerticalEdge, solid: CGFloat) {
         super.init(effect: UIBlurEffect(style: .regular))
         isUserInteractionEnabled = false
+        // Для доступности слоя нет: иначе он «накрывал» кнопки над собой, и автотесты
+        // не могли нажать «Отправить» (точка нажатия {-1, -1}, сборка 0.14 #7).
+        isAccessibilityElement = false
+        accessibilityElementsHidden = true
         // CAFilter — закрытый класс QuartzCore; имя собирается строкой.
         guard let filterType = NSClassFromString("CAFilter") as? NSObject.Type,
               let filter = filterType.perform(NSSelectorFromString("filterWithType:"), with: "variableBlur")?
