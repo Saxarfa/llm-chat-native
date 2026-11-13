@@ -176,18 +176,22 @@ final class StudioUITests: XCTestCase {
         sleep(1)
         snap("ui-10-details")
         button(app, contains: "На весь экран").tap()
-        XCTAssertTrue(app.buttons["Закрыть"].firstMatch.waitForExistence(timeout: 5))
+        let close = element(app, "viewer.close")
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
         sleep(1)
         snap("ui-11-viewer")
-        app.buttons["Закрыть"].firstMatch.tap()
+        close.tap()
     }
 
     /// Арт на весь экран: фон размыт, смахивание вниз закрывает просмотр (с 0.13).
     func testViewerSwipeToClose() {
         let app = launch("studioArt")
-        let close = app.buttons["Закрыть"].firstMatch
+        let close = element(app, "viewer.close")
         XCTAssertTrue(close.waitForExistence(timeout: 10))
         sleep(1)
+        // Кнопка на экране: в первой сборке 0.13 размытый фон раздвигал просмотр и она уезжала за край.
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(close.frame), "«Закрыть» за краем экрана: \(close.frame)")
+        XCTAssertTrue(close.isHittable)
         snap("ui-12-viewer-blur")
         let window = app.windows.firstMatch
         let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))

@@ -455,6 +455,8 @@ struct ImageViewer: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             HStack {
                 CircleIconButton(symbol: "xmark", label: "Закрыть") { dismiss() }
+                    // Под прозрачным просмотром экран остаётся в дереве доступности — своя метка для тестов.
+                    .accessibilityIdentifier("viewer.close")
                 Spacer()
                 if image != nil {
                     CircleIconButton(symbol: "square.and.arrow.down", label: "Сохранить в Фото") {
@@ -495,14 +497,20 @@ struct ImageViewer: View {
     private var background: some View {
         ZStack {
             Rectangle().fill(.ultraThinMaterial)
-            if let backdrop {
-                Image(uiImage: backdrop)
-                    .resizable()
-                    .scaledToFill()
-                    .blur(radius: 40, opaque: true)
-                    .opacity(0.6)
-                    .transition(.opacity)
-            }
+            // Копия «с заполнением» шире экрана — она в наложении на Color.clear и обрезана,
+            // иначе раздвигала весь просмотр (в первой сборке 0.13 кнопки уезжали за край экрана).
+            Color.clear
+                .overlay {
+                    if let backdrop {
+                        Image(uiImage: backdrop)
+                            .resizable()
+                            .scaledToFill()
+                            .blur(radius: 40, opaque: true)
+                            .opacity(0.6)
+                            .transition(.opacity)
+                    }
+                }
+                .clipped()
             Color.black.opacity(0.42)
         }
         .animation(.easeOut(duration: 0.3), value: backdrop)
