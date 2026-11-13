@@ -66,19 +66,16 @@ enum Theme {
         let far: UnitPoint = edge == .top ? .bottom : .top
         // Как на снимке Claude (13.11.2026): размыта только кромка — под часами и под капсулой,
         // текст рядом с кнопками почти чёткий. Один тонкий материал, быстро сходящий на нет.
+        // Чистое размытие без подложки (материал в тёмной теме белил кромку — замечание 14.11.2026):
+        // сила спадает к ленте за счёт маски.
+        _ = tint
         return ZStack {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .opacity(0.75)
+            PlainBlur()
                 .mask(LinearGradient(stops: [
                     .init(color: .black, location: 0),
-                    .init(color: .black, location: solid),
-                    .init(color: .clear, location: min(1, solid + 0.3)),
+                    .init(color: .black.opacity(0.6), location: solid),
+                    .init(color: .clear, location: min(1, solid + 0.35)),
                 ], startPoint: edge, endPoint: far))
-            LinearGradient(stops: [
-                .init(color: tint.opacity(0.25), location: 0),
-                .init(color: tint.opacity(0), location: solid + 0.05),
-            ], startPoint: edge, endPoint: far)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -315,6 +312,23 @@ struct LabeledField<Content: View>: View {
                 .frame(minHeight: 52)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.line))
+        }
+    }
+}
+
+
+/// Размытие того, что под ним, без тонировки и подсветки материала: у системного вида
+/// убираются слои цвета, остаётся только размытие фона. Касания не принимает.
+struct PlainBlur: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIVisualEffectView {
+        let view = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ view: UIVisualEffectView, context: Context) {
+        DispatchQueue.main.async {
+            for sub in view.subviews.dropFirst() { sub.alpha = 0 }
         }
     }
 }
