@@ -73,6 +73,22 @@ enum Theme {
             .accessibilityHidden(true)
     }
 
+    /// Размытие под нижними кнопками (капсула ввода, поиск «Недавних»): системный материал
+    /// с маской-градиентом, без затемнения. Только SwiftUI: слой UIKit (`VariableBlur`) под
+    /// полем ввода и кнопками перехватывал нажатия «Отправить» (автотесты сборок 0.14 #7, #8).
+    static func bottomBlur(_ tint: Color, solid: CGFloat = 0.7) -> some View {
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .overlay(tint.opacity(0.18))
+            .mask(LinearGradient(stops: [
+                .init(color: .black, location: 0),
+                .init(color: .black, location: solid),
+                .init(color: .clear, location: 1),
+            ], startPoint: .bottom, endPoint: .top))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
     /// Засечки — только для логотипа и приветствия.
     static func display(_ size: CGFloat) -> Font {
         .system(size: size, weight: .regular, design: .serif)

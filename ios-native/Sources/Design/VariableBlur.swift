@@ -45,6 +45,17 @@ final class VariableBlurUIView: UIVisualEffectView {
         for view in subviews.dropFirst() { view.alpha = 0 }
     }
 
+    // Касания проходят насквозь — и сам вид, и обёртка SwiftUI вокруг него их не ловят.
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? { nil }
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool { false }
+
+    override func didMoveToSuperview() {
+        super.didMoveToSuperview()
+        superview?.isUserInteractionEnabled = false
+        superview?.accessibilityElementsHidden = true
+    }
+
     required init?(coder: NSCoder) {
         fatalError("init(coder:) не используется")
     }

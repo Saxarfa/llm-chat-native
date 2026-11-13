@@ -125,7 +125,7 @@ struct RecentsScreen: View {
             .padding(.top, 6)
             .padding(.bottom, searching ? 8 : resting)
             .background(alignment: .bottom) {
-                Theme.edgeBlur(Theme.canvas, from: .bottom, solid: 0.7)
+                Theme.bottomBlur(Theme.canvas)
                     .padding(.top, -26)
                     .ignoresSafeArea(edges: .bottom)
                     .allowsHitTesting(false)

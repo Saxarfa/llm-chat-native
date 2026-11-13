@@ -66,7 +66,7 @@ struct SidebarView: View {
             footer
                 .padding(.bottom, resting)
                 .background(alignment: .bottom) {
-                    Theme.edgeBlur(Theme.rail, from: .bottom)
+                    Theme.bottomBlur(Theme.rail, solid: 0.5)
                         .padding(.top, -26)
                         .ignoresSafeArea(edges: .bottom)
                         .allowsHitTesting(false)
