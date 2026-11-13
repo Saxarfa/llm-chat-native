@@ -9,7 +9,9 @@ enum Theme {
     static let rail = dynamic(dark: 0x111111, light: 0xEEEBE3)
     static let ink = dynamic(dark: 0xE8E6DF, light: 0x302E28)
     static let muted = dynamic(dark: 0xA3A29A, light: 0x686256)
-    static let subtle = dynamic(dark: 0x7D7C76, light: 0x857D6E)
+    /// Самый бледный текст (подписи, даты). Контраст не ниже 4,5:1 и на карточках, и на фоне шторок
+    /// (аудит 13.11.2026: было 3,6–3,8).
+    static let subtle = dynamic(dark: 0x8C8B85, light: 0x736C5F)
     static let line = dynamic(UIColor.white.withAlphaComponent(0.075), UIColor(hex: 0x514832, alpha: 0.11))
     static let fill = dynamic(UIColor.white.withAlphaComponent(0.06), UIColor(hex: 0x514832, alpha: 0.06))
     static let fillActive = dynamic(UIColor.white.withAlphaComponent(0.11), UIColor(hex: 0x514832, alpha: 0.11))
@@ -55,19 +57,18 @@ enum Theme {
         ], startPoint: edge, endPoint: edge == .top ? .bottom : .top)
     }
 
-    /// Размытие под плавающей шапкой (или над нижними кнопками), как в шторке Claude:
-    /// у края — размытие с тонировкой цветом фона, к середине экрана оно плавно сходит на нет.
-    static func edgeBlur(_ tint: Color, from edge: UnitPoint) -> some View {
-        ZStack {
-            Rectangle().fill(.ultraThinMaterial)
-            tint.opacity(0.6)
-        }
-        .mask(LinearGradient(stops: [
-            .init(color: .black, location: 0),
-            .init(color: .black, location: 0.5),
-            .init(color: .black.opacity(0.6), location: 0.78),
-            .init(color: .clear, location: 1),
-        ], startPoint: edge, endPoint: edge == .top ? .bottom : .top))
+    /// Размытие под плавающей шапкой (или под капсулой и нижними кнопками), как у Claude
+    /// (запись экрана пользователя 13.11.2026): содержимое под краем не затемняется, а размывается —
+    /// сильнее всего у края, к середине экрана размытие сходит на нет. Лёгкая дымка цветом фона —
+    /// только у самой кромки (часы, полоса «домой»), чтобы их было видно поверх текста.
+    /// `solid` — доля высоты от края, где размытие полное.
+    static func edgeBlur(_ tint: Color, from edge: UnitPoint, solid: CGFloat = 0.45) -> some View {
+        VariableBlur(radius: 12, edge: edge == .top ? .top : .bottom, solid: solid)
+            .overlay(LinearGradient(stops: [
+                .init(color: tint.opacity(0.5), location: 0),
+                .init(color: tint.opacity(0.16), location: 0.3),
+                .init(color: tint.opacity(0), location: 0.6),
+            ], startPoint: edge, endPoint: edge == .top ? .bottom : .top))
     }
 
     /// Засечки — только для логотипа и приветствия.

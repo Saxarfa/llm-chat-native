@@ -196,6 +196,11 @@ enum PreviewScene: String, CaseIterable {
                                       FeedAttachment(id: "att:m1:1", name: "бриф.md", kind: .markdown)]),
             ChatMessage(id: "m2", role: "assistant", content: "Готово: тёплый закат, солнце справа, спокойная вода.",
                         model: "Nano Banana 2.1", arts: [FeedArt(id: "pv1", width: 1536, height: 1024)]),
+            ChatMessage(id: "m3", role: "user", content: "А теперь то же самое ночью, через ComfyUI."),
+            // Идущая генерация ComfyUI — плитка с процентом.
+            ChatMessage(id: "m4", role: "assistant", content: "", model: "flux-dev",
+                        arts: [FeedArt(id: "pv4", status: "generating", width: 1536, height: 1024, ready: false,
+                                       progress: 0.42)]),
         ])
     }
 

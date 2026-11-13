@@ -84,20 +84,18 @@ final class ComposerUITests: XCTestCase {
         wait(for: [gone], timeout: 6)
     }
 
-    /// Линия контекста по низу карточки ввода (видна с клавиатурой): нажатие показывает,
-    /// сколько занято и сколько свободно.
-    func testContextDetails() {
+    /// Линии контекста по низу карточки ввода больше нет (13.11.2026), а у модели на чипе
+    /// виден уровень рассуждений, как у Claude.
+    func testCardWithoutContextLine() {
         let app = launch("thread")
         let input = element(app, "chat.input")
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         input.tap()
-        let line = element(app, "composer.context")
-        XCTAssertTrue(line.waitForExistence(timeout: 10))
-        line.tap()
-        XCTAssertTrue(app.staticTexts["Контекст модели"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Свободно"].exists)
+        XCTAssertFalse(element(app, "composer.context").waitForExistence(timeout: 3), "линии контекста нет")
+        let chip = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Модель:'")).firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 5))
         sleep(1)
-        snap("ui-c4-context")
+        snap("ui-c4-card")
     }
 
     /// «⋯» в шапке открывает «Настройки модели»: значения сохраняются за моделью.

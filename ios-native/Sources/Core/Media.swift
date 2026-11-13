@@ -40,6 +40,8 @@ struct FeedArt: Identifiable, Equatable {
     let ready: Bool
     let isVideo: Bool
     let error: String
+    /// Доля готовности 0…1 — только у генерации в ComfyUI (у AI Studio хода работы нет).
+    let progress: Double?
 
     var busy: Bool { ["queued", "preparing", "generating"].contains(status) }
 
@@ -68,7 +70,8 @@ struct FeedArt: Identifiable, Equatable {
     }
 
     init(id: String, status: String = "done", width: Int = 1024, height: Int = 1024, ready: Bool = true,
-         isVideo: Bool = false, error: String = "") {
+         isVideo: Bool = false, error: String = "", progress: Double? = nil) {
+        self.progress = progress
         self.id = id
         self.status = status
         self.width = width
@@ -88,6 +91,11 @@ struct FeedArt: Identifiable, Equatable {
         let count = (json[isVideo ? "video_count" : "image_count"] as? NSNumber)?.intValue ?? 0
         ready = status == "done" && count > 0
         error = (json["error"] as? String) ?? ""
+        if (json["provider"] as? String) != "aistudio", let value = (json["progress"] as? NSNumber)?.doubleValue {
+            progress = min(max(value / 100, 0), 1)
+        } else {
+            progress = nil
+        }
     }
 
     static func list(_ value: Any?) -> [FeedArt] {
@@ -105,6 +113,11 @@ struct ViewerItem: Identifiable, Equatable {
     }
 
     let source: Source
+
+    var isVideo: Bool {
+        if case .video = source { return true }
+        return false
+    }
 
     var id: String {
         switch source {

@@ -12,7 +12,36 @@ struct ServerSettings {
     init(json: [String: Any]) {
         shared = ChatConfig.dict(json["settings"])
         modelConfigs = ChatConfig.dict(json["model_configs"])
-        modelProfiles = ChatConfig.dict(json["model_profiles"])
+        modelProfiles = PhoneProfiles.merged(ChatConfig.dict(json["model_profiles"]))
+    }
+}
+
+/// Имя и фото моделей телефона хранятся и на самом телефоне: так они видны без связи с ПК
+/// и не теряются, если ПК не ответил. На ПК они уходят обычным профилем модели.
+enum PhoneProfiles {
+    private static let key = "phoneModelProfiles"
+
+    static var all: [String: [String: Any]] {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return json.compactMapValues { $0 as? [String: Any] }
+    }
+
+    static func save(_ id: String, _ patch: [String: Any]) {
+        var profiles = all
+        profiles[id] = (profiles[id] ?? [:]).merging(patch) { _, new in new }
+        if let data = try? JSONSerialization.data(withJSONObject: profiles) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
+    /// Профили с ПК, а поверх — сохранённые на телефоне для его моделей.
+    static func merged(_ server: [String: Any]) -> [String: Any] {
+        var result = server
+        for (id, local) in all {
+            result[id] = ChatConfig.dict(result[id]).merging(local) { _, phone in phone }
+        }
+        return result
     }
 }
 
@@ -235,7 +264,8 @@ enum ChatConfig {
         ]
         config.merge(modelDefaults(model)) { _, new in new }
         let profile = dict(settings.modelProfiles[model])
-        config["systemPrompt"] = present(profile["systemPrompt"]) ?? present(settings.shared["systemPrompt"]) ?? defaultPrompt
+        // Своя инструкция модели, иначе встроенная. «Общей инструкции» больше нет (удалена 13.11.2026).
+        config["systemPrompt"] = present(profile["systemPrompt"]) ?? defaultPrompt
         // `null` на сервере — значение сброшено: действует профиль.
         let saved = dict(settings.modelConfigs[model]).merging(dict(overrides[model])) { _, new in new }
             .filter { !($0.value is NSNull) }

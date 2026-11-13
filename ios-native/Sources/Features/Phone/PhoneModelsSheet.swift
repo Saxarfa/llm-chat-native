@@ -70,7 +70,7 @@ struct PhoneModelsSheet: View {
             Text("«\(item.name)» освободит место. Чаты с ней на ПК останутся.")
         }
         .sheet(item: $configuring) { item in
-            ModelSettingsSheet(modelID: item.chatID)
+            ModelProfileSheet(modelID: item.chatID)
                 .environment(model)
         }
         .task {
@@ -105,22 +105,36 @@ struct PhoneModelsSheet: View {
     private func installedRow(_ item: PhoneModel) -> some View {
         let loaded = phone.loadedFile == item.file
         let selected = model.activeModelID == item.chatID
+        // Своё имя, если его задали; иначе имя файла (квантование — строкой ниже).
+        let name = ChatConfig.text(ChatConfig.dict(model.settings.modelProfiles[item.chatID])["alias"]) ?? item.name
+        let info = phone.infos[item.file]
         return HStack(spacing: 12) {
             Button {
                 onChoose(item.chatID)
             } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.name)
-                        .font(.system(size: 16, weight: selected ? .semibold : .regular))
-                        .foregroundStyle(Theme.ink)
-                        .lineLimit(2)
-                    HStack(spacing: 6) {
-                        Text([item.quant, PhoneMemory.gigabytes(item.size), loaded ? "в памяти" : nil]
-                            .compactMap { $0 }.joined(separator: " · "))
-                        FitBadge(fit: phone.fit(item.size, context: phone.wantedContext(item.file), file: item.file))
+                HStack(spacing: 12) {
+                    AvatarView(image: ChatConfig.text(ChatConfig.dict(model.settings.modelProfiles[item.chatID])["avatar"]),
+                               name: name, size: 34)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(name)
+                            .font(.system(size: 16, weight: selected ? .semibold : .regular))
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(2)
+                        HStack(spacing: 6) {
+                            Text([item.quant, PhoneMemory.gigabytes(item.size), loaded ? "в памяти" : nil]
+                                .compactMap { $0 }.joined(separator: " · "))
+                            FitBadge(fit: phone.fit(item.size, context: phone.wantedContext(item.file), file: item.file))
+                        }
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.subtle)
+                        // Что модель умеет сверх текста: картинки (файл проектора скачан) и MTP.
+                        if phone.visionFile(for: item.file) != nil || info?.hasMTP == true {
+                            HStack(spacing: 6) {
+                                if phone.visionFile(for: item.file) != nil { CapabilityBadge(text: "Зрение", symbol: "eye") }
+                                if info?.hasMTP == true { CapabilityBadge(text: "MTP", symbol: "bolt") }
+                            }
+                        }
                     }
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.subtle)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -149,6 +163,9 @@ struct PhoneModelsSheet: View {
             Menu {
                 Button("Выбрать для чата", systemImage: "bubble.left") { onChoose(item.chatID) }
                 Button("Настройки модели", systemImage: "slider.horizontal.3") { configuring = item }
+                if phone.visionFile(for: item.file) == nil, item.repo != nil {
+                    Button("Добавить зрение", systemImage: "eye") { Task { await phone.addVision(for: item) } }
+                }
                 if loaded {
                     Button("Выгрузить из памяти", systemImage: "memorychip") { Task { await phone.unload() } }
                         .disabled(phone.generating)
@@ -306,12 +323,15 @@ private struct DownloadRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            let projector = item.file.hasPrefix(PhoneModels.visionPrefix)
+            let title = projector ? "Зрение · " + PhoneModelNames.title(String(item.file.dropFirst(PhoneModels.visionPrefix.count)))
+                                  : PhoneModelNames.title(item.file)
             HStack(spacing: 8) {
-                Text(PhoneModelNames.title(item.file))
+                Text(title)
                     .font(.system(size: 16))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
-                if let quant = PhoneModelNames.quant(item.file) {
+                if !projector, let quant = PhoneModelNames.quant(item.file) {
                     Text(quant).font(.system(size: 13)).foregroundStyle(Theme.subtle)
                 }
                 Spacer(minLength: 8)
@@ -356,6 +376,21 @@ private struct DownloadRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .accessibilityIdentifier("phone.download")
+    }
+}
+
+/// Умение модели — «Зрение», «MTP».
+struct CapabilityBadge: View {
+    let text: String
+    let symbol: String
+
+    var body: some View {
+        Label(text, systemImage: symbol)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Theme.muted)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Theme.fillActive, in: Capsule())
     }
 }
 

@@ -17,15 +17,18 @@ struct ComposerToolsSheet: View {
     var body: some View {
         let id = model.activeModelID
         let onPhone = PhoneModelID.isPhone(id)
+        // Модель телефона видит картинки, если рядом с ней скачан проектор зрения (mmproj).
+        let seesImages = onPhone && model.phone.visionFile(for: PhoneModelID.file(of: id)) != nil
         let nano = ChatParameters.isNano(id)
         let detents: Set<PresentationDetent> = onPhone ? [.height(420)] : nano ? [.height(330)] : [.fraction(0.72), .large]
 
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    PhotoStrip(enabled: !onPhone, onCamera: { pick(.camera) }, onLibrary: { pick(.photo) })
+                    PhotoStrip(enabled: !onPhone || seesImages, onCamera: { pick(.camera) }, onLibrary: { pick(.photo) })
                     if onPhone {
-                        SettingsNote(text: "Модель на телефоне понимает только текст.")
+                        SettingsNote(text: seesImages ? "Модель на телефоне видит картинки, но не файлы."
+                                     : "Модель на телефоне понимает только текст. Чтобы она видела картинки, добавьте ей файл зрения в «Моделях на телефоне».")
                     }
                     SettingsCard {
                         ToolRow(title: "Добавить файлы", symbol: "doc.badge.plus", enabled: !onPhone) { pick(.file) }
@@ -86,7 +89,8 @@ struct ComposerToolsSheet: View {
                     .font(.system(size: 16))
                     .foregroundStyle(Theme.ink)
                     .frame(minWidth: 44, minHeight: 44)
-                    .disabled(PhoneModelID.isPhone(model.activeModelID))
+                    .disabled(PhoneModelID.isPhone(model.activeModelID)
+                              && model.phone.visionFile(for: PhoneModelID.file(of: model.activeModelID)) == nil)
                     .accessibilityIdentifier("tools.photo")
             }
         }

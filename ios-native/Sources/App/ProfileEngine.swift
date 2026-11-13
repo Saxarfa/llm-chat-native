@@ -41,10 +41,17 @@ extension AppModel {
         let previous = settings.modelProfiles[id]
         settings.modelProfiles[id] = ChatConfig.dict(previous).merging(patch) { _, new in new }
         guard preview == nil else { return }
+        // Модель телефона: имя и фото сохраняются на телефоне сразу, ПК — когда ответит.
+        let onPhone = PhoneModelID.isPhone(id)
+        if onPhone {
+            PhoneProfiles.save(id, patch)
+            if offline { return }
+        }
         do {
             guard let api else { throw APIError.unreachable }
             _ = try await api.json("/api/settings", method: "POST", body: ["model_profiles": [id: patch]])
         } catch {
+            if onPhone { return }
             settings.modelProfiles[id] = previous
             settingsNotice = (error as? APIError)?.message ?? "Не удалось сохранить профиль модели."
             Haptics.error()

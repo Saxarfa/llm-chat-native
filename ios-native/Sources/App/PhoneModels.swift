@@ -35,6 +35,10 @@ final class PhoneModels {
     var searchError: String?
     var files: [String: [HFFile]] = [:]
     var filesError: [String: String] = [:]
+    /// Проекторы картинок (`mmproj`) в репозиториях: качаются вместе с моделью.
+    var projectors: [String: [HFFile]] = [:]
+    /// Модели, у которых на телефоне есть проектор картинок (файл `Models/Vision/<модель>`).
+    var visionModels: Set<String> = []
 
     /// Модель в памяти движка и её контекст.
     var loadedFile: String?
@@ -51,6 +55,9 @@ final class PhoneModels {
     @ObservationIgnored private var started = false
     /// С каким контекстом из настроек загружена модель (фактический может быть меньше обучающего).
     @ObservationIgnored private var loadedWanted = 0
+    /// С проектором ли и с MTP ли загружена модель.
+    @ObservationIgnored private var loadedVision: String?
+    @ObservationIgnored private var loadedMTP = false
 
     static let tokenKey = "hf_token"
     static let context = 4096
@@ -60,10 +67,11 @@ final class PhoneModels {
 
     private var isPreview: Bool { app?.preview != nil }
 
-    /// Пункты группы «На телефоне» в выборе модели.
+    /// Пункты группы «На телефоне» в выборе модели — со своим именем, если его задали.
     var options: [ModelOption] {
-        installed.map { ModelOption(id: $0.chatID, name: PhoneModelNames.display($0.chatID), group: .phone,
-                                    loaded: $0.file == loadedFile) }
+        let profiles = app?.settings.modelProfiles ?? [:]
+        return installed.map { ModelOption(id: $0.chatID, name: ChatConfig.modelName($0.chatID, profiles: profiles),
+                                           group: .phone, loaded: $0.file == loadedFile) }
     }
 
     // MARK: - Запуск
@@ -105,6 +113,19 @@ final class PhoneModels {
 
     nonisolated static func path(of file: String) -> URL { folder.appendingPathComponent(file) }
 
+    /// Загрузки проекторов помечены этой папкой: `Vision/<файл модели>`.
+    nonisolated static let visionPrefix = "Vision/"
+
+    nonisolated static func visionKey(for model: String) -> String { visionPrefix + model }
+
+    /// Файл проектора картинок модели (может ещё не существовать).
+    nonisolated static func visionPath(for model: String) -> URL { path(of: visionKey(for: model)) }
+
+    /// Проектор картинок скачанной модели — если он есть на телефоне.
+    func visionFile(for model: String) -> URL? {
+        visionModels.contains(model) ? Self.visionPath(for: model) : nil
+    }
+
     /// Список сверяется с папкой: файлы без записи добавляются, записи без файлов убираются.
     func reloadInstalled() {
         var list = (try? JSONDecoder().decode([PhoneModel].self, from: Data(contentsOf: Self.indexURL))) ?? []
@@ -116,6 +137,8 @@ final class PhoneModels {
             list.append(PhoneModel(file: name, repo: nil, size: size, added: Date().timeIntervalSince1970))
         }
         installed = list.sorted { $0.added > $1.added }
+        let projectors = (try? FileManager.default.contentsOfDirectory(atPath: Self.path(of: "Vision").path)) ?? []
+        visionModels = Set(projectors).intersection(installed.map(\.file))
         saveIndex()
     }
 
@@ -251,6 +274,7 @@ final class PhoneModels {
             try Self.check(response, data: data)
             let tree = (try JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
             let list = HFFile.list(tree)
+            projectors[repo] = HFFile.projectors(tree)
             files[repo] = list
             filesError[repo] = list.isEmpty ? "В репозитории нет цельных файлов GGUF, которые можно скачать на телефон." : nil
         } catch is CancellationError {
@@ -297,6 +321,43 @@ final class PhoneModels {
             downloads[name]?.state = .running
         } catch {
             downloads[name]?.state = .failed((error as? PhoneEngineError)?.message ?? "Не удалось начать скачивание.")
+            return
+        }
+        // Модель умеет смотреть на картинки — проектор (mmproj) из того же репозитория качается следом.
+        if let projector = HFFile.bestProjector(projectors[repo] ?? []) {
+            await downloadVision(repo: repo, projector: projector, model: name)
+        }
+    }
+
+    /// Проектор картинок для уже скачанной модели (её репозиторий известен).
+    func addVision(for item: PhoneModel) async {
+        guard let repo = item.repo else {
+            notice = "Модель добавлена из «Файлов» — откуда брать файл зрения, неизвестно."
+            return
+        }
+        if projectors[repo] == nil { await loadFiles(repo) }
+        guard let projector = HFFile.bestProjector(projectors[repo] ?? []) else {
+            notice = "В репозитории этой модели нет файла зрения (mmproj) — она понимает только текст."
+            return
+        }
+        await downloadVision(repo: repo, projector: projector, model: item.file)
+    }
+
+    private func downloadVision(repo: String, projector: HFFile, model: String) async {
+        let key = Self.visionKey(for: model)
+        guard downloads[key]?.state != .running, !visionModels.contains(model) else { return }
+        downloads[key] = Download(file: key, repo: repo, path: projector.path, total: projector.size)
+        if isPreview {
+            downloads[key]?.state = .running
+            return
+        }
+        do {
+            let url = try await resolve(repo: repo, path: projector.path)
+            try? FileManager.default.createDirectory(at: Self.path(of: "Vision"), withIntermediateDirectories: true)
+            DownloadCenter.shared.start(url: url, file: key, repo: repo, path: projector.path, resume: resumeData.removeValue(forKey: key))
+            downloads[key]?.state = .running
+        } catch {
+            downloads[key]?.state = .failed((error as? PhoneEngineError)?.message ?? "Не удалось начать скачивание.")
         }
     }
 
@@ -327,6 +388,11 @@ final class PhoneModels {
 
     func retry(_ item: Download) async {
         downloads[item.file] = nil
+        if item.file.hasPrefix(Self.visionPrefix) {
+            await downloadVision(repo: item.repo, projector: HFFile(path: item.path, size: item.total),
+                                 model: String(item.file.dropFirst(Self.visionPrefix.count)))
+            return
+        }
         await download(repo: item.repo, file: HFFile(path: item.path.isEmpty ? item.file : item.path, size: item.total))
     }
 
@@ -342,6 +408,13 @@ final class PhoneModels {
 
     func finished(file: String, repo: String, size: Int64) {
         downloads[file] = nil
+        if file.hasPrefix(Self.visionPrefix) {
+            let model = String(file.dropFirst(Self.visionPrefix.count))
+            visionModels.insert(model)
+            // Модель уже в памяти — при следующем ответе она перезагрузится вместе с проектором.
+            Haptics.success()
+            return
+        }
         installed.removeAll { $0.file == file }
         installed.insert(PhoneModel(file: file, repo: repo, size: size, added: Date().timeIntervalSince1970), at: 0)
         saveIndex()
@@ -382,7 +455,11 @@ final class PhoneModels {
 
     func delete(_ model: PhoneModel) async {
         if loadedFile == model.file { await unload() }
-        if !isPreview { try? FileManager.default.removeItem(at: Self.path(of: model.file)) }
+        if !isPreview {
+            try? FileManager.default.removeItem(at: Self.path(of: model.file))
+            try? FileManager.default.removeItem(at: Self.visionPath(for: model.file))
+        }
+        visionModels.remove(model.file)
         installed.removeAll { $0.file == model.file }
         infos[model.file] = nil
         saveIndex()
@@ -405,7 +482,11 @@ final class PhoneModels {
             return
         }
         let wanted = wantedContext(file)
-        if loadedFile == file, runner.loadedPath != nil, loadedWanted == wanted { return }
+        let vision = visionFile(for: file)?.path
+        if infos[file] == nil { await loadInfo(file) }
+        let mtp = mtpWanted(file)
+        if loadedFile == file, runner.loadedPath != nil, loadedWanted == wanted, loadedVision == vision,
+           loadedMTP == mtp { return }
         guard let model = installed.first(where: { $0.file == file }) else {
             throw PhoneEngineError(message: "Модели «\(PhoneModelNames.title(file))» нет на этом телефоне. Скачайте её в окне «Модели на телефоне».")
         }
@@ -417,20 +498,32 @@ final class PhoneModels {
         loading = true
         defer { loading = false }
         do {
-            contextSize = try await runner.load(path: Self.path(of: file).path, context: wanted)
+            contextSize = try await runner.load(path: Self.path(of: file).path, vision: vision, mtp: mtp, context: wanted)
         } catch {
             guard tooBig else { throw error }
             throw PhoneEngineError(message: "Модель не загрузилась — похоже, не хватило памяти: нужно около \(PhoneMemory.gigabytes(needed(model.size, context: wanted, file: file))), свободно \(PhoneMemory.gigabytes(availableMemory)). Уменьшите контекст в настройках модели или выберите квантование ниже.")
         }
         loadedFile = file
         loadedWanted = wanted
+        loadedVision = vision
+        loadedMTP = mtp
     }
 
+    /// Включать ли голову MTP: она есть в файле и не выключена в настройках модели.
+    func mtpWanted(_ file: String) -> Bool {
+        guard infos[file]?.hasMTP == true else { return false }
+        let saved = ChatConfig.dict(app?.settings.modelConfigs[PhoneModelID.make(file: file)])
+        return (saved["mtp"] as? Bool) ?? true
+    }
+
+    /// Работает ли сейчас ускорение MTP у загруженной модели.
+    var mtpActive: Bool { runner.hasMTP }
+
     /// Ответ модели кусками текста. В режиме снимков — заготовленный текст.
-    func stream(messages: [(role: String, content: String)], sampling: PhoneSampling,
+    func stream(messages: [(role: String, content: String)], images: [Data] = [], sampling: PhoneSampling,
                 stats: @escaping @Sendable (PhoneRunStats) -> Void) -> AsyncThrowingStream<String, Error> {
         if isPreview { return Self.previewStream() }
-        return runner.stream(messages: messages, sampling: sampling, stats: stats)
+        return runner.stream(messages: messages, images: images, sampling: sampling, stats: stats)
     }
 
     func cancel() {
@@ -558,6 +651,7 @@ final class DownloadCenter: NSObject, URLSessionDownloadDelegate, @unchecked Sen
         // Временный файл живёт только до конца этого вызова — переносим сразу.
         let target = PhoneModels.path(of: tag.file)
         do {
+            try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
             if FileManager.default.fileExists(atPath: target.path) { try FileManager.default.removeItem(at: target) }
             try FileManager.default.moveItem(at: location, to: target)
             let size = (try FileManager.default.attributesOfItem(atPath: target.path)[.size] as? NSNumber)?.int64Value ?? 0

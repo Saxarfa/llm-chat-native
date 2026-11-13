@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Разделы настроек, открывающиеся переходом внутрь.
 enum SettingsPage: Hashable {
-    case profile, computer, models, search, memory, instruction
+    case profile, computer, models, search, memory
     case model(String)
 }
 
@@ -83,13 +83,11 @@ struct SettingsSheet: View {
         case .models:
             ModelsPage().settingsPage("Модели")
         case .model(let id):
-            ModelProfilePage(modelID: id).settingsPage("Профиль модели")
+            ModelProfilePage(modelID: id).settingsPage(ChatConfig.modelName(id, profiles: model.settings.modelProfiles))
         case .search:
             SearchPage().settingsPage("Веб-поиск")
         case .memory:
             MemorySheet(embedded: true).settingsPage("Память")
-        case .instruction:
-            InstructionPage().settingsPage("Общая инструкция")
         }
     }
 
@@ -121,14 +119,15 @@ struct SettingsSheet: View {
                     }
                     .buttonStyle(RowPressStyle())
                     CardDivider(inset: 53)
-                    link("Общая инструкция", symbol: "text.quote", page: .instruction)
-                    CardDivider(inset: 53)
                     IconToggleRow(title: "Тактильный отклик", symbol: "iphone.radiowaves.left.and.right",
                                   isOn: model.haptics) { model.haptics = $0 }
                 }
 
                 SectionCaption(text: "Внешний вид")
                 AppearancePicker()
+
+                SectionCaption(text: "Шрифт ответов")
+                AnswerFontPicker()
 
                 SettingsCard {
                     Button {
@@ -206,9 +205,12 @@ struct SettingsSheet: View {
     }
 }
 
-/// Оформление раздела настроек: заголовок по центру, круглая кнопка «назад», фон шторки.
+/// Оформление раздела настроек: заголовок по центру, круглая кнопка «назад» (или «закрыть»,
+/// если раздел — корень отдельного окна), фон шторки.
 private struct SettingsPageChrome: ViewModifier {
     let title: String
+    var symbol = "chevron.left"
+    var label = "Назад"
     @Environment(\.dismiss) private var dismiss
 
     func body(content: Content) -> some View {
@@ -216,7 +218,7 @@ private struct SettingsPageChrome: ViewModifier {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(Theme.sheet)
             .safeAreaInset(edge: .top, spacing: 0) {
-                SheetBar(title: title, symbol: "chevron.left", label: "Назад", action: { dismiss() })
+                SheetBar(title: title, symbol: symbol, label: label, action: { dismiss() })
             }
             .navigationTitle(title)
             .navigationBarBackButtonHidden(true)
@@ -225,8 +227,8 @@ private struct SettingsPageChrome: ViewModifier {
 }
 
 extension View {
-    func settingsPage(_ title: String) -> some View {
-        modifier(SettingsPageChrome(title: title))
+    func settingsPage(_ title: String, symbol: String = "chevron.left", label: String = "Назад") -> some View {
+        modifier(SettingsPageChrome(title: title, symbol: symbol, label: label))
     }
 }
 

@@ -415,7 +415,7 @@ private struct LoraCatalogRow: View {
                         HStack(spacing: 5) {
                             Text(entry.title).font(.system(size: 16)).foregroundStyle(Theme.ink).lineLimit(1)
                             if entry.favorite {
-                                Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(Theme.muted)
+                                Image(systemName: "star.fill").font(.system(size: 11)).foregroundStyle(Theme.muted)
                             }
                         }
                         if !entry.description.isEmpty {

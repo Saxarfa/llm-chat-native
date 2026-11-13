@@ -306,7 +306,10 @@ struct ParameterRow: View {
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.subtle)
                         .frame(width: 34, height: 34)
+                        // Зона нажатия 44, а место в строке прежнее.
+                        .padding(5)
                         .contentShape(Rectangle())
+                        .padding(-5)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Описание: \(spec.label)")
@@ -447,7 +450,10 @@ struct ParameterRow: View {
                 .foregroundStyle(next == draft ? Theme.subtle : Theme.ink)
                 .frame(width: 34, height: 34)
                 .background(Theme.fill, in: Circle())
-                .contentShape(Circle())
+                // Видимый круг 34, зона нажатия 44 — место в строке прежнее.
+                .padding(5)
+                .contentShape(Rectangle())
+                .padding(-5)
         }
         .buttonStyle(PressScaleStyle())
         .disabled(next == draft)

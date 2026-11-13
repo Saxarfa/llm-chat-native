@@ -23,10 +23,13 @@ private final class StatsBox: @unchecked Sendable {
 /// без связи снимок ждёт на телефоне (`OfflineEngine`).
 extension AppModel {
     /// Вопрос уже в ленте. Загружает модель; `false` — ответа не будет (текст вернётся в поле).
-    func startOnPhone(_ id: String, model: String, text: String, messageID: String, now: Double, isNew: Bool) async -> Bool {
+    func startOnPhone(_ id: String, model: String, text: String, messageID: String, now: Double, isNew: Bool,
+                      attachments: [DraftAttachment] = []) async -> Bool {
         let file = PhoneModelID.file(of: model)
         phoneRuns.insert(id)
-        let question: [String: Any] = ["id": messageID, "role": "user", "content": text, "attachments": [Any](),
+        // Картинки — как у вопросов на ПК (`dataUrl`): так их видят и лента, и сайт после синхронизации.
+        let files: [[String: Any]] = attachments.map { ["name": $0.name, "dataUrl": $0.dataURL] }
+        let question: [String: Any] = ["id": messageID, "role": "user", "content": text, "attachments": files,
                                        "timestamp": Int(now)]
         var entry = isNew ? RawChat(messages: [], updatedAt: 0) : (rawChats[id] ?? RawChat(messages: [], updatedAt: 0))
         if isNew { entry.title = Self.phoneTitle(text) }
@@ -69,10 +72,22 @@ extension AppModel {
         let system = (ChatConfig.present(config["systemPrompt"]) as? String) ?? ChatConfig.defaultPrompt
         var prompt: [(role: String, content: String)] = []
         if !system.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { prompt.append((role: "system", content: system)) }
-        for message in rawChats[id]?.messages ?? [] {
-            guard let role = message["role"] as? String, role == "user" || role == "assistant",
-                  let content = message["content"] as? String,
-                  !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+        let messages = rawChats[id]?.messages ?? []
+        // Модель смотрит на картинки только последнего вопроса: старые занимали бы весь контекст.
+        let lastQuestion = messages.lastIndex { ($0["role"] as? String) == "user" }
+        var images: [Data] = []
+        if let lastQuestion {
+            for file in (messages[lastQuestion]["attachments"] as? [[String: Any]]) ?? [] {
+                guard let url = file["dataUrl"] as? String, FeedAttachment.kind(ofDataURL: url) == .image,
+                      let bytes = ImageStore.decode(dataURL: url) else { continue }
+                images.append(bytes)
+            }
+        }
+        for (index, message) in messages.enumerated() {
+            guard let role = message["role"] as? String, role == "user" || role == "assistant" else { continue }
+            let content = (message["content"] as? String) ?? ""
+            let withImages = index == lastQuestion && !images.isEmpty
+            guard withImages || !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
             prompt.append((role: role, content: role == "assistant" ? PhoneChatFormat.clean(content) : content))
         }
 
@@ -81,7 +96,7 @@ extension AppModel {
         var output = ""
         var failure: String?
         do {
-            for try await piece in phone.stream(messages: prompt, sampling: PhoneSampling(config: config),
+            for try await piece in phone.stream(messages: prompt, images: images, sampling: PhoneSampling(config: config),
                                                 stats: { box.set($0) }) {
                 output += piece
                 let parts = ThinkSplitter.split(output)
@@ -102,8 +117,10 @@ extension AppModel {
             ]
             if !parts.reasoning.isEmpty { answer["reasoning"] = parts.reasoning }
             if let stats = box.value {
-                answer["metrics"] = ["device": "iphone", "prompt_tokens": stats.promptTokens, "tokens": stats.tokens,
-                                     "tokens_per_second": (stats.tokensPerSecond * 10).rounded() / 10] as [String: Any]
+                var metrics: [String: Any] = ["device": "iphone", "prompt_tokens": stats.promptTokens, "tokens": stats.tokens,
+                                              "tokens_per_second": (stats.tokensPerSecond * 10).rounded() / 10]
+                if stats.draftedAccepted > 0 { metrics["mtp_accepted"] = stats.draftedAccepted }
+                answer["metrics"] = metrics
             }
             rawChats[id]?.messages.append(answer)
         }

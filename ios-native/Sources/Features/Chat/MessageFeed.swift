@@ -26,23 +26,31 @@ struct MessageFeed: View {
         proxy.scrollTo(Self.bottomID, anchor: .bottom)
     }
 
+    /// Что показывать: ленту открытого чата, а пока она не подставлена — копию из кэша.
+    /// Так при переходе в другой чат сразу видна переписка, без мигания «загрузки».
+    private var current: (state: AppModel.ThreadState, items: [FeedMessage]) {
+        if model.threadChatID == model.activeChatID { return (model.threadState, model.thread) }
+        if let id = model.activeChatID, let cached = model.threadCache[id] { return (.loaded, cached) }
+        return (.loading, [])
+    }
+
     var body: some View {
         let live = model.activeLive
-        switch model.threadChatID == model.activeChatID ? model.threadState : .loading {
+        let snapshot = current
+        let items = snapshot.items
+        switch snapshot.state {
         case .idle, .loading:
-            ProgressView()
-                .tint(Theme.muted)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            DelayedSpinner()
         case .failed(let message):
             FeedNotice(text: message, actionTitle: "Повторить") {
                 Task { await model.loadThread() }
             }
         case .loaded:
-            if model.thread.isEmpty && live == nil {
+            if items.isEmpty && live == nil {
                 FeedNotice(text: "В этом чате пока нет сообщений.", actionTitle: nil, action: {})
             } else {
-                let visible = model.thread.suffix(shown)
-                let earlier = model.thread.count - visible.count
+                let visible = items.suffix(shown)
+                let earlier = items.count - visible.count
                 GeometryReader { box in
                     ScrollViewReader { proxy in
                         ScrollView {
@@ -82,10 +90,10 @@ struct MessageFeed: View {
                                 if let live {
                                     LiveAnswerView(live: live)
                                         .transition(.asymmetric(insertion: .opacity, removal: .identity))
-                                } else if let last = model.thread.last, !last.isUser {
+                                } else if let last = items.last, !last.isUser {
                                     Text("\(last.model.isEmpty ? "Модель" : ChatConfig.modelName(last.model, profiles: model.settings.modelProfiles)) — это ИИ, который может ошибаться.")
-                                        .font(.system(size: 11.5))
-                                        .foregroundStyle(Theme.subtle.opacity(0.85))
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Theme.subtle)
                                         .padding(.top, -10)
                                         .transition(.identity)
                                 }
@@ -165,6 +173,22 @@ struct MessageFeed: View {
     }
 }
 
+/// Колёсико загрузки появляется не сразу: быстрый ответ сервера не мигает им.
+private struct DelayedSpinner: View {
+    @State private var visible = false
+
+    var body: some View {
+        ProgressView()
+            .tint(Theme.muted)
+            .opacity(visible ? 1 : 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .task {
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                withAnimation(.easeOut(duration: 0.2)) { visible = true }
+            }
+    }
+}
+
 /// Время последнего движения пальца по ленте. Класс, а не `@State`-значение:
 /// запись не должна перерисовывать ленту.
 private final class TouchClock {
@@ -179,14 +203,26 @@ private struct BottomEdgeKey: PreferenceKey {
     }
 }
 
-/// Ответ, который пишется прямо сейчас.
+/// Ответ, который пишется прямо сейчас. Статус — вариант «Искра» (выбран пользователем
+/// 13.11.2026): коралловая искра вращается и «дышит», подпись этапа сменяется снизу вверх,
+/// через 2 с рядом идёт счётчик секунд; когда пошёл текст, статус сворачивается в «Думал N с».
 private struct LiveAnswerView: View {
     let live: AppModel.LiveState
+    @State private var started = Date()
+    /// Сколько секунд модель готовилась до первого слова ответа.
+    @State private var thought: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if !live.reasoning.isEmpty {
-                ReasoningView(text: live.reasoning, title: live.isThinking ? "Размышляет…" : "Размышления")
+                ReasoningView(text: live.reasoning, title: live.isThinking ? "Размышляет…"
+                              : thought.map { "Думал \($0) с" } ?? "Размышления")
+            } else if let thought, thought >= 2, !live.text.isEmpty {
+                Text("Думал \(thought) с")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.muted)
+                    .padding(.top, -6)
+                    .transition(.opacity)
             }
             if !live.blocks.isEmpty {
                 MarkdownView(blocks: live.blocks)
@@ -195,35 +231,89 @@ private struct LiveAnswerView: View {
                 ArtView(art: art)
             }
             if live.text.isEmpty || live.stopping {
-                HStack(spacing: 9) {
-                    PulseDot()
-                    Text(live.stopping ? "Останавливаю…" : live.phase)
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.muted)
-                        .lineLimit(2)
-                }
-                .frame(minHeight: 28)
-                .transition(.opacity)
+                SparkStatus(text: live.stopping ? "Останавливаю" : live.phase, started: started)
+                    .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.easeOut(duration: 0.3), value: live.text.isEmpty)
+        .onChange(of: live.text.isEmpty) { _, empty in
+            if !empty, thought == nil { thought = max(0, Int(Date().timeIntervalSince(started).rounded())) }
+        }
         .accessibilityElement(children: .combine)
     }
 }
 
-/// Пульсирующая коралловая точка — модель думает или пишет, как искра у Claude.
-private struct PulseDot: View {
-    @State private var on = false
+/// Строка статуса «Искра»: искра, подпись этапа и (после 2 с) секунды ожидания.
+private struct SparkStatus: View {
+    let text: String
+    let started: Date
+
+    /// «Ищу в интернете…» → «Ищу в интернете»: многоточие заменяет живая искра.
+    private var label: String {
+        var value = text.trimmingCharacters(in: .whitespaces)
+        while value.hasSuffix("…") || value.hasSuffix(".") { value.removeLast() }
+        return value.isEmpty ? "Думаю" : value
+    }
 
     var body: some View {
-        Circle()
-            .fill(Theme.send)
-            .frame(width: 9, height: 9)
-            .scaleEffect(on ? 1 : 0.55)
-            .opacity(on ? 1 : 0.5)
-            .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: on)
-            .onAppear { on = true }
-            .accessibilityHidden(true)
+        HStack(spacing: 9) {
+            Spark()
+            Text(label)
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.muted)
+                .lineLimit(2)
+                .id(label)
+                .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
+                                        removal: .move(edge: .top).combined(with: .opacity)))
+            TimelineView(.periodic(from: started, by: 1)) { context in
+                let seconds = Int(context.date.timeIntervalSince(started))
+                if seconds >= 2 {
+                    Text("· \(seconds) с")
+                        .font(.system(size: 14).monospacedDigit())
+                        .foregroundStyle(Theme.subtle)
+                        .contentTransition(.numericText(value: Double(seconds)))
+                        .transition(.opacity)
+                }
+            }
+        }
+        .clipped()
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: label)
+        .frame(minHeight: 28)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Коралловая четырёхлучевая искра: медленно вращается и «дышит».
+private struct Spark: View {
+    var body: some View {
+        TimelineView(.animation) { context in
+            let time = context.date.timeIntervalSinceReferenceDate
+            SparkShape()
+                .fill(Theme.send)
+                .frame(width: 13, height: 13)
+                .rotationEffect(.degrees(time.truncatingRemainder(dividingBy: 2.4) / 2.4 * 360))
+                .scaleEffect(0.85 + 0.2 * (0.5 + 0.5 * sin(time * 2 * .pi / 1.2)))
+        }
+        .frame(width: 16, height: 16)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct SparkShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let c = CGPoint(x: rect.midX, y: rect.midY)
+        let r = min(rect.width, rect.height) / 2
+        let inner = r * 0.28
+        var path = Path()
+        for index in 0..<8 {
+            let angle = Double(index) * .pi / 4 - .pi / 2
+            let radius = index.isMultiple(of: 2) ? r : inner
+            let point = CGPoint(x: c.x + CGFloat(cos(angle)) * radius, y: c.y + CGFloat(sin(angle)) * radius)
+            if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
+        }
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -366,8 +456,8 @@ private struct AssistantMessageView: View {
                         AnswerMoreMenu(message: message)
                     }
                 }
-                .padding(.leading, -6)
-                .padding(.top, -5)
+                .padding(.leading, -7)
+                .padding(.top, -8)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -383,7 +473,8 @@ private struct AnswerIcon: View {
         Image(systemName: symbol)
             .font(.system(size: 13.5, weight: .regular))
             .foregroundStyle(active ? Theme.accent : Theme.muted.opacity(0.85))
-            .frame(width: 29, height: 38)
+            // Зона нажатия 32×44 (было 29×38 — мимо легко промахнуться, аудит 13.11.2026).
+            .frame(width: 32, height: 44)
             .contentShape(Rectangle())
     }
 }
@@ -480,7 +571,7 @@ private struct VariantStepper: View {
             Image(systemName: symbol)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(possible && enabled ? Theme.muted : Theme.subtle.opacity(0.5))
-                .frame(width: 26, height: 38)
+                .frame(width: 32, height: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressScaleStyle())

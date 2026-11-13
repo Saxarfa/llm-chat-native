@@ -87,15 +87,22 @@ struct ArtView: View {
                 }
             } label: {
                 tile {
-                    if let image {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                    } else if failed {
-                        placeholder("Не удалось загрузить. Нажмите, чтобы повторить.", symbol: "arrow.clockwise")
-                    } else {
-                        ProgressView().tint(Theme.muted)
+                    ZStack {
+                        if let image {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .transition(.opacity)
+                        } else if failed {
+                            placeholder("Не удалось загрузить. Нажмите, чтобы повторить.", symbol: "arrow.clockwise")
+                        } else {
+                            // Готовый арт ещё качается — тот же живой фон, что во время генерации.
+                            GenerationAura()
+                                .opacity(0.8)
+                                .transition(.opacity)
+                        }
                     }
+                    .animation(.easeOut(duration: 0.35), value: image != nil)
                 }
             }
             .buttonStyle(PressScaleStyle())
@@ -108,14 +115,8 @@ struct ArtView: View {
                 failed = image == nil
             }
         } else if art.busy {
-            tile {
-                VStack(spacing: 12) {
-                    ProgressView().tint(Theme.muted)
-                    Text(art.statusText)
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.muted)
-                }
-            }
+            GenerationTile(ratio: art.ratio, progress: art.progress, status: art.statusText)
+                .frame(maxWidth: 340)
         } else {
             note(art.statusText, symbol: "photo")
         }
@@ -206,14 +207,8 @@ private struct VideoArtView: View {
                 }
             }
         } else if art.busy {
-            tile {
-                VStack(spacing: 12) {
-                    ProgressView().tint(Theme.muted)
-                    Text(art.statusText)
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.muted)
-                }
-            }
+            GenerationTile(ratio: art.ratio, progress: art.progress, status: art.statusText)
+                .frame(maxWidth: 340)
         } else {
             Label(art.statusText, systemImage: "film")
                 .font(.system(size: 14))
@@ -363,7 +358,7 @@ struct DraftAttachmentStrip: View {
             .padding(.horizontal, 2)
             .padding(.top, 6)
         }
-        .modifier(GuardsDrawer())
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
     }
 
     private func chip(_ item: DraftAttachment) -> some View {
@@ -395,11 +390,11 @@ struct DraftAttachmentStrip: View {
                 model.removeAttachment(item)
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Theme.ink)
                     .frame(width: 22, height: 22)
                     .background(Color.black.opacity(0.72), in: Circle())
-                    .frame(width: 40, height: 40, alignment: .topTrailing)
+                    .frame(width: 44, height: 44, alignment: .topTrailing)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -410,14 +405,17 @@ struct DraftAttachmentStrip: View {
 }
 
 /// Просмотр на весь экран: увеличение щипком и двойным нажатием, сохранение в «Фото».
-/// Фон — размытый (сам арт, растянутый и размытый, поверх размытого чата), а не чёрный;
-/// смахивание вверх или вниз закрывает, как в «Фото». Открытый из студии просмотр
-/// сам переключается на новый арт, когда генерация закончилась.
+/// Показывается поверх самого экрана (а не отдельным системным окном): фон — по-настоящему
+/// размытый экран под ним и сам арт, а закрытие — своё. Смахивание вверх или вниз закрывает,
+/// как в «Фото»: картинка чуть уходит по ходу пальца, уменьшаясь, и тает вместе с фоном
+/// (раньше она улетала за край, а потом ещё уезжало системное окно — замечание 13.11.2026).
+/// Открытый из студии просмотр сам переключается на новый арт, когда генерация закончилась.
 struct ImageViewer: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
     let item: ViewerItem
     var followsStudio = false
+    /// Убрать просмотр. Вызывается, когда уход уже доигран, — родитель убирает его без анимации.
+    let onClose: () -> Void
     @State private var image: UIImage?
     @State private var backdrop: UIImage?
     @State private var loading = true
@@ -426,23 +424,28 @@ struct ImageViewer: View {
     /// Какой арт показан сейчас (при слежении за студией меняется).
     @State private var shownArt: String?
     @State private var drag: CGSize = .zero
+    /// Просмотр проявился (первый кадр — прозрачный, затем плавное появление).
+    @State private var shown = false
     @State private var closing = false
 
     /// 0 — на месте, 1 — утащили далеко: фон и кнопки тают.
     private var progress: CGFloat { min(1, abs(drag.height) / 320) }
 
+    private var visible: Bool { shown && !closing }
+
     var body: some View {
         ZStack {
             background
-                .opacity(1 - progress * 0.85)
+                .opacity(visible ? 1 - progress * 0.85 : 0)
                 .ignoresSafeArea()
             if let image {
                 ZoomableImage(image: image,
                               onDrag: { value in if !closing { drag = value } },
                               onEnd: finishDrag)
                     .ignoresSafeArea()
-                    .scaleEffect(1 - progress * 0.14)
+                    .scaleEffect(visible ? 1 - progress * 0.14 : (closing ? 0.86 : 0.94))
                     .offset(drag)
+                    .opacity(visible ? 1 : 0)
             } else if !loading {
                 Text("Не удалось открыть изображение.")
                     .font(.system(size: 16))
@@ -454,8 +457,7 @@ struct ImageViewer: View {
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             HStack {
-                CircleIconButton(symbol: "xmark", label: "Закрыть") { dismiss() }
-                    // Под прозрачным просмотром экран остаётся в дереве доступности — своя метка для тестов.
+                CircleIconButton(symbol: "xmark", label: "Закрыть") { close() }
                     .accessibilityIdentifier("viewer.close")
                 Spacer()
                 if image != nil {
@@ -467,7 +469,7 @@ struct ImageViewer: View {
             }
             .padding(.horizontal, 12)
             .frame(height: 52)
-            .opacity(1 - min(1, progress * 2.5))
+            .opacity(visible ? 1 - min(1, progress * 2.5) : 0)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let note {
@@ -482,18 +484,24 @@ struct ImageViewer: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: note)
-        .preferredColorScheme(.dark)
-        // Прозрачная подложка показа: под размытием виден чат, а при смахивании — он сам.
-        .presentationBackground(.clear)
+        // Тёмный вид только у самого просмотра; preferredColorScheme перекрасил бы всё окно.
+        .environment(\.colorScheme, .dark)
+        .ignoresSafeArea(.keyboard)
         .task { await load() }
+        .onAppear {
+            Keyboard.hide()
+            DrawerSwipe.viewerOpen = true
+            withAnimation(.easeOut(duration: 0.24)) { shown = true }
+        }
+        .onDisappear { DrawerSwipe.viewerOpen = false }
         .onChange(of: model.studio.completed.first?.id) { _, newest in
             guard followsStudio, let newest, newest != shownArt, !closing else { return }
             Task { await show(art: newest) }
         }
     }
 
-    /// Размытый фон: системное размытие того, что под просмотром, и поверх — сам арт,
-    /// сильно размытый и притемнённый (так фон не чёрный, даже если система подложку не убрала).
+    /// Размытый фон: системное размытие экрана под просмотром и поверх — сам арт,
+    /// сильно размытый и притемнённый.
     private var background: some View {
         ZStack {
             Rectangle().fill(.ultraThinMaterial)
@@ -516,18 +524,24 @@ struct ImageViewer: View {
         .animation(.easeOut(duration: 0.3), value: backdrop)
     }
 
+    /// Закрыть: картинка уменьшается и тает вместе с фоном; direction — куда её вели пальцем.
+    private func close(direction: CGFloat = 0) {
+        guard !closing else { return }
+        withAnimation(.easeOut(duration: 0.24)) {
+            closing = true
+            if direction != 0 {
+                drag = CGSize(width: drag.width, height: drag.height + (direction < 0 ? -140 : 140))
+            }
+        } completion: {
+            onClose()
+        }
+    }
+
     private func finishDrag(velocity: CGFloat, distance: CGFloat) {
         guard !closing else { return }
         if abs(distance) > 110 || abs(velocity) > 900 {
-            closing = true
             Haptics.tap()
-            let away: CGFloat = (distance == 0 ? velocity : distance) < 0 ? -1200 : 1200
-            withAnimation(.easeOut(duration: 0.22)) { drag = CGSize(width: drag.width, height: away) }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                var quiet = Transaction()
-                quiet.disablesAnimations = true
-                withTransaction(quiet) { dismiss() }
-            }
+            close(direction: distance == 0 ? velocity : distance)
         } else {
             withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { drag = .zero }
         }

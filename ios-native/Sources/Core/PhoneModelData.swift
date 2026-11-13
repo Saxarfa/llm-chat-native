@@ -73,6 +73,28 @@ struct HFFile: Identifiable, Equatable {
         .sorted { $0.size < $1.size }
     }
 
+    /// Проекторы картинок (`mmproj`): с ними модель видит изображения (библиотека mtmd llama.cpp).
+    static func projectors(_ tree: [[String: Any]]) -> [HFFile] {
+        tree.compactMap { item -> HFFile? in
+            guard (item["type"] as? String) == "file", let path = item["path"] as? String else { return nil }
+            let name = (path as NSString).lastPathComponent.lowercased()
+            guard name.hasSuffix(".gguf"), name.contains("mmproj"),
+                  name.range(of: #"-\d{5}-of-\d{5}\.gguf$"#, options: .regularExpression) == nil else { return nil }
+            let lfs = item["lfs"] as? [String: Any]
+            let size = (lfs?["size"] as? NSNumber)?.int64Value ?? (item["size"] as? NSNumber)?.int64Value ?? 0
+            return HFFile(path: path, size: size)
+        }
+    }
+
+    /// Какой проектор качать: F16 (лучше всего работает на Metal), затем BF16, Q8_0, самый лёгкий.
+    static func bestProjector(_ list: [HFFile]) -> HFFile? {
+        func name(_ file: HFFile) -> String { file.file.lowercased() }
+        return list.first { name($0).contains("f16") && !name($0).contains("bf16") }
+            ?? list.first { name($0).contains("bf16") }
+            ?? list.first { name($0).contains("q8") }
+            ?? list.min { $0.size < $1.size }
+    }
+
     static func isUsable(_ path: String) -> Bool {
         let name = (path as NSString).lastPathComponent.lowercased()
         guard name.hasSuffix(".gguf") else { return false }
@@ -259,6 +281,8 @@ struct PhoneSampling: Equatable {
     var stop: [String] = []
     /// Рассуждать перед ответом (если модель умеет).
     var thinking = false
+    /// Ускорять ответ головой MTP, если она есть в файле модели.
+    var mtp = true
 
     init() {}
 
@@ -274,6 +298,7 @@ struct PhoneSampling: Equatable {
         if let value = number("max_tokens") { maxTokens = Int(value) }
         stop = ((config["stop"] as? [Any]) ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty }
         thinking = (config["thinking"] as? Bool) ?? false
+        mtp = (config["mtp"] as? Bool) ?? true
     }
 }
 

@@ -49,6 +49,18 @@ final class ClaudeLookUITests: XCTestCase {
         sleep(1)
         snap("ui-l2-settings-light")
         app.buttons["Тема: Тёмная"].firstMatch.tap()
+        XCTAssertFalse(element(app, "settings.instruction").exists, "«Общей инструкции» больше нет")
+
+        // Шрифт ответов: плитка выбирается и запоминается.
+        let sans = app.buttons["Шрифт ответов: Без засечек"].firstMatch
+        if !sans.isHittable { root.swipeUp() }
+        XCTAssertTrue(sans.waitForExistence(timeout: 5))
+        sans.tap()
+        XCTAssertTrue(sans.isSelected, "шрифт без засечек выбран")
+        sleep(1)
+        snap("ui-l2b-answer-font")
+        app.buttons["Шрифт ответов: С засечками"].firstMatch.tap()
+        root.swipeDown()
         root.swipeDown()
 
         element(app, "settings.computer").tap()
@@ -66,10 +78,16 @@ final class ClaudeLookUITests: XCTestCase {
         let row = app.buttons.matching(identifier: "models.row").firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         row.tap()
-        XCTAssertTrue(app.staticTexts["Профиль модели"].waitForExistence(timeout: 5))
-        XCTAssertTrue(element(app, "profile.parameters").exists, "«Параметры ответа»")
+        // Страница модели — сразу всё: фото, название, системный промпт и параметры ответа.
+        XCTAssertTrue(element(app, "model.page").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Системный промпт"].exists)
+        XCTAssertTrue(element(app, "param.temperature.field").exists, "параметры ответа прямо на странице")
+        XCTAssertFalse(element(app, "profile.parameters").exists, "отдельного окна параметров больше нет")
         sleep(1)
         snap("ui-l4-model-profile")
+        element(app, "model.page").swipeUp()
+        sleep(1)
+        snap("ui-l5-model-parameters")
     }
 
     /// Поиск в шторке открывает «Недавние»: список со временем, поиск по названию.

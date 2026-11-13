@@ -33,15 +33,20 @@ struct MainView: View {
                     .scrollDisabled(swiping)
                     .accessibilityHidden(!isOpen)
 
-                Group {
+                ZStack {
+                    // Смена раздела (чат, студия, «Недавние») — мягкое проявление, а не резкая подмена.
                     if model.screen == .studio {
                         StudioScreen(onMenu: { setOpen(!isOpen) })
+                            .transition(.opacity)
                     } else if model.screen == .recents {
                         RecentsScreen(onMenu: { setOpen(!isOpen) })
+                            .transition(.opacity)
                     } else {
                         ChatScreen(onMenu: { setOpen(!isOpen) })
+                            .transition(.opacity)
                     }
                 }
+                    .animation(.easeOut(duration: 0.24), value: model.screen)
                     .frame(width: geo.size.width)
                     // Пока меню тянут вбок, лента не листается вверх-вниз.
                     .scrollDisabled(swiping)
@@ -107,8 +112,9 @@ struct MainView: View {
             .onChanged { value in
                 if axis == nil {
                     // Палец листает код, таблицу или ленту студии — закрытое меню не трогаем.
-                    let scrollingBlock = !isOpen && (HorizontalScrollGuard.isActive
-                        || HorizontalScrollGuard.covers(value.startLocation))
+                    let scrollingBlock = !isOpen && (DrawerSwipe.viewerOpen
+                        || HorizontalScrollGuard.covers(value.startLocation)
+                        || HorizontalScrollGuard.scrollsSideways(at: value.startLocation))
                     let horizontal = !scrollingBlock
                         && abs(value.translation.width) > abs(value.translation.height) * 1.3
                     axis = horizontal ? .horizontal : .vertical
@@ -134,6 +140,8 @@ struct MainView: View {
 /// на весь экран, спрашивают `blocksTaps` и в это время ничего не делают.
 enum DrawerSwipe {
     static var lastMove = Date.distantPast
+    /// Открыт просмотр картинки поверх экрана: свайп вбок не открывает меню.
+    static var viewerOpen = false
 
     static var blocksTaps: Bool {
         Date().timeIntervalSince(lastMove) < 0.4

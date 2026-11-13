@@ -58,9 +58,12 @@ struct StudioScreen: View {
             })
             .environment(model)
         }
-        .fullScreenCover(item: $viewer) { item in
+        .overlay {
             // Открыт арт студии, а генерация идёт: готовый новый арт сменяет показанный.
-            ImageViewer(item: item, followsStudio: true)
+            if let item = viewer {
+                ImageViewer(item: item, followsStudio: true) { viewer = nil }
+                    .id(item.id)
+            }
         }
         .onAppear(perform: openPreviewPanel)
     }
@@ -139,18 +142,21 @@ private struct StudioStage: View {
                         .padding(6)
                         .id(shownID)
                         .transition(.opacity)
-                } else {
+                } else if studio.pendingJob == nil {
                     empty
+                        .transition(.opacity)
                 }
+                // Идёт генерация — живой фон с ходом работы (процент — только у ComfyUI);
+                // прежний арт, если он есть, виден под ним размытым.
                 if let job = studio.pendingJob {
-                    VStack {
-                        ProgressBar(value: job.progress.map { Double($0) / 100 })
-                        Spacer()
-                    }
-                    .padding(12)
+                    GenerationTile(progress: job.isCloud ? nil : job.progress.map { Double($0) / 100 },
+                                   status: job.statusText, cornerRadius: 22,
+                                   translucent: image != nil && studio.selected != nil)
+                        .transition(.opacity)
                 }
             }
             .animation(.easeOut(duration: 0.25), value: shownID)
+            .animation(.easeOut(duration: 0.35), value: studio.pendingJob?.id)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .contentShape(Rectangle())
             .onTapGesture {
@@ -247,33 +253,6 @@ private struct StudioStage: View {
             image = loaded
             shownID = job.id
         }
-    }
-}
-
-/// Тонкая полоса хода генерации; без процента — бегущий отрезок.
-private struct ProgressBar: View {
-    let value: Double?
-    @State private var phase = false
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Theme.fillActive)
-                if let value {
-                    Capsule().fill(Theme.ink)
-                        .frame(width: max(6, geo.size.width * value))
-                        .animation(.easeOut(duration: 0.4), value: value)
-                } else {
-                    Capsule().fill(Theme.ink.opacity(0.8))
-                        .frame(width: geo.size.width * 0.3)
-                        .offset(x: phase ? geo.size.width * 0.7 : 0)
-                        .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: phase)
-                        .onAppear { phase = true }
-                }
-            }
-        }
-        .frame(height: 4)
-        .accessibilityHidden(true)
     }
 }
 
@@ -620,7 +599,7 @@ private struct Chip: View {
                     .lineLimit(1)
                 if let symbol {
                     Image(systemName: symbol)
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(Theme.muted)
                 }
             }

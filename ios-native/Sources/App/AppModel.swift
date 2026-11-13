@@ -287,7 +287,17 @@ final class AppModel {
         chatsLoading = true
         defer { chatsLoading = false }
         do {
-            chats = mergeLocal(try await api.chats())
+            let fresh = mergeLocal(try await api.chats())
+            // Список мог уйти на сервер раньше, чем только что отправленный вопрос создал чат
+            // (например, при возврате в приложение): такой чат не теряем и не закрываем —
+            // иначе вопрос исчезал и открывался пустой чат (баг 13.11.2026).
+            let known = Set(fresh.map(\.id))
+            let now = Date().timeIntervalSince1970 * 1000
+            let creating = chats.filter { chat in
+                !known.contains(chat.id)
+                    && (lives[chat.id] != nil || (chat.id == activeChatID && now - chat.updatedAt < 120_000))
+            }
+            chats = creating + fresh
             chatsError = nil
             if let active = activeChatID, !chats.contains(where: { $0.id == active }) {
                 activeChatID = nil

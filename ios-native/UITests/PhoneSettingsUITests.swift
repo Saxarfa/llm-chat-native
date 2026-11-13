@@ -47,15 +47,23 @@ final class PhoneSettingsUITests: XCTestCase {
         XCTAssertTrue(gear.waitForExistence(timeout: 10), "у модели есть видимая кнопка настроек")
         sleep(1)
         gear.tap()
+        // Страница модели телефона: имя и фото, промпт, рассуждения, контекст, зрение и MTP.
         XCTAssertTrue(app.staticTexts["Настройки модели"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Изменить фото"].firstMatch.exists, "фото модели телефона меняется")
+        sleep(1)
+        snap("ui-s0-phone-model-page")
+        let page = element(app, "model.page")
+        page.swipeUp()
         XCTAssertTrue(app.switches.matching(NSPredicate(format: "label CONTAINS %@", "Рассуждения")).firstMatch
             .waitForExistence(timeout: 5), "Qwen3 умеет выключать рассуждения — переключатель есть")
         XCTAssertTrue(app.staticTexts["Контекст"].exists)
+        XCTAssertTrue(app.staticTexts["Зрение"].exists, "видно, умеет ли модель смотреть на картинки")
         sleep(1)
         snap("ui-s1-model-settings")
 
         let field = element(app, "param.temperature.field")
         XCTAssertTrue(field.waitForExistence(timeout: 5))
+        if !field.isHittable { page.swipeUp() }
         // Курсор — в конец поля (текст выровнен вправо), старое значение стираем.
         field.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3), "нажатие по полю открывает клавиатуру")

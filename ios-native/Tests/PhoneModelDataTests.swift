@@ -38,6 +38,37 @@ final class PhoneModelDataTests: XCTestCase {
         XCTAssertEqual(files.first?.file, "model-Q2_K.gguf")
     }
 
+    /// Проектор картинок (mmproj) качается вместе с моделью: предпочтение — F16, затем BF16, Q8_0.
+    func testVisionProjectorIsPicked() {
+        let tree: [[String: Any]] = [
+            ["type": "file", "path": "model-Q4_K_M.gguf", "size": 2_500_000_000],
+            ["type": "file", "path": "mmproj-BF16.gguf", "size": 900_000_000],
+            ["type": "file", "path": "mmproj-F16.gguf", "size": 900_000_000],
+            ["type": "file", "path": "mmproj-F32.gguf", "size": 1_800_000_000],
+        ]
+        let projectors = HFFile.projectors(tree)
+        XCTAssertEqual(projectors.count, 3)
+        XCTAssertEqual(HFFile.bestProjector(projectors)?.file, "mmproj-F16.gguf")
+        XCTAssertEqual(HFFile.bestProjector(projectors.filter { !$0.file.contains("-F16") })?.file, "mmproj-BF16.gguf")
+        XCTAssertNil(HFFile.bestProjector(HFFile.projectors([["type": "file", "path": "model-Q4_K_M.gguf", "size": 1]])))
+        XCTAssertEqual(PhoneModels.visionKey(for: "m.gguf"), "Vision/m.gguf")
+    }
+
+    /// Процент готовности арта — только у ComfyUI; у AI Studio его нет.
+    func testArtProgressOnlyForComfy() {
+        let comfy = FeedArt(json: ["id": "a", "status": "generating", "progress": 42])
+        XCTAssertEqual(comfy?.progress ?? -1, 0.42, accuracy: 0.0001)
+        let studio = FeedArt(json: ["id": "b", "status": "generating", "progress": 50, "provider": "aistudio"])
+        XCTAssertNil(studio?.progress)
+        XCTAssertNil(FeedArt(json: ["id": "c", "status": "generating"])?.progress)
+    }
+
+    /// MTP: по умолчанию включено, выключается в параметрах модели.
+    func testMTPSetting() {
+        XCTAssertTrue(PhoneSampling(config: [:]).mtp)
+        XCTAssertFalse(PhoneSampling(config: ["mtp": false]).mtp)
+    }
+
     func testMemoryFit() {
         let available: Int64 = 5_200_000_000
         XCTAssertEqual(PhoneMemory.fit(fileSize: 2_500_000_000, available: available), .fits)

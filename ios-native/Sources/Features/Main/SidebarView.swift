@@ -153,7 +153,7 @@ struct SidebarView: View {
                 HStack(spacing: 5) {
                     Text("Показать все")
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: 11, weight: .medium))
                 }
                 .font(.system(size: 12.5))
                 .foregroundStyle(Theme.subtle)

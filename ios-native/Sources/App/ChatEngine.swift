@@ -126,6 +126,11 @@ extension AppModel {
 
     /// Загружает ленту активного чата. Вызывается экраном при смене `activeChatID`.
     func loadThread() async {
+        // Лента уходящего чата — в кэш как есть, с только что отправленным вопросом:
+        // иначе при возврате показывалась старая копия без него, а ответ уже шёл (баг 13.11.2026).
+        if let previous = threadChatID, previous != activeChatID, !thread.isEmpty {
+            threadCache[previous] = thread
+        }
         guard let id = activeChatID else {
             thread = []
             threadState = .idle
@@ -239,9 +244,15 @@ extension AppModel {
         let onPhone = PhoneModelID.isPhone(activeModelID)
         guard !text.isEmpty || !attachments.isEmpty, onPhone || preview == nil else { return false }
         if onPhone, !attachments.isEmpty {
-            sendError = "Модель на телефоне понимает только текст. Уберите вложения или выберите модель на ПК."
-            Haptics.error()
-            return false
+            // Картинки модель телефона видит, если рядом с ней скачан проектор зрения (mmproj).
+            let images = attachments.allSatisfy { $0.kind == .image }
+            if !images || phone.visionFile(for: PhoneModelID.file(of: activeModelID)) == nil {
+                sendError = images
+                    ? "Эта модель на телефоне не видит картинки: нет файла зрения. Добавьте его в «Модели на телефоне» (… у модели → «Добавить зрение») или выберите модель на ПК."
+                    : "Модель на телефоне понимает текст и картинки, но не файлы. Уберите файл или выберите модель на ПК."
+                Haptics.error()
+                return false
+            }
         }
         let isNew = activeChatID == nil
         let id = activeChatID ?? "chat_" + UUID().uuidString.lowercased()
@@ -274,6 +285,7 @@ extension AppModel {
             thread.append(question)
             threadState = .loaded
         }
+        threadCache[id] = thread
         Haptics.tap()
 
         if isNew {
@@ -282,7 +294,8 @@ extension AppModel {
             draftOverrides = [:]
         }
         if onPhone {
-            return await startOnPhone(id, model: model, text: text, messageID: messageID, now: now, isNew: isNew)
+            return await startOnPhone(id, model: model, text: text, messageID: messageID, now: now, isNew: isNew,
+                                      attachments: attachments)
         }
         guard let api else {
             lives[id] = nil

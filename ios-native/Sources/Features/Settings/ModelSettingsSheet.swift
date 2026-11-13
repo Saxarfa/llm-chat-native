@@ -14,11 +14,7 @@ struct ModelSettingsSheet: View {
             SheetHeader(title: "Настройки модели", subtitle: ChatConfig.modelName(id, profiles: model.settings.modelProfiles))
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    if ChatParameters.isNano(id) {
-                        NanoParameters(modelID: id)
-                    } else {
-                        TextParameters(modelID: id)
-                    }
+                    ModelParameters(modelID: id)
                 }
                 .id(id)
                 .padding(.horizontal, 16)
@@ -60,10 +56,28 @@ private struct SettingsNoticeAlert: ViewModifier {
     }
 }
 
+/// Все параметры ответа модели: у моделей картинок — свои (Nano Banana, Omni), у остальных —
+/// рассуждения, контекст (у моделей телефона), числа и инструкция. Встраивается и в окно
+/// «Настройки модели», и прямо в страницу модели в настройках.
+struct ModelParameters: View {
+    let modelID: String
+    /// Страница модели показывает инструкцию отдельным разделом выше — здесь её тогда нет.
+    var showsInstruction = true
+
+    var body: some View {
+        if ChatParameters.isNano(modelID) {
+            NanoParameters(modelID: modelID)
+        } else {
+            TextParameters(modelID: modelID, showsInstruction: showsInstruction)
+        }
+    }
+}
+
 /// Текстовые модели: рассуждения, контекст (у моделей телефона), числовые параметры, инструкция.
 private struct TextParameters: View {
     @Environment(AppModel.self) private var model
     let modelID: String
+    var showsInstruction = true
     @State private var advanced = false
     @State private var instruction = false
     @State private var confirmReset = false
@@ -102,6 +116,7 @@ private struct TextParameters: View {
             }
             .task { await model.phone.loadInfo(file) }
             PhoneContextSection(modelID: modelID)
+            PhoneAbilitiesSection(modelID: modelID)
         } else if let reasoning = ChatParameters.reasoning(modelID) {
             SectionCaption(text: "Рассуждения")
             SettingsCard {
@@ -144,8 +159,10 @@ private struct TextParameters: View {
             }
         }
 
-        DisclosureHeader(title: "Инструкция модели", open: $instruction)
-        if instruction {
+        if showsInstruction {
+            DisclosureHeader(title: "Инструкция модели", open: $instruction)
+        }
+        if showsInstruction && instruction {
             SettingsCard {
                 InstructionEditor(placeholder: "Например: отвечай кратко и по делу",
                                   saved: ChatConfig.text(config["systemPrompt"]) ?? "") { text in
@@ -222,6 +239,63 @@ private struct PhoneContextSection: View {
 
     static func tokens(_ count: Int) -> String {
         count >= 1024 ? "\(count / 1024)K" : String(count)
+    }
+}
+
+/// Зрение (проектор картинок рядом с моделью) и ускорение MTP (голова в самом файле модели).
+private struct PhoneAbilitiesSection: View {
+    @Environment(AppModel.self) private var model
+    let modelID: String
+
+    var body: some View {
+        let phone = model.phone
+        let file = PhoneModelID.file(of: modelID)
+        let hasMTP = phone.infos[file]?.hasMTP == true
+        let sees = phone.visionFile(for: file) != nil
+        let item = phone.installed.first { $0.file == file }
+        let fetching = phone.downloads[PhoneModels.visionKey(for: file)] != nil
+
+        SectionCaption(text: "Умения")
+        SettingsCard {
+            if hasMTP {
+                ToggleRow(title: "Ускорение MTP",
+                          hint: "Модель угадывает несколько слов наперёд и проверяет их разом — ответ идёт быстрее",
+                          isOn: (model.modelConfig(modelID)["mtp"] as? Bool) ?? true) { value in
+                    Task { await model.setModelValue("mtp", value, model: modelID) }
+                }
+                CardDivider()
+            }
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Зрение")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Theme.ink)
+                    Text(sees ? "Видит картинки из вопроса" : fetching ? "Скачиваю файл зрения…" : "Понимает только текст")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.subtle)
+                }
+                Spacer(minLength: 8)
+                if sees {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                } else if fetching {
+                    ProgressView().controlSize(.small).tint(Theme.muted)
+                } else if let item, item.repo != nil {
+                    Button("Добавить") {
+                        Haptics.tap()
+                        Task { await phone.addVision(for: item) }
+                    }
+                    .buttonStyle(PillButtonStyle())
+                    .accessibilityIdentifier("phone.vision.add")
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 58)
+        }
+        if !hasMTP {
+            SettingsNote(text: "Ускорение MTP появится у моделей, в файле которых есть голова MTP (например, Qwen 3.5 и 3.6).")
+        }
     }
 }
 

@@ -18,6 +18,11 @@ struct GGUFInfo: Equatable, Sendable {
     /// Скользящее окно внимания и какие слои им пользуются (`true` — окно).
     var slidingWindow: Int?
     var slidingPattern: [Bool] = []
+    /// Слои MTP (multi-token prediction, `<arch>.nextn_predict_layers`): голова, которая
+    /// угадывает следующие токены наперёд — llama.cpp проверяет их пачкой, ответ идёт быстрее.
+    var mtpLayers: Int?
+
+    var hasMTP: Bool { (mtpLayers ?? 0) > 0 }
 
     var thinking: PhoneThinking { PhoneThinking.kind(template: chatTemplate) }
 
@@ -69,7 +74,7 @@ struct GGUFInfo: Equatable, Sendable {
         var flags: [String: [Bool]] = [:]
         let wanted = [".block_count", ".attention.head_count", ".attention.head_count_kv", ".attention.key_length",
                       ".attention.value_length", ".embedding_length", ".attention.sliding_window",
-                      ".attention.sliding_window_pattern"]
+                      ".attention.sliding_window_pattern", ".nextn_predict_layers"]
         for _ in 0..<min(count, 100_000) {
             guard let key = reader.string(), let type = reader.u32() else { return nil }
             switch key {
@@ -120,6 +125,7 @@ struct GGUFInfo: Equatable, Sendable {
         info.valueLength = number("attention.value_length")
         info.embedding = number("embedding_length")
         info.slidingWindow = number("attention.sliding_window")
+        info.mtpLayers = number("nextn_predict_layers")
         if let list = lists[prefix + "attention.head_count_kv"] {
             info.kvHeads = list
         } else if let single = number("attention.head_count_kv") {

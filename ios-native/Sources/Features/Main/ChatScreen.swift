@@ -26,15 +26,18 @@ struct ChatScreen: View {
                     .gesture(DragGesture(minimumDistance: 12).onEnded { value in
                         if value.translation.height > 30 { Keyboard.hide() }
                     })
-                    .transition(.opacity)
+                    .transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 0.97)),
+                                            removal: .opacity))
             } else {
                 MessageFeed()
                     // Свой экземпляр ленты на каждый чат: позиция прокрутки не переносится.
                     .id(model.activeChatID)
-                    .transition(.opacity)
+                    // Переход между чатами: прежний тает, новый проявляется, чуть поднимаясь.
+                    .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 12)),
+                                            removal: .opacity))
             }
         }
-        .animation(.easeOut(duration: 0.2), value: model.activeChatID)
+        .animation(.easeOut(duration: 0.26), value: model.activeChatID)
         // Нажатие на пустое место или на текст ленты убирает клавиатуру.
         .contentShape(Rectangle())
         .onTapGesture { Keyboard.hide() }
@@ -48,10 +51,11 @@ struct ChatScreen: View {
                         .transition(.opacity)
                 }
             }
-            // Шапка без подложки: лента уходит под кнопки и под «остров», затухая к верху экрана.
+            // Шапка без подложки: лента уходит под кнопки и под «остров» и там размывается
+            // (не затемняется — замечание пользователя 13.11.2026), как у Claude.
             .background(alignment: .top) {
-                Theme.fade(Theme.canvas, from: .top)
-                    .padding(.bottom, -22)
+                Theme.edgeBlur(Theme.canvas, from: .top)
+                    .padding(.bottom, -24)
                     .ignoresSafeArea(edges: .top)
                     .allowsHitTesting(false)
             }
@@ -63,11 +67,17 @@ struct ChatScreen: View {
             model.editing = nil
             await model.loadThread()
         }
-        .fullScreenCover(item: $bound.viewer) { item in
+        // Картинка — поверх экрана (под ней размыт сам чат); видео — отдельным окном с плеером.
+        .overlay {
+            if let item = model.viewer, !item.isVideo {
+                ImageViewer(item: item) { model.viewer = nil }
+                    .id(item.id)
+            }
+        }
+        .fullScreenCover(item: Binding(get: { model.viewer?.isVideo == true ? model.viewer : nil },
+                                       set: { bound.viewer = $0 })) { item in
             if case .video(_, let url) = item.source {
                 VideoViewer(url: url)
-            } else {
-                ImageViewer(item: item)
             }
         }
         .sheet(isPresented: $showParameters) {
@@ -190,7 +200,7 @@ struct ChatScreen: View {
 /// Поле ввода, как у Claude. Без клавиатуры — строка-капсула: «+», подсказка, микрофон, «Отправить».
 /// С клавиатурой (или когда уже есть текст и вложения) — карточка в две строки: сверху текст,
 /// снизу «+», модель, микрофон и «Отправить»; пока модель отвечает — «Стоп», а набранный вопрос
-/// встаёт в очередь. Тонкая линия по низу карточки — сколько контекста модели занято.
+/// встаёт в очередь.
 struct ComposerBar: View {
     @Environment(AppModel.self) private var model
     @Binding var text: String
@@ -200,7 +210,6 @@ struct ComposerBar: View {
     @State private var showCamera = false
     @State private var showFiles = false
     @State private var showTools = false
-    @State private var showContext = false
     /// Что выбрали в меню «+»: открывается, когда меню закрылось.
     @State private var pendingSource: ComposerToolsSheet.Source?
     @State private var picked: [PhotosPickerItem] = []
@@ -252,10 +261,10 @@ struct ComposerBar: View {
         .padding(.horizontal, expanded ? 8 : 15)
         .padding(.top, 6)
         .padding(.bottom, focused ? 8 : (expanded ? 2 : resting))
-        // Без подложки: лента уходит под капсулу и затухает к низу экрана.
+        // Без подложки: лента уходит под капсулу и размывается к низу экрана.
         .background(alignment: .bottom) {
-            Theme.fade(Theme.canvas, from: .bottom)
-                .padding(.top, -18)
+            Theme.edgeBlur(Theme.canvas, from: .bottom, solid: 0.7)
+                .padding(.top, -26)
                 .ignoresSafeArea(edges: .bottom)
                 .allowsHitTesting(false)
         }
@@ -284,12 +293,6 @@ struct ComposerBar: View {
             if idle { model.runQueue() }
         }
         .onChange(of: model.activeChatID) { _, _ in model.runQueue() }
-        // Контекст пересчитывается, когда меняется переписка, модель или закончился ответ.
-        .task(id: contextKey) {
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            guard !Task.isCancelled else { return }
-            await model.measureContext()
-        }
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker { image in
                 showCamera = false
@@ -357,11 +360,9 @@ struct ComposerBar: View {
                 .onTapGesture { focused = true }
         }
         .overlay(shape.strokeBorder(Theme.capsuleLine).allowsHitTesting(false))
-        .overlay(alignment: .bottom) {
-            if expanded, let usage = model.activeContext, let fraction = usage.fraction {
-                contextLine(usage, fraction: fraction)
-            }
-        }
+        // Линии контекста по низу карточки больше нет (замечание пользователя 13.11.2026:
+        // «убери, потом подумаем, куда её засунуть»); подсчёт `measureContext` и окно
+        // `ContextDetails` остались для будущего места.
         .shadow(color: .black.opacity(0.14), radius: 14, y: 4)
     }
 
@@ -473,39 +474,6 @@ struct ComposerBar: View {
         }
     }
 
-    private var contextKey: String {
-        "\(model.activeChatID ?? "")|\(model.activeModelID)|\(model.thread.count)|\(model.activeLive == nil)|\(model.activeBranchName)"
-    }
-
-    /// Линия по низу карточки: занятая часть контекста. Нажатие — подробности.
-    private func contextLine(_ usage: ContextUsage, fraction: Double) -> some View {
-        Button {
-            Haptics.tap()
-            showContext = true
-        } label: {
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.line)
-                    Capsule().fill(fraction >= 0.9 ? Theme.danger : Theme.subtle)
-                        .frame(width: max(2, geometry.size.width * fraction))
-                }
-                .frame(height: 2)
-                .frame(maxHeight: .infinity, alignment: .bottom)
-            }
-            .frame(height: 10)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 30)
-        .padding(.bottom, 2.5)
-        .accessibilityLabel("Контекст модели: \(Int((fraction * 100).rounded()))%")
-        .accessibilityIdentifier("composer.context")
-        .popover(isPresented: $showContext, arrowEdge: .bottom) {
-            ContextDetails(usage: usage)
-                .presentationCompactAdaptation(.popover)
-        }
-    }
-
     /// Вопрос в очереди над полем ввода: отменить или (если не ушёл) повторить.
     private func queuedRow(_ item: QueuedMessage) -> some View {
         HStack(spacing: 8) {
@@ -522,7 +490,7 @@ struct ComposerBar: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 36, height: 32)
+                        .frame(width: 44, height: 40)
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Повторить")
@@ -532,7 +500,7 @@ struct ComposerBar: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 36, height: 32)
+                    .frame(width: 44, height: 40)
                     .contentShape(Rectangle())
             }
             .accessibilityLabel("Убрать из очереди")
@@ -573,23 +541,27 @@ struct ComposerBar: View {
     }
 
     private var modelButton: some View {
-        Button {
+        let level = reasoningLabel
+        return Button {
             Keyboard.hide()
             Haptics.tap()
             showModels = true
         } label: {
-            // Целиком «модель + уровень», если влезает; иначе только модель, а не два обрезанных слова.
+            // Как у Claude: рядом с моделью — уровень рассуждений. Если целиком не влезает,
+            // сокращается название модели, а уровень остаётся виден.
             ViewThatFits(in: .horizontal) {
-                chip(level: reasoningLabel).fixedSize()
-                chip(level: nil).fixedSize()
-                chip(level: nil)
+                chip(level: level).fixedSize()
+                chip(level: level)
             }
             .frame(minHeight: 44)
             .contentShape(Rectangle())
             .padding(.vertical, -7)
         }
         .buttonStyle(PressScaleStyle())
-        .accessibilityLabel("Модель: \(model.activeModelName)")
+        // Ряд кнопок отдаёт чипу всё свободное место; без этого HStack делил ширину
+        // пополам с распоркой, и уровень рассуждений никогда не помещался.
+        .layoutPriority(1)
+        .accessibilityLabel("Модель: \(model.activeModelName)" + (level.map { ", \($0)" } ?? ""))
         .accessibilityHint("Выбрать модель")
     }
 
@@ -599,10 +571,13 @@ struct ComposerBar: View {
                 .fontWeight(.medium)
                 .foregroundStyle(Theme.ink)
                 .lineLimit(1)
+                .truncationMode(.tail)
             if let level {
                 Text(level)
                     .foregroundStyle(Theme.muted)
                     .lineLimit(1)
+                    .fixedSize()
+                    .layoutPriority(1)
             }
         }
         .font(.system(size: 14))

@@ -374,7 +374,9 @@ struct ModelsPage: View {
     }
 }
 
-/// «Профиль модели»: фото, название, описание, инструкция; параметры ответа — отдельным окном.
+/// Страница модели: сразу всё — фото, название и описание, системный промпт и все параметры
+/// ответа (раньше параметры открывались ещё одним окном: «слишком много нажимать» — 13.11.2026).
+/// Та же страница открывается из «Моделей на телефоне» — там же имя и фото скачанной модели.
 struct ModelProfilePage: View {
     @Environment(AppModel.self) private var model
     let modelID: String
@@ -382,7 +384,6 @@ struct ModelProfilePage: View {
     @State private var tagline = ""
     @State private var picked: PhotosPickerItem?
     @State private var choosing = false
-    @State private var showParameters = false
     @FocusState private var focus: Field?
 
     private enum Field { case alias, tagline }
@@ -405,9 +406,11 @@ struct ModelProfilePage: View {
                             .buttonStyle(PillButtonStyle())
                         }
                     }
-                    Text(modelID)
+                    Text(PhoneModelID.isPhone(modelID) ? PhoneModelID.file(of: modelID) : modelID)
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.subtle)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
@@ -418,37 +421,29 @@ struct ModelProfilePage: View {
                     CardDivider()
                     field("Описание", text: $tagline, prompt: "Для чего эта модель", which: .tagline)
                 }
-                SettingsNote(text: "Описание видно под названием в выборе модели.")
+                SettingsNote(text: "Название и фото видны в выборе модели и в чатах.")
 
-                SectionCaption(text: "Ответы")
-                SettingsCard {
-                    Button {
-                        Haptics.tap()
-                        showParameters = true
-                    } label: {
-                        ToolRowLabel(title: "Параметры ответа", symbol: "slider.horizontal.3")
-                    }
-                    .buttonStyle(RowPressStyle())
-                    .accessibilityIdentifier("profile.parameters")
-                }
-
-                SectionCaption(text: "Инструкция модели")
-                SettingsCard {
-                    InstructionEditor(placeholder: "Как этой модели отвечать",
-                                      saved: ChatConfig.text(model.modelConfig(modelID)["systemPrompt"])
-                                          ?? ChatConfig.text(profile["systemPrompt"]) ?? "") { text in
-                        await model.saveModelInstruction(text, model: modelID)
+                // У моделей картинок своя инструкция — она среди их параметров ниже.
+                if !ChatParameters.isNano(modelID) {
+                    SectionCaption(text: "Системный промпт")
+                    SettingsCard {
+                        InstructionEditor(placeholder: "Как этой модели отвечать",
+                                          saved: ChatConfig.text(model.modelConfig(modelID)["systemPrompt"])
+                                              ?? ChatConfig.text(profile["systemPrompt"]) ?? "") { text in
+                            await model.saveModelInstruction(text, model: modelID)
+                        }
                     }
                 }
+
+                ModelParameters(modelID: modelID, showsInstruction: false)
+                    .id(modelID)
             }
             .padding(.horizontal, 18)
             .padding(.bottom, 32)
         }
         .scrollDismissesKeyboard(.interactively)
+        .accessibilityIdentifier("model.page")
         .photosPicker(isPresented: $choosing, selection: $picked, matching: .images)
-        .sheet(isPresented: $showParameters) {
-            ModelSettingsSheet(modelID: modelID)
-        }
         .onAppear {
             alias = ChatConfig.text(profile["alias"]) ?? ""
             tagline = ChatConfig.text(profile["tagline"]) ?? ""
@@ -496,6 +491,24 @@ struct ModelProfilePage: View {
         let value = (which == .alias ? alias : tagline).trimmingCharacters(in: .whitespacesAndNewlines)
         guard value != (ChatConfig.text(profile[key]) ?? "") else { return }
         Task { await model.saveModelProfile(modelID, [key: value]) }
+    }
+}
+
+/// Страница модели отдельным окном — из «Моделей на телефоне».
+struct ModelProfileSheet: View {
+    let modelID: String
+
+    var body: some View {
+        NavigationStack {
+            ModelProfilePage(modelID: modelID)
+                .settingsPage("Настройки модели", symbol: "xmark", label: "Закрыть")
+        }
+        .tint(Theme.ink)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.sheet)
+        .presentationCornerRadius(28)
+        .settingsNotice()
     }
 }
 
@@ -572,27 +585,5 @@ struct SearchPage: View {
             .padding(.horizontal, 18)
             .padding(.bottom, 32)
         }
-    }
-}
-
-/// «Общая инструкция» — для моделей без своей.
-struct InstructionPage: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                SettingsCard {
-                    InstructionEditor(placeholder: "Как модели отвечать во всех чатах",
-                                      saved: ChatConfig.text(model.settings.shared["systemPrompt"]) ?? ChatConfig.defaultPrompt) { text in
-                        await model.saveShared(["systemPrompt": text])
-                    }
-                }
-                SettingsNote(text: "Для моделей без своей инструкции. Свою задают в «Модели → профиль модели».")
-            }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 32)
-        }
-        .scrollDismissesKeyboard(.interactively)
     }
 }
