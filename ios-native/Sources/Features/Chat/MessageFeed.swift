@@ -68,8 +68,9 @@ struct MessageFeed: View {
                                     if message.isUser {
                                         UserMessageView(message: message, canEdit: live == nil)
                                             .id(message.id)
+                                            // Вопрос поднимается от поля ввода на своё место.
                                             .transition(.asymmetric(
-                                                insertion: .opacity.combined(with: .offset(y: 16)),
+                                                insertion: .opacity.combined(with: .offset(y: 220)),
                                                 removal: .identity))
                                     } else if message.rawID != live?.replacingID {
                                         // Перегенерируемый ответ на время заменяет живая строка.

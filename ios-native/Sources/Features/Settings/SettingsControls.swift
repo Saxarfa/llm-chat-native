@@ -30,6 +30,47 @@ struct SheetHeader: View {
     }
 }
 
+/// Шапка шторки, как у Claude: круглая кнопка слева, заголовок по центру, справа — своя кнопка.
+/// Без подложки: содержимое уходит под неё и затухает.
+struct SheetBar<Trailing: View>: View {
+    let title: String
+    let symbol: String
+    let label: String
+    let action: () -> Void
+    @ViewBuilder let trailing: Trailing
+
+    var body: some View {
+        ZStack {
+            Text(title)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+                .lineLimit(1)
+                .padding(.horizontal, 52)
+                .accessibilityAddTraits(.isHeader)
+            HStack {
+                CircleIconButton(symbol: symbol, label: label, action: action)
+                Spacer()
+                trailing
+            }
+        }
+        .padding(.horizontal, 15)
+        .padding(.top, 14)
+        .padding(.bottom, 8)
+        .background(alignment: .top) {
+            Theme.fade(Theme.sheet, from: .top)
+                .padding(.bottom, -14)
+                .ignoresSafeArea(edges: .top)
+                .allowsHitTesting(false)
+        }
+    }
+}
+
+extension SheetBar where Trailing == EmptyView {
+    init(title: String, symbol: String, label: String, action: @escaping () -> Void) {
+        self.init(title: title, symbol: symbol, label: label, action: action) { EmptyView() }
+    }
+}
+
 /// Группа строк на общей подложке, строки разделены тонкой линией.
 struct SettingsCard<Content: View>: View {
     @ViewBuilder let content: Content

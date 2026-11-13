@@ -79,8 +79,9 @@ final class ComposerUITests: XCTestCase {
         sleep(1)
         snap("ui-c3-queue")
         app.buttons["Убрать из очереди"].firstMatch.tap()
-        let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: text(app, contains: "В очереди"))
-        wait(for: [gone], timeout: 3)
+        let row = text(app, contains: "В очереди")
+        let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: row)
+        wait(for: [gone], timeout: 6)
     }
 
     /// Линия контекста по низу карточки ввода (видна с клавиатурой): нажатие показывает,

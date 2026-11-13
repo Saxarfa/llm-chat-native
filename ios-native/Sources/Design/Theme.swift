@@ -43,8 +43,8 @@ enum Theme {
     static func fade(_ color: Color, from edge: UnitPoint) -> LinearGradient {
         LinearGradient(stops: [
             .init(color: color, location: 0),
-            .init(color: color.opacity(0.94), location: 0.42),
-            .init(color: color.opacity(0.6), location: 0.74),
+            .init(color: color.opacity(0.96), location: 0.5),
+            .init(color: color.opacity(0.72), location: 0.78),
             .init(color: color.opacity(0), location: 1),
         ], startPoint: edge, endPoint: edge == .top ? .bottom : .top)
     }

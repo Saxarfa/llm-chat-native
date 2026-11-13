@@ -26,21 +26,13 @@ struct SettingsSheet: View {
     var body: some View {
         NavigationStack(path: $path) {
             root
-                .navigationTitle("Настройки")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        CircleIconButton(symbol: "xmark", label: "Закрыть") { dismiss() }
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    SheetBar(title: "Настройки", symbol: "xmark", label: "Закрыть", action: { dismiss() }) {
                         CircleIconButton(symbol: "info", label: "О приложении") { showAbout = true }
                     }
-                    ToolbarItem(placement: .principal) {
-                        Text("Настройки")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Theme.ink)
-                    }
                 }
+                .navigationTitle("Настройки")
+                .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: SettingsPage.self) { page in
                     destination(page)
                 }
@@ -223,19 +215,12 @@ private struct SettingsPageChrome: ViewModifier {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(Theme.sheet)
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(true)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    CircleIconButton(symbol: "chevron.left", label: "Назад") { dismiss() }
-                }
-                ToolbarItem(placement: .principal) {
-                    Text(title)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                SheetBar(title: title, symbol: "chevron.left", label: "Назад", action: { dismiss() })
             }
+            .navigationTitle(title)
+            .navigationBarBackButtonHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
     }
 }
 

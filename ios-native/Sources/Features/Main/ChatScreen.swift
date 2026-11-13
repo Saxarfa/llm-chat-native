@@ -132,13 +132,16 @@ struct ChatScreen: View {
                 }
                 .background(Theme.surface, in: Capsule())
                 .overlay(Capsule().strokeBorder(Theme.line))
+                .transition(.opacity.combined(with: .scale(scale: 0.86, anchor: .trailing)))
             } else {
                 CircleIconButton(symbol: "slider.horizontal.3", label: "Настройки модели") {
                     openParameters()
                 }
                 .padding(.trailing, -3)
+                .transition(.opacity.combined(with: .scale(scale: 0.86, anchor: .trailing)))
             }
         }
+        .animation(Theme.spring, value: model.activeChatID == nil)
         .padding(.horizontal, 16)
         .frame(height: 44)
         .padding(.top, -6)
@@ -531,7 +534,7 @@ struct ComposerBar: View {
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.line))
         .accessibilityIdentifier("composer.queued")
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .transition(.opacity)
     }
 
     /// Подсказка в пустом поле, как у Claude: «Общайтесь с …» в новом чате, «Ответьте …» в начатом.
@@ -643,6 +646,8 @@ struct ComposerBar: View {
     private func submit() {
         guard canSend else { return }
         dictation.stop()
+        // Как у Claude: после отправки клавиатура уходит, капсула сворачивается в строку.
+        focused = false
         let message = text
         if model.activeLive != nil, model.editing == nil {
             // Модель ещё отвечает: вопрос уйдёт сразу после ответа.
