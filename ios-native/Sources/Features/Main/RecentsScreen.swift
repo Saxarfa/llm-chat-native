@@ -72,7 +72,7 @@ struct RecentsScreen: View {
             .background(alignment: .top) {
                 Theme.edgeBlur(Theme.canvas, from: .top)
                     .padding(.bottom, -24)
-                    .ignoresSafeArea(edges: .top)
+                    .ignoresSafeArea(.container, edges: .top)
                     .allowsHitTesting(false)
             }
         }
@@ -127,7 +127,7 @@ struct RecentsScreen: View {
             .background(alignment: .bottom) {
                 Theme.bottomBlur(Theme.canvas)
                     .padding(.top, -26)
-                    .ignoresSafeArea(edges: .bottom)
+                    .ignoresSafeArea(.container, edges: .bottom)
                     .allowsHitTesting(false)
             }
         }
