@@ -51,14 +51,13 @@ struct ChatBranch: Identifiable, Equatable {
 
 struct ModelOption: Identifiable, Equatable {
     enum Group: Int, CaseIterable {
-        case local, phone, studio, subscription
+        case local, phone, studio
 
         var title: String {
             switch self {
             case .local: return "Локальные"
             case .phone: return "На телефоне"
             case .studio: return "AI Studio"
-            case .subscription: return "Подписка"
             }
         }
     }
@@ -90,7 +89,7 @@ enum ChatConfig {
         "aistudio/gemini-2.5-flash-image": "Nano Banana",
         "aistudio/gemma-4-31b-it": "Gemma 4 31B",
         "aistudio/gemma-4-26b-a4b-it": "Gemma 4 26B A4B",
-        "aistudio/gemini-3.8-flash": "Gemini 3.8 Flash",
+        "aistudio/gemini-4-hydrogen": "Gemini 4 Hydrogen",
         "aistudio/gemini-3.5-flash-lite": "Gemini 3.5 Flash-Lite",
         "aistudio/gemini-4-argon": "Gemini 4 Argon",
         "aistudio/gemini-4-carbon": "Gemini 4 Carbon",
@@ -99,14 +98,14 @@ enum ChatConfig {
     private static let studioLevels: [String: [String]] = [
         "aistudio/gemma-4-31b-it": ["minimal", "high"],
         "aistudio/gemma-4-26b-a4b-it": ["minimal", "high"],
-        "aistudio/gemini-3.8-flash": ["low", "medium", "high"],
+        "aistudio/gemini-4-hydrogen": ["low", "medium", "high", "xhigh"],
         "aistudio/gemini-3.5-flash-lite": ["minimal", "low", "medium", "high"],
         "aistudio/gemini-4-argon": ["low", "medium", "high"],
         "aistudio/gemini-4-carbon": ["low", "medium", "high"],
     ]
 
     private static let studioDefaultStrength: [String: String] = [
-        "aistudio/gemini-3.8-flash": "medium",
+        "aistudio/gemini-4-hydrogen": "high",
         "aistudio/gemini-3.5-flash-lite": "minimal",
         "aistudio/gemini-4-argon": "medium",
         "aistudio/gemini-4-carbon": "medium",
@@ -144,30 +143,27 @@ enum ChatConfig {
 
     // MARK: - Имена и группы моделей
 
+    static func selectable(_ id: String) -> Bool {
+        !id.hasPrefix("google-subscription/") && !id.hasPrefix("gemini-web/") && !id.hasPrefix("google/") && id != "aistudio/gemini-3.8-flash"
+    }
+
     static func group(of id: String) -> ModelOption.Group {
         if PhoneModelID.isPhone(id) { return .phone }
         if id.hasPrefix("aistudio/") { return .studio }
-        if id.hasPrefix("google-subscription/") || id.hasPrefix("gemini-web/") { return .subscription }
         return .local
     }
 
     static func modelName(_ id: String, profiles: [String: Any]) -> String {
         if let alias = text(dict(profiles[id])["alias"]) { return alias }
         if PhoneModelID.isPhone(id) { return PhoneModelNames.display(id) }
-        if id.hasPrefix("gemini-web/") {
-            return ("Gemini " + titleCased(String(id.dropFirst("gemini-web/".count))))
-                .replacingOccurrences(of: "Flash Lite", with: "Flash-Lite")
-        }
+
         if id.hasPrefix("aistudio/") {
             return studioNames[id] ?? String(id.dropFirst("aistudio/".count))
         }
         if let known = localNames[id] { return known }
         var prefix = ""
         var rest = id
-        if rest.hasPrefix("google-subscription/") {
-            prefix = "Подписка · "
-            rest = String(rest.dropFirst("google-subscription/".count))
-        } else if rest.hasPrefix("google/") {
+        if rest.hasPrefix("google/") {
             prefix = "Google · "
             rest = String(rest.dropFirst("google/".count))
         }
@@ -190,7 +186,7 @@ enum ChatConfig {
 
     private static func modelDefaults(_ model: String) -> [String: Any] {
         if model.hasPrefix("aistudio/") {
-            return ["temperature": 1, "top_p": 0.95, "top_k": 64, "thinking": true, "max_tokens": 32768]
+            return ["temperature": 1, "top_p": 0.95, "top_k": 64, "thinking": true, "max_tokens": -1]
         }
         switch model {
         case "gemma-12b-uncensored":
@@ -199,10 +195,10 @@ enum ChatConfig {
             return ["temperature": 1, "top_p": 0.95, "min_p": 0, "top_k": 64, "repeat_penalty": 1]
         case "gemma-4-e4b-uncensored":
             return ["temperature": 1, "top_p": 0.95, "min_p": 0, "top_k": 64, "repeat_penalty": 1,
-                    "presence_penalty": 0, "frequency_penalty": 0, "thinking": true, "max_tokens": 512]
+                    "presence_penalty": 0, "frequency_penalty": 0, "thinking": true, "max_tokens": -1]
         case "qwen-3.6-35b-a3b-mtp":
             return ["temperature": 1, "top_p": 0.95, "min_p": 0, "top_k": 20, "repeat_penalty": 1,
-                    "presence_penalty": 1.5, "frequency_penalty": 0, "max_tokens": 16384, "thinking": true]
+                    "presence_penalty": 1.5, "frequency_penalty": 0, "max_tokens": -1, "thinking": true]
         default:
             return [:]
         }
@@ -223,7 +219,7 @@ enum ChatConfig {
             strength = "high"
         }
         guard let levels, !levels.contains(strength) else { return strength }
-        let lowFloor: Set<String> = ["aistudio/gemini-3.8-flash", "aistudio/gemini-4-argon", "aistudio/gemini-4-carbon"]
+        let lowFloor: Set<String> = ["aistudio/gemini-4-hydrogen", "aistudio/gemini-4-argon", "aistudio/gemini-4-carbon"]
         if lowFloor.contains(model), strength == "minimal" { strength = "low" }
         else if model.hasPrefix("aistudio/gemma-4-"), strength == "low" { strength = "minimal" }
         else { strength = "high" }
@@ -245,10 +241,7 @@ enum ChatConfig {
             .filter { !($0.value is NSNull) }
         config.merge(saved) { _, new in new }
 
-        if model.hasPrefix("google-subscription/") || model.hasPrefix("gemini-web/"), text(config["reasoning_strength"]) == nil {
-            let suffix = ["low", "medium", "high"].first { model.hasSuffix("-" + $0) }
-            config["reasoning_strength"] = suffix ?? "high"
-        }
+
         if studioLevels[model] != nil {
             config["reasoning_strength"] = reasoningStrength(model, saved: saved)
         }

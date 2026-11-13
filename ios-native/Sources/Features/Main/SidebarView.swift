@@ -173,7 +173,7 @@ struct SidebarView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: symbol)
-                    .font(.system(size: 15, weight: .light))
+                    .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(Theme.ink.opacity(0.9))
                     .frame(width: 22)
                 Text(title)

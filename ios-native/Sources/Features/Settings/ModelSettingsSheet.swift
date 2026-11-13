@@ -72,7 +72,6 @@ private struct TextParameters: View {
         let config = model.modelConfig(modelID)
         let saved = model.savedModelValues(modelID)
         let onPhone = PhoneModelID.isPhone(modelID)
-        let subscription = ChatParameters.isSubscription(modelID)
         let specs = ChatParameters.specs
             .filter { ChatParameters.supported(modelID, $0.key) }
             .filter { !onPhone || ($0.key != "presence_penalty" && $0.key != "frequency_penalty") }
@@ -121,9 +120,6 @@ private struct TextParameters: View {
             }
         }
 
-        if subscription {
-            SettingsNote(text: "Доступны инструкции и уровень рассуждений. Температурой и длиной ответа управляет сервис подписки.")
-        }
 
         if !main.isEmpty {
             SectionCaption(text: "Ответ")

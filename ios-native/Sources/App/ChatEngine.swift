@@ -58,10 +58,8 @@ extension AppModel {
             "kind": "models",
         ]
         async let local = try? await api.json("/api/inference/probe", method: "POST", body: probe)
-        async let subscription = try? await api.json("/api/providers/google-subscription")
         async let studio = try? await api.json("/api/providers/aistudio")
-        async let web = try? await api.json("/api/providers/gemini-web")
-        let answers = await [local, subscription, studio, web]
+        let answers = await [local, studio]
 
         var entries: [[String: Any]] = []
         var catalog: [String: [String: Any]] = [:]
@@ -84,7 +82,7 @@ extension AppModel {
         var seen = Set<String>()
         var result: [ModelOption] = []
         for entry in entries {
-            guard let id = entry["id"] as? String, !id.isEmpty,
+            guard let id = entry["id"] as? String, !id.isEmpty, ChatConfig.selectable(id),
                   !ChatConfig.mediaModels.contains(id), seen.insert(id).inserted else { continue }
             var state = entry["status"] as? String
             if let status = entry["status"] as? [String: Any] { state = status["value"] as? String }

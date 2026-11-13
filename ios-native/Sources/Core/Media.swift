@@ -203,7 +203,7 @@ enum AttachmentPrep {
 
     private static let pdfModels: Set<String> = [
         "aistudio/gemini-4-carbon", "aistudio/gemini-4-argon",
-        "aistudio/gemini-3.8-flash", "aistudio/gemini-3.5-flash-lite",
+        "aistudio/gemini-4-hydrogen", "aistudio/gemini-3.5-flash-lite",
     ]
 
     static func image(data: Data, name: String) throws -> DraftAttachment {

@@ -335,10 +335,10 @@ struct ComposerBar: View {
                     .font(.system(size: 16))
                     .foregroundStyle(Theme.ink)
                     .focused($focused)
-                    .padding(.leading, expanded ? 12 : 48)
-                    .padding(.trailing, expanded ? 12 : 84)
-                    .padding(.top, expanded ? 14 : 12.5)
-                    .padding(.bottom, expanded ? 52 : 12.5)
+                    .padding(.leading, expanded ? 12 : 49)
+                    .padding(.trailing, expanded ? 12 : 86)
+                    .padding(.top, expanded ? 15 : 12.5)
+                    .padding(.bottom, expanded ? 54 : 12.5)
                     .accessibilityIdentifier("chat.input")
                 controls(live: live, expanded: expanded)
             }
@@ -444,9 +444,9 @@ struct ComposerBar: View {
             Image(systemName: "plus")
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(Theme.ink.opacity(0.82))
-                .frame(width: 30, height: 30)
+                .frame(width: 31, height: 31)
                 .background(Theme.fill, in: Circle())
-                .modifier(ControlHit(size: 30))
+                .modifier(ControlHit(size: 31))
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel("Вложения и инструменты")
@@ -594,9 +594,9 @@ struct ComposerBar: View {
                     .lineLimit(1)
             }
         }
-        .font(.system(size: 12.5))
+        .font(.system(size: 12))
         .padding(.horizontal, 12)
-        .frame(height: 30)
+        .frame(height: 31)
         .background(Theme.fill, in: Capsule())
     }
 
@@ -611,9 +611,9 @@ struct ComposerBar: View {
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(dictation.active ? Theme.accent : Theme.muted)
                 .symbolEffect(.variableColor.iterative, isActive: dictation.active)
-                .frame(width: 30, height: 30)
+                .frame(width: 31, height: 31)
                 .background(dictation.active ? Theme.accent.opacity(0.16) : Theme.fill, in: Circle())
-                .modifier(ControlHit(size: 30))
+                .modifier(ControlHit(size: 31))
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel(dictation.active ? "Остановить диктовку" : "Диктовка")

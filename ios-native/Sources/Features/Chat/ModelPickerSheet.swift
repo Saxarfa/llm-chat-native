@@ -143,7 +143,6 @@ struct ModelPickerSheet: View {
         case .local: return item.loaded ? "На компьютере · загружена в память" : "На компьютере"
         case .phone: return "Работает на iPhone без компьютера"
         case .studio: return ChatParameters.isNano(item.id) ? "AI Studio · создаёт изображения" : "AI Studio"
-        case .subscription: return "Подписка Google"
         }
     }
 

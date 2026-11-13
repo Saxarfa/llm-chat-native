@@ -27,7 +27,7 @@ struct ParameterSpec: Identifiable {
 }
 
 /// Какие параметры показывать для модели. Перенос `frontend/src/domain.ts`
-/// (`parameterSupported`, `reasoningKind`, `subscriptionLevels`, `nano*`) и списков из
+/// (`parameterSupported`, `reasoningKind`, `reasoningLevels`, `nano*`) и списков из
 /// `Settings.tsx`/`NanoChatParameters.tsx`. Менять только вместе с сайтом.
 enum ChatParameters {
     static let specs: [ParameterSpec] = [
@@ -69,24 +69,21 @@ enum ChatParameters {
 
     static func isNano(_ model: String) -> Bool { nanoModels.contains(model) }
 
-    static func isSubscription(_ model: String) -> Bool {
-        model.hasPrefix("google-subscription/") || model.hasPrefix("gemini-web/")
-    }
 
     static func usesGoogleSearch(_ model: String) -> Bool {
-        model.hasPrefix("aistudio/") || model.hasPrefix("gemini-web/")
+        model.hasPrefix("aistudio/")
     }
 
     static func supported(_ model: String, _ key: String) -> Bool {
         if isNano(model) { return false }
-        if model == "aistudio/gemini-4-argon" || model == "aistudio/gemini-4-carbon" || model.hasPrefix("gemini-web/") {
+        if (model == "aistudio/gemini-4-argon" || model == "aistudio/gemini-4-carbon") && key != "max_tokens" {
             return false
         }
         return !model.hasPrefix("aistudio/") || ["temperature", "top_p", "top_k", "max_tokens"].contains(key)
     }
 
     static func studioOutputLimit(_ model: String) -> Int {
-        ["aistudio/gemini-3.8-flash", "aistudio/gemini-3.5-flash-lite"].contains(model) ? 65536 : 32768
+        ["aistudio/gemini-4-hydrogen", "aistudio/gemini-3.5-flash-lite"].contains(model) ? 65536 : 32768
     }
 
     /// Пределы параметра для этой модели (у AI Studio длина ответа ограничена самой моделью).
@@ -107,7 +104,7 @@ enum ChatParameters {
     private static let studioLevels: [String: [Choice]] = [
         "aistudio/gemma-4-31b-it": [Choice("minimal", "Минимальный"), Choice("high", "Высокий")],
         "aistudio/gemma-4-26b-a4b-it": [Choice("minimal", "Минимальный"), Choice("high", "Высокий")],
-        "aistudio/gemini-3.8-flash": [Choice("low", "Низкий"), Choice("medium", "Средний"), Choice("high", "Высокий")],
+        "aistudio/gemini-4-hydrogen": [Choice("low", "Низкий"), Choice("medium", "Средний"), Choice("high", "Высокий"), Choice("xhigh", "Максимальный")],
         "aistudio/gemini-3.5-flash-lite": [Choice("minimal", "Минимальный"), Choice("low", "Низкий"), Choice("medium", "Средний"), Choice("high", "Высокий")],
         "aistudio/gemini-4-argon": [Choice("low", "Низкий"), Choice("medium", "Средний"), Choice("high", "Высокий")],
         "aistudio/gemini-4-carbon": [Choice("low", "Низкий"), Choice("medium", "Средний"), Choice("high", "Высокий")],
@@ -120,14 +117,6 @@ enum ChatParameters {
 
     static func reasoning(_ model: String) -> Reasoning? {
         if let levels = studioLevels[model] { return .levels(levels) }
-        if model.hasPrefix("gemini-web/") {
-            return .levels([Choice("low", "Низкий"), Choice("medium", "Средний"), Choice("high", "Высокий")])
-        }
-        if model.hasPrefix("google-subscription/") {
-            return .levels(model.contains("-pro")
-                ? [Choice("low", "Лёгкие"), Choice("high", "Глубокие")]
-                : [Choice("low", "Лёгкие"), Choice("medium", "Средние"), Choice("high", "Глубокие")])
-        }
         if toggleModels.contains(model) { return .toggle }
         if model == "muse-glimmer-30b" {
             return .levels([Choice("low", "Минимальные"), Choice("medium", "Средние"), Choice("high", "Высокие"), Choice("xhigh", "Максимальные")])

@@ -238,9 +238,8 @@ enum PreviewScene: String, CaseIterable {
         ModelOption(id: "gemma-26b-qat", name: "Gemma 26B QAT", group: .local, loaded: true),
         ModelOption(id: "qwen-3.8-27b-it", name: "Qwen 3.8 27B It", group: .local, loaded: false),
         ModelOption(id: "muse-glimmer-30b", name: "Muse Glimmer 30B", group: .local, loaded: false),
-        ModelOption(id: "aistudio/gemini-3.8-flash", name: "Gemini 3.8 Flash", group: .studio, loaded: false),
+        ModelOption(id: "aistudio/gemini-4-hydrogen", name: "Gemini 4 Hydrogen", group: .studio, loaded: false),
         ModelOption(id: "aistudio/gemma-4-31b-it", name: "Gemma 4 31B", group: .studio, loaded: false),
-        ModelOption(id: "gemini-web/pro", name: "Gemini Pro", group: .subscription, loaded: false),
     ]
 
     static var live: AppModel.LiveState {

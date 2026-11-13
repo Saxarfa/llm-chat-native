@@ -149,7 +149,7 @@ struct ChatRowLabel: View {
     var body: some View {
         HStack(alignment: showTime ? .top : .center, spacing: 10) {
             Image(systemName: chat.pinned ? "pin" : "message")
-                .font(.system(size: 15, weight: .light))
+                .font(.system(size: 16, weight: .regular))
                 .foregroundStyle(Theme.ink.opacity(0.8))
                 .frame(width: 22)
                 .padding(.top, showTime ? 1 : 0)
