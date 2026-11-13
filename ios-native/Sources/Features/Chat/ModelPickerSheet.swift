@@ -11,7 +11,7 @@ struct ModelPickerSheet: View {
         VStack(spacing: 0) {
             ZStack {
                 Text("Выбор модели")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 HStack {
                     CircleIconButton(symbol: "xmark", label: "Закрыть") { dismiss() }
@@ -22,7 +22,7 @@ struct ModelPickerSheet: View {
                     }
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 15)
             .padding(.top, 14)
             .padding(.bottom, 6)
 
@@ -37,9 +37,9 @@ struct ModelPickerSheet: View {
                         // «На телефоне» видна всегда: из неё открывается окно моделей телефона.
                         if !items.isEmpty || group == .phone {
                             Text(group.title)
-                                .font(.system(size: 14))
+                                .font(.system(size: 12.5))
                                 .foregroundStyle(Theme.subtle)
-                                .padding(.horizontal, 8)
+                                .padding(.horizontal, 18)
                                 .padding(.top, 12)
                             SettingsCard {
                                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -54,7 +54,7 @@ struct ModelPickerSheet: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 18)
                 .padding(.bottom, 24)
             }
         }
@@ -85,10 +85,10 @@ struct ModelPickerSheet: View {
             Haptics.tap()
             showPhone = true
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Image(systemName: "iphone")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Theme.ink)
+                    .font(.system(size: 15, weight: .light))
+                    .foregroundStyle(Theme.ink.opacity(0.9))
                     .frame(width: 22)
                 Text(model.phone.installed.isEmpty ? "Скачать модель на телефон" : "Модели на телефоне")
                     .font(.system(size: 16))
@@ -98,11 +98,11 @@ struct ModelPickerSheet: View {
                     ProgressView().controlSize(.small).tint(Theme.muted)
                 }
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Theme.subtle)
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 52)
+            .frame(minHeight: 46)
             .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())
@@ -156,23 +156,23 @@ struct ModelPickerSheet: View {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.name)
-                        .font(.system(size: 17))
+                        .font(.system(size: 16))
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
                     Text(detail(item))
-                        .font(.system(size: 13))
+                        .font(.system(size: 12))
                         .foregroundStyle(Theme.subtle)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
                 if selected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(Theme.accent)
                 }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 60)
+            .frame(minHeight: 58)
             .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())

@@ -113,7 +113,7 @@ private struct MarkdownBlockView: View {
                 ForEach(items) { item in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(item.marker)
-                            .font(.system(size: 17, design: .serif).monospacedDigit())
+                            .font(.system(size: 16.5, design: .serif).monospacedDigit())
                             .foregroundStyle(Theme.muted)
                             .frame(minWidth: 16, alignment: .trailing)
                         BodyText(text: item.text)
@@ -151,7 +151,7 @@ private struct BodyText: View {
     var body: some View {
         // Текст ответа — шрифтом с засечками, как в приложении Claude.
         Text(InlineMarkdown.render(text))
-            .font(.system(size: 17, design: .serif))
+            .font(.system(size: 16.5, design: .serif))
             .foregroundStyle(color)
             .lineSpacing(5)
             .fixedSize(horizontal: false, vertical: true)
@@ -163,6 +163,8 @@ private struct BodyText: View {
 struct CopyButton: View {
     let text: String
     var label = "Скопировать"
+    /// В ряду под ответом — мелкий значок, как остальные там.
+    var compact = false
     @State private var copied = false
 
     var body: some View {
@@ -175,10 +177,10 @@ struct CopyButton: View {
                 copied = false
             }
         } label: {
-            Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(copied ? Theme.ink : Theme.muted)
-                .frame(width: 44, height: 40)
+            Image(systemName: copied ? "checkmark" : (compact ? "square.on.square" : "doc.on.doc"))
+                .font(.system(size: compact ? 13.5 : 14, weight: compact ? .regular : .medium))
+                .foregroundStyle(copied ? Theme.ink : Theme.muted.opacity(compact ? 0.85 : 1))
+                .frame(width: compact ? 29 : 44, height: compact ? 38 : 40)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressScaleStyle())

@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Чат и боковое меню под ним: меню открывается кнопкой или движением пальца вправо,
-/// чат при этом сдвигается и затемняется.
+/// Чат и боковое меню под ним, как у Claude: меню открывается кнопкой или движением пальца вправо,
+/// чат при этом уезжает вправо карточкой со скруглёнными углами и тускнеет; меню стоит на месте.
 struct MainView: View {
     private enum DragAxis { case horizontal, vertical }
 
@@ -20,7 +20,7 @@ struct MainView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let width = min(geo.size.width * 0.86, 360)
+            let width = min((geo.size.width * 0.733).rounded(), 330)
             let offset = min(max((isOpen ? width : 0) + dragX, 0), width)
             let progress = width > 0 ? offset / width : 0
 
@@ -29,8 +29,6 @@ struct MainView: View {
 
                 SidebarView(onClose: { setOpen(false) })
                     .frame(width: width)
-                    .offset(x: (progress - 1) * width * 0.22)
-                    .opacity(0.35 + 0.65 * progress)
                     .allowsHitTesting(isOpen && !swiping)
                     .scrollDisabled(swiping)
                     .accessibilityHidden(!isOpen)
@@ -49,10 +47,21 @@ struct MainView: View {
                     .scrollDisabled(swiping)
                     .background(Theme.canvas.ignoresSafeArea())
                     .overlay {
-                        Color.black.opacity(0.45 * progress)
+                        Theme.canvas.opacity(0.62 * progress)
                             .ignoresSafeArea()
                             .allowsHitTesting(isOpen)
                             .onTapGesture { setOpen(false) }
+                    }
+                    // Углы карточки: поверх чата рисуется фон меню, вырезанный скруглённым прямоугольником.
+                    .overlay {
+                        CardCorners(radius: 42 * progress)
+                            .fill(Theme.rail, style: FillStyle(eoFill: true))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 42 * progress, style: .continuous)
+                                    .strokeBorder(Theme.line.opacity(Double(progress)))
+                            }
+                            .ignoresSafeArea()
+                            .allowsHitTesting(false)
                     }
                     .offset(x: offset)
                     .accessibilityHidden(isOpen)
@@ -115,5 +124,21 @@ struct MainView: View {
                 let projected = (isOpen ? width : 0) + value.predictedEndTranslation.width
                 setOpen(projected > width / 2)
             }
+    }
+}
+
+/// Прямоугольник без скруглённой середины — то, что остаётся в углах карточки чата.
+private struct CardCorners: Shape {
+    var radius: CGFloat
+
+    var animatableData: CGFloat {
+        get { radius }
+        set { radius = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path(rect)
+        path.addRoundedRect(in: rect, cornerSize: CGSize(width: radius, height: radius), style: .continuous)
+        return path
     }
 }

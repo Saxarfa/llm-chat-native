@@ -16,6 +16,11 @@ struct MessageFeed: View {
     private static let space = "feed-space"
     private static let page = 30
 
+    /// Сколько в ленте своих вопросов: по этому числу анимируется появление нового.
+    private var questions: Int {
+        model.thread.reduce(0) { $0 + ($1.isUser ? 1 : 0) }
+    }
+
     private func follow(_ proxy: ScrollViewProxy) {
         guard atBottom, Date().timeIntervalSince(touch.last) > 0.3 else { return }
         proxy.scrollTo(Self.bottomID, anchor: .bottom)
@@ -63,19 +68,25 @@ struct MessageFeed: View {
                                     if message.isUser {
                                         UserMessageView(message: message, canEdit: live == nil)
                                             .id(message.id)
+                                            .transition(.asymmetric(
+                                                insertion: .opacity.combined(with: .offset(y: 16)),
+                                                removal: .identity))
                                     } else if message.rawID != live?.replacingID {
                                         // Перегенерируемый ответ на время заменяет живая строка.
                                         AssistantMessageView(message: message, canRegenerate: live == nil)
                                             .id(message.id)
+                                            .transition(.identity)
                                     }
                                 }
                                 if let live {
                                     LiveAnswerView(live: live)
+                                        .transition(.asymmetric(insertion: .opacity, removal: .identity))
                                 } else if let last = model.thread.last, !last.isUser {
                                     Text("\(last.model.isEmpty ? "Модель" : ChatConfig.modelName(last.model, profiles: model.settings.modelProfiles)) — это ИИ, который может ошибаться.")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(Theme.subtle)
+                                        .font(.system(size: 11.5))
+                                        .foregroundStyle(Theme.subtle.opacity(0.85))
                                         .padding(.top, -10)
+                                        .transition(.identity)
                                 }
                                 Color.clear
                                     .frame(height: 1)
@@ -85,11 +96,13 @@ struct MessageFeed: View {
                                     })
                                     .id(Self.bottomID)
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                            .padding(.bottom, 8)
+                            .padding(.horizontal, 15)
+                            .padding(.top, 20)
+                            .padding(.bottom, 14)
                             // Короткий чат начинается сверху, а не прижимается к полю ввода.
                             .frame(minHeight: box.size.height, alignment: .top)
+                            // Анимация — только когда добавился свой вопрос, а не при дописанном ответе.
+                            .animation(Theme.spring, value: questions)
                         }
                         .coordinateSpace(name: Self.space)
                         .defaultScrollAnchor(model.preview == .threadTop ? .top : .bottom)
@@ -102,6 +115,32 @@ struct MessageFeed: View {
                         .simultaneousGesture(DragGesture(minimumDistance: 4).onChanged { _ in
                             touch.last = Date()
                         })
+                        // Лента отлистана вверх — кнопка «вниз» над полем ввода, как у Claude.
+                        .overlay(alignment: .bottom) {
+                            if !atBottom {
+                                Button {
+                                    Haptics.tap()
+                                    atBottom = true
+                                    withAnimation(Theme.spring) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                                } label: {
+                                    Image(systemName: "arrow.down")
+                                        .font(.system(size: 14, weight: .regular))
+                                        .foregroundStyle(Theme.ink.opacity(0.82))
+                                        .frame(width: 34, height: 34)
+                                        .background(Theme.surface, in: Circle())
+                                        .overlay(Circle().strokeBorder(Theme.line))
+                                        .shadow(color: .black.opacity(0.22), radius: 8, y: 2)
+                                        .frame(width: 44, height: 44)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(PressScaleStyle())
+                                .padding(.bottom, 4)
+                                .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                                .accessibilityLabel("К последнему сообщению")
+                                .accessibilityIdentifier("feed.down")
+                            }
+                        }
+                        .animation(.easeOut(duration: 0.18), value: atBottom)
                         .onChange(of: live?.text.count) { follow(proxy) }
                         .onChange(of: live?.phase) { follow(proxy) }
                         .onChange(of: live?.arts.count) { follow(proxy) }
@@ -155,12 +194,10 @@ private struct LiveAnswerView: View {
                 ArtView(art: art)
             }
             if live.text.isEmpty || live.stopping {
-                HStack(spacing: 10) {
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(Theme.muted)
+                HStack(spacing: 9) {
+                    PulseDot()
                     Text(live.stopping ? "Останавливаю…" : live.phase)
-                        .font(.system(size: 15))
+                        .font(.system(size: 14))
                         .foregroundStyle(Theme.muted)
                         .lineLimit(2)
                 }
@@ -170,6 +207,22 @@ private struct LiveAnswerView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Пульсирующая коралловая точка — модель думает или пишет, как искра у Claude.
+private struct PulseDot: View {
+    @State private var on = false
+
+    var body: some View {
+        Circle()
+            .fill(Theme.send)
+            .frame(width: 9, height: 9)
+            .scaleEffect(on ? 1 : 0.55)
+            .opacity(on ? 1 : 0.5)
+            .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: on)
+            .onAppear { on = true }
+            .accessibilityHidden(true)
     }
 }
 
@@ -227,13 +280,13 @@ private struct UserMessageView: View {
             }
             if !message.text.isEmpty {
                 Text(message.text)
-                    .font(.system(size: 17))
+                    .font(.system(size: 16))
                     .foregroundStyle(Theme.ink)
-                    .lineSpacing(4)
+                    .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 11)
-                    .background(Theme.fillActive, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(Theme.bubble, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .contextMenu {
                         Button {
@@ -262,6 +315,7 @@ private struct UserMessageView: View {
             }
         }
         .padding(.leading, 44)
+        .padding(.trailing, -3)
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }
@@ -287,7 +341,7 @@ private struct AssistantMessageView: View {
                 // Как под ответом у Claude: скопировать, поделиться, прочитать вслух, ответить заново.
                 HStack(spacing: 0) {
                     if !message.text.isEmpty {
-                        CopyButton(text: message.text, label: "Скопировать ответ")
+                        CopyButton(text: message.text, label: "Скопировать ответ", compact: true)
                         ShareLink(item: message.text) {
                             AnswerIcon(symbol: "square.and.arrow.up")
                         }
@@ -311,8 +365,8 @@ private struct AssistantMessageView: View {
                         AnswerMoreMenu(message: message)
                     }
                 }
-                .padding(.leading, -13)
-                .padding(.top, -6)
+                .padding(.leading, -6)
+                .padding(.top, -5)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -326,9 +380,9 @@ private struct AnswerIcon: View {
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: 15, weight: .regular))
-            .foregroundStyle(active ? Theme.accent : Theme.muted)
-            .frame(width: 42, height: 40)
+            .font(.system(size: 13.5, weight: .regular))
+            .foregroundStyle(active ? Theme.accent : Theme.muted.opacity(0.85))
+            .frame(width: 29, height: 38)
             .contentShape(Rectangle())
     }
 }
@@ -410,7 +464,7 @@ private struct VariantStepper: View {
         HStack(spacing: 0) {
             step("chevron.left", label: "Предыдущий вариант", to: message.variantIndex - 1)
             Text("\(message.variantIndex + 1)/\(message.variantCount)")
-                .font(.system(size: 13, weight: .medium).monospacedDigit())
+                .font(.system(size: 12, weight: .medium).monospacedDigit())
                 .foregroundStyle(Theme.muted)
                 .accessibilityLabel("Вариант \(message.variantIndex + 1) из \(message.variantCount)")
             step("chevron.right", label: "Следующий вариант", to: message.variantIndex + 1)
@@ -423,9 +477,9 @@ private struct VariantStepper: View {
             Task { await model.selectVariant(message, index: index) }
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(possible && enabled ? Theme.muted : Theme.subtle.opacity(0.5))
-                .frame(width: 32, height: 40)
+                .frame(width: 26, height: 38)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressScaleStyle())

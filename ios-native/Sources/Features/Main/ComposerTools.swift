@@ -36,7 +36,7 @@ struct ComposerToolsSheet: View {
                     } else if !nano {
                         SettingsCard {
                             searchRow(id)
-                            CardDivider()
+                            CardDivider(inset: 53)
                             knowledgeRow
                         }
                         SettingsCard {
@@ -54,7 +54,7 @@ struct ComposerToolsSheet: View {
                         SettingsNote(text: "Поиск и базы знаний — для этого чата. Рассуждения и память — для всех чатов с этой моделью.")
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 18)
                 .padding(.top, 4)
                 .padding(.bottom, 24)
             }
@@ -77,20 +77,21 @@ struct ComposerToolsSheet: View {
     private var header: some View {
         ZStack {
             Text("Добавление в чат")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.ink)
             HStack {
                 CircleIconButton(symbol: "xmark", label: "Закрыть") { dismiss() }
                 Spacer()
                 Button("Фото") { pick(.photo) }
-                    .font(.system(size: 17))
+                    .font(.system(size: 16))
                     .foregroundStyle(Theme.ink)
                     .frame(minWidth: 44, minHeight: 44)
                     .disabled(PhoneModelID.isPhone(model.activeModelID))
                     .accessibilityIdentifier("tools.photo")
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.leading, 15)
+        .padding(.trailing, 18)
         .padding(.top, 14)
         .padding(.bottom, 8)
         .background(Theme.sheet)
@@ -145,14 +146,15 @@ struct ToolRowLabel: View {
     var enabled = true
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             Image(systemName: symbol)
-                .font(.system(size: 17))
-                .foregroundStyle(enabled ? Theme.ink : Theme.subtle)
-                .frame(width: 24)
+                .font(.system(size: 15, weight: .light))
+                .foregroundStyle(enabled ? Theme.ink.opacity(0.9) : Theme.subtle)
+                .frame(width: 22)
             Text(title)
-                .font(.system(size: 17))
+                .font(.system(size: 16))
                 .foregroundStyle(enabled ? Theme.ink : Theme.subtle)
+                .lineLimit(1)
             Spacer(minLength: 8)
             if let value {
                 Text(value)
@@ -162,12 +164,13 @@ struct ToolRowLabel: View {
             }
             if let chevron {
                 Image(systemName: chevron)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Theme.subtle)
             }
         }
-        .padding(.horizontal, 16)
-        .frame(minHeight: 54)
+        .padding(.leading, 17)
+        .padding(.trailing, 16)
+        .frame(minHeight: 46)
         .contentShape(Rectangle())
     }
 }
@@ -201,7 +204,7 @@ private struct PhotoStrip: View {
     @State private var allowed = true
     @State private var loading: String?
 
-    private static let side: CGFloat = 108
+    private static let side: CGFloat = 90
     private static let manager = PHCachingImageManager()
 
     var body: some View {
@@ -225,9 +228,9 @@ private struct PhotoStrip: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
         }
-        .padding(.horizontal, -16)
+        .padding(.horizontal, -18)
         .modifier(DrawerFreeZone())
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.45)
@@ -239,14 +242,14 @@ private struct PhotoStrip: View {
         Button(action: action) {
             VStack(spacing: 8) {
                 Image(systemName: symbol)
-                    .font(.system(size: 20))
+                    .font(.system(size: 17, weight: .light))
                 Text(title)
-                    .font(.system(size: 15))
+                    .font(.system(size: 14))
             }
             .foregroundStyle(Theme.ink)
             .frame(width: Self.side, height: Self.side)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(PressScaleStyle())
     }
@@ -262,7 +265,7 @@ private struct PhotoStrip: View {
                     }
                 }
                 .frame(width: Self.side, height: Self.side)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 if added.contains(key) || loading == key {
                     Group {
                         if loading == key {

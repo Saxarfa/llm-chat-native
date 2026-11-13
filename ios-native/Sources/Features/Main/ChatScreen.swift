@@ -24,12 +24,15 @@ struct ChatScreen: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .scrollBounceBehavior(.basedOnSize)
+                .transition(.opacity)
             } else {
                 MessageFeed()
                     // Свой экземпляр ленты на каждый чат: позиция прокрутки не переносится.
                     .id(model.activeChatID)
+                    .transition(.opacity)
             }
         }
+        .animation(.easeOut(duration: 0.2), value: model.activeChatID)
         // Нажатие на пустое место или на текст ленты убирает клавиатуру.
         .contentShape(Rectangle())
         .onTapGesture { Keyboard.hide() }
@@ -40,9 +43,15 @@ struct ChatScreen: View {
                     OfflineBanner()
                         .padding(.horizontal, 12)
                         .padding(.bottom, 6)
-                        .background(Theme.canvas)
                         .transition(.opacity)
                 }
+            }
+            // Шапка без подложки: лента уходит под кнопки и под «остров», затухая к верху экрана.
+            .background(alignment: .top) {
+                Theme.fade(Theme.canvas, from: .top)
+                    .padding(.bottom, -22)
+                    .ignoresSafeArea(edges: .top)
+                    .allowsHitTesting(false)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -87,6 +96,7 @@ struct ChatScreen: View {
     }
 
     /// Шапка как у Claude: слева меню, справа «Новый чат» и «⋯» в общей капсуле; названия чата нет.
+    /// Кнопки стоят сразу под «островом» и плавают над лентой.
     private var header: some View {
         HStack(spacing: 8) {
             CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: onMenu)
@@ -112,25 +122,27 @@ struct ChatScreen: View {
                         ChatMenuItems(chat: chat, onRename: { renaming = chat }, onDelete: { deleting = chat })
                     } label: {
                         Image(systemName: "ellipsis")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Theme.ink)
-                            .frame(width: 44, height: 40)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Theme.ink.opacity(0.82))
+                            .frame(width: 43, height: 38)
                             .contentShape(Rectangle())
                     }
                     .accessibilityLabel("Ещё")
                     .accessibilityIdentifier("chat.more")
                 }
-                .padding(.horizontal, 2)
-                .background(Theme.fill, in: Capsule())
+                .background(Theme.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder(Theme.line))
             } else {
                 CircleIconButton(symbol: "slider.horizontal.3", label: "Настройки модели") {
                     openParameters()
                 }
+                .padding(.trailing, -3)
             }
         }
-        .padding(.horizontal, 12)
-        .frame(height: 52)
-        .background(Theme.canvas)
+        .padding(.horizontal, 16)
+        .frame(height: 44)
+        .padding(.top, -6)
+        .padding(.bottom, 4)
     }
 
     private func headerIcon(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
@@ -139,9 +151,9 @@ struct ChatScreen: View {
             action()
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Theme.ink)
-                .frame(width: 44, height: 40)
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(Theme.ink.opacity(0.82))
+                .frame(width: 43, height: 38)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressScaleStyle())
@@ -155,10 +167,10 @@ struct ChatScreen: View {
     }
 
     private var welcome: some View {
-        VStack(spacing: 14) {
-            Wordmark(size: 34)
+        VStack(spacing: 12) {
+            Wordmark(size: 30)
             Text(greeting)
-                .font(Theme.display(24))
+                .font(Theme.display(21))
                 .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
         }
@@ -170,9 +182,10 @@ struct ChatScreen: View {
     }
 }
 
-/// Поле ввода. Прикреплено к нижней безопасной зоне, поэтому поднимается вместе с клавиатурой.
-/// Слева — меню «+» и выбор модели, справа — отправка; пока модель отвечает — «Стоп», а набранный
-/// вопрос встаёт в очередь. Тонкая линия внизу — сколько контекста модели занято.
+/// Поле ввода, как у Claude. Без клавиатуры — строка-капсула: «+», подсказка, микрофон, «Отправить».
+/// С клавиатурой (или когда уже есть текст и вложения) — карточка в две строки: сверху текст,
+/// снизу «+», модель, микрофон и «Отправить»; пока модель отвечает — «Стоп», а набранный вопрос
+/// встаёт в очередь. Тонкая линия по низу карточки — сколько контекста модели занято.
 struct ComposerBar: View {
     @Environment(AppModel.self) private var model
     @Binding var text: String
@@ -208,8 +221,17 @@ struct ComposerBar: View {
         return hasText || !model.draftAttachments.isEmpty
     }
 
+    /// Карточка в две строки — когда печатают или уже есть что отправить; иначе строка-капсула.
+    private var expanded: Bool {
+        focused || hasText || model.editing != nil || !model.draftAttachments.isEmpty
+            || model.attachmentsBusy || dictation.active
+    }
+
     var body: some View {
         let live = model.activeLive
+        let expanded = self.expanded
+        // Строка-капсула стоит чуть ниже безопасной зоны, у самой полосы «домой», как у Claude.
+        let resting: CGFloat = Screen.bottomInset > 0 ? -4 : 8
         VStack(spacing: 8) {
             if let error = model.sendError {
                 errorBanner(error)
@@ -220,62 +242,21 @@ struct ComposerBar: View {
             ForEach(model.activeQueue) { item in
                 queuedRow(item)
             }
-
-            VStack(alignment: .leading, spacing: 10) {
-                if model.editing != nil {
-                    editBanner
-                } else if !model.draftAttachments.isEmpty || model.attachmentsBusy {
-                    DraftAttachmentStrip()
-                }
-
-                TextField("", text: $text, prompt: Text(placeholder).foregroundStyle(Theme.subtle), axis: .vertical)
-                    .lineLimit(1...8)
-                    .font(.system(size: 17))
-                    .foregroundStyle(Theme.ink)
-                    .focused($focused)
-                    .padding(.horizontal, 6)
-                    .padding(.top, 4)
-                    .accessibilityIdentifier("chat.input")
-
-                HStack(spacing: 6) {
-                    if model.editing == nil {
-                        attachButton
-                    }
-                    modelButton
-                    Spacer(minLength: 8)
-                    if live != nil {
-                        actionButton(symbol: "stop.fill", label: "Остановить ответ", active: live?.stopping != true,
-                                     primary: !(model.editing == nil && hasText)) {
-                            Task { await model.stop() }
-                        }
-                        if model.editing == nil && hasText {
-                            actionButton(symbol: "arrow.up", label: "Добавить в очередь", active: canSend, action: submit)
-                                .transition(.scale.combined(with: .opacity))
-                        }
-                    } else {
-                        if model.editing == nil {
-                            micButton
-                        }
-                        actionButton(symbol: model.editing == nil ? "arrow.up" : "checkmark",
-                                     label: model.editing == nil ? "Отправить" : "Сохранить правку",
-                                     active: canSend, action: submit)
-                    }
-                }
-                if let usage = model.activeContext, let fraction = usage.fraction {
-                    contextLine(usage, fraction: fraction)
-                }
-            }
-            .padding(10)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Theme.line))
-            .shadow(color: .black.opacity(0.12), radius: 16, y: 4)
-            .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .onTapGesture { focused = true }
+            card(live: live, expanded: expanded)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, expanded ? 8 : 15)
         .padding(.top, 6)
-        .padding(.bottom, 8)
-        .background(Theme.canvas)
+        .padding(.bottom, focused ? 8 : (expanded ? 2 : resting))
+        // Без подложки: лента уходит под капсулу и затухает к низу экрана.
+        .background(alignment: .bottom) {
+            Theme.fade(Theme.canvas, from: .bottom)
+                .padding(.top, -18)
+                .ignoresSafeArea(edges: .bottom)
+                .allowsHitTesting(false)
+        }
+        .animation(Theme.morph, value: expanded)
+        .animation(Theme.morph, value: focused)
+        .animation(.easeOut(duration: 0.15), value: canSend)
         .animation(.easeOut(duration: 0.18), value: model.sendError)
         .animation(.easeOut(duration: 0.18), value: model.draftAttachments)
         .animation(.easeOut(duration: 0.18), value: model.activeQueue)
@@ -332,6 +313,79 @@ struct ComposerBar: View {
         }
     }
 
+    private func card(live: AppModel.LiveState?, expanded: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: expanded ? 26 : 23, style: .continuous)
+        return VStack(alignment: .leading, spacing: 0) {
+            if model.editing != nil {
+                editBanner
+                    .padding(.horizontal, 8)
+                    .padding(.top, 6)
+            } else if !model.draftAttachments.isEmpty || model.attachmentsBusy {
+                DraftAttachmentStrip()
+                    .padding(.horizontal, 10)
+                    .padding(.top, 10)
+            }
+            // Одно и то же поле в обоих видах (меняются только отступы) — фокус не теряется.
+            ZStack(alignment: .bottom) {
+                TextField("", text: $text, prompt: Text(placeholder).foregroundStyle(Theme.subtle), axis: .vertical)
+                    .lineLimit(expanded ? 1...8 : 1...1)
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.ink)
+                    .focused($focused)
+                    .padding(.leading, expanded ? 12 : 48)
+                    .padding(.trailing, expanded ? 12 : 84)
+                    .padding(.top, expanded ? 14 : 12.5)
+                    .padding(.bottom, expanded ? 52 : 12.5)
+                    .accessibilityIdentifier("chat.input")
+                controls(live: live, expanded: expanded)
+            }
+        }
+        .background(Theme.surface, in: shape)
+        .overlay(shape.strokeBorder(Theme.line))
+        .overlay(alignment: .bottom) {
+            if expanded, let usage = model.activeContext, let fraction = usage.fraction {
+                contextLine(usage, fraction: fraction)
+            }
+        }
+        .shadow(color: .black.opacity(0.14), radius: 14, y: 4)
+        .contentShape(shape)
+        .onTapGesture { focused = true }
+    }
+
+    /// Нижний ряд: «+», модель (только в карточке), микрофон и «Отправить» / «Стоп».
+    private func controls(live: AppModel.LiveState?, expanded: Bool) -> some View {
+        HStack(spacing: 8) {
+            if model.editing == nil {
+                attachButton
+            }
+            if expanded {
+                modelButton
+                    .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .leading)))
+            }
+            Spacer(minLength: 4)
+            if model.editing == nil {
+                micButton
+            }
+            if live != nil {
+                roundAction(symbol: "stop.fill", label: "Остановить ответ", style: .stop,
+                            active: live?.stopping != true) {
+                    Task { await model.stop() }
+                }
+                if model.editing == nil && hasText {
+                    roundAction(symbol: "arrow.up", label: "Добавить в очередь", style: .send,
+                                active: canSend, action: submit)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            } else {
+                roundAction(symbol: model.editing == nil ? "arrow.up" : "checkmark",
+                            label: model.editing == nil ? "Отправить" : "Сохранить правку",
+                            style: canSend ? .send : .idle, active: canSend, action: submit)
+            }
+        }
+        .padding(.horizontal, 7)
+        .padding(.bottom, 7)
+    }
+
     private func errorBanner(_ error: String, onClose: (() -> Void)? = nil) -> some View {
         Button {
             if let onClose { onClose() } else { model.sendError = nil }
@@ -385,12 +439,11 @@ struct ComposerBar: View {
             showTools = true
         } label: {
             Image(systemName: "plus")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Theme.muted)
-                .frame(width: 36, height: 36)
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(Theme.ink.opacity(0.82))
+                .frame(width: 30, height: 30)
                 .background(Theme.fill, in: Circle())
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+                .modifier(ControlHit(size: 30))
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel("Вложения и инструменты")
@@ -411,7 +464,7 @@ struct ComposerBar: View {
         "\(model.activeChatID ?? "")|\(model.activeModelID)|\(model.thread.count)|\(model.activeLive == nil)|\(model.activeBranchName)"
     }
 
-    /// Линия по низу капсулы: занятая часть контекста. Нажатие — подробности.
+    /// Линия по низу карточки: занятая часть контекста. Нажатие — подробности.
     private func contextLine(_ usage: ContextUsage, fraction: Double) -> some View {
         Button {
             Haptics.tap()
@@ -424,15 +477,14 @@ struct ComposerBar: View {
                         .frame(width: max(2, geometry.size.width * fraction))
                 }
                 .frame(height: 2)
-                .frame(maxHeight: .infinity, alignment: .center)
+                .frame(maxHeight: .infinity, alignment: .bottom)
             }
-            .frame(height: 12)
-            .padding(.horizontal, 12)
+            .frame(height: 10)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.top, -6)
-        .padding(.bottom, -4)
+        .padding(.horizontal, 30)
+        .padding(.bottom, 2.5)
         .accessibilityLabel("Контекст модели: \(Int((fraction * 100).rounded()))%")
         .accessibilityIdentifier("composer.context")
         .popover(isPresented: $showContext, arrowEdge: .bottom) {
@@ -520,6 +572,7 @@ struct ComposerBar: View {
             }
             .frame(minHeight: 44)
             .contentShape(Rectangle())
+            .padding(.vertical, -7)
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel("Модель: \(model.activeModelName)")
@@ -529,7 +582,8 @@ struct ComposerBar: View {
     private func chip(level: String?) -> some View {
         HStack(spacing: 5) {
             Text(model.activeModelName)
-                .foregroundStyle(Theme.ink.opacity(0.85))
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.ink.opacity(0.9))
                 .lineLimit(1)
             if let level {
                 Text(level)
@@ -537,9 +591,9 @@ struct ComposerBar: View {
                     .lineLimit(1)
             }
         }
-        .font(.system(size: 14, weight: .medium))
+        .font(.system(size: 12.5))
         .padding(.horizontal, 12)
-        .frame(height: 34)
+        .frame(height: 30)
         .background(Theme.fill, in: Capsule())
     }
 
@@ -551,29 +605,35 @@ struct ComposerBar: View {
             }
         } label: {
             Image(systemName: dictation.active ? "waveform" : "mic")
-                .font(.system(size: 17, weight: .regular))
+                .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(dictation.active ? Theme.accent : Theme.muted)
                 .symbolEffect(.variableColor.iterative, isActive: dictation.active)
-                .frame(width: 36, height: 36)
-                .background(dictation.active ? Theme.accent.opacity(0.16) : Color.clear, in: Circle())
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+                .frame(width: 30, height: 30)
+                .background(dictation.active ? Theme.accent.opacity(0.16) : Theme.fill, in: Circle())
+                .modifier(ControlHit(size: 30))
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel(dictation.active ? "Остановить диктовку" : "Диктовка")
         .accessibilityIdentifier("composer.mic")
     }
 
-    private func actionButton(symbol: String, label: String, active: Bool, primary: Bool = true,
-                              action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private enum ActionStyle {
+        /// Есть что отправить — коралловая; нечего — светлая с бледной стрелкой; «Стоп» — серая.
+        case send, idle, stop
+    }
+
+    private func roundAction(symbol: String, label: String, style: ActionStyle, active: Bool,
+                             action: @escaping () -> Void) -> some View {
+        let ink: Color = style == .send ? .white : style == .stop ? Theme.ink : Theme.buttonPrimaryText.opacity(0.4)
+        let face: Color = style == .send ? Theme.send : style == .stop ? Theme.fillActive : Theme.buttonPrimary
+        return Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: symbol == "stop.fill" ? 13 : 16, weight: .semibold))
-                .foregroundStyle(primary ? Theme.buttonPrimaryText : Theme.ink)
-                .frame(width: 36, height: 36)
-                .background(primary ? Theme.buttonPrimary.opacity(active ? 1 : 0.25) : Theme.fill, in: Circle())
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+                .font(.system(size: style == .stop ? 11 : 14, weight: style == .stop ? .bold : .medium))
+                .foregroundStyle(ink)
+                .frame(width: 32, height: 32)
+                .background(face, in: Circle())
+                .opacity(active || style == .idle ? 1 : 0.5)
+                .modifier(ControlHit(size: 32))
         }
         .buttonStyle(PressScaleStyle())
         .disabled(!active)
@@ -611,6 +671,19 @@ struct ComposerBar: View {
                 if model.draftAttachments.isEmpty { model.draftAttachments = files }
             }
         }
+    }
+}
+
+/// Круглая кнопка капсулы: видимый размер `size`, зона нажатия шире и 44 по высоте.
+private struct ControlHit: ViewModifier {
+    let size: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .frame(width: size + 10, height: 44)
+            .contentShape(Rectangle())
+            .padding(.horizontal, -5)
+            .padding(.vertical, -(44 - size) / 2)
     }
 }
 

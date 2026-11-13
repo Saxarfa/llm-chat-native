@@ -17,8 +17,10 @@ struct RecentsScreen: View {
     }
 
     var body: some View {
+        // Поиск стоит как строка-капсула в чате: чуть ниже безопасной зоны, у полосы «домой».
+        let resting: CGFloat = Screen.bottomInset > 0 ? -4 : 8
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 2) {
+            LazyVStack(alignment: .leading, spacing: 3) {
                 let chats = found
                 if chats.isEmpty {
                     Text(query.isEmpty ? "Диалогов пока нет" : "Ничего не найдено")
@@ -37,6 +39,7 @@ struct RecentsScreen: View {
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
                             .frame(minHeight: 60)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(RowPressStyle())
@@ -46,7 +49,8 @@ struct RecentsScreen: View {
                     .accessibilityIdentifier("recents.row")
                 }
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
             .padding(.bottom, 80)
         }
         .scrollDismissesKeyboard(.interactively)
@@ -54,16 +58,23 @@ struct RecentsScreen: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             ZStack {
                 Text("Недавние")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 HStack {
                     CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: onMenu)
                     Spacer()
                 }
             }
-            .padding(.horizontal, 12)
-            .frame(height: 52)
-            .background(Theme.canvas)
+            .padding(.horizontal, 16)
+            .frame(height: 44)
+            .padding(.top, -6)
+            .padding(.bottom, 4)
+            .background(alignment: .top) {
+                Theme.fade(Theme.canvas, from: .top)
+                    .padding(.bottom, -22)
+                    .ignoresSafeArea(edges: .top)
+                    .allowsHitTesting(false)
+            }
         }
         .overlay(alignment: .bottomTrailing) {
             Button {
@@ -72,10 +83,10 @@ struct RecentsScreen: View {
                 model.screen = .chat
             } label: {
                 Label("Новый чат", systemImage: "plus")
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Theme.buttonPrimaryText)
-                    .padding(.horizontal, 20)
-                    .frame(height: 46)
+                    .padding(.horizontal, 16)
+                    .frame(height: 42)
                     .background(Theme.buttonPrimary, in: Capsule())
                     .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
             }
@@ -86,10 +97,10 @@ struct RecentsScreen: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16))
+                    .font(.system(size: 14))
                     .foregroundStyle(Theme.subtle)
                 TextField("", text: $query, prompt: Text("Поиск").foregroundStyle(Theme.subtle))
-                    .font(.system(size: 17))
+                    .font(.system(size: 16))
                     .foregroundStyle(Theme.ink)
                     .focused($searching)
                     .submitLabel(.search)
@@ -106,14 +117,19 @@ struct RecentsScreen: View {
                     .accessibilityLabel("Очистить поиск")
                 }
             }
-            .padding(.horizontal, 16)
-            .frame(height: 48)
+            .padding(.horizontal, 15)
+            .frame(height: 44)
             .background(Theme.surface, in: Capsule())
             .overlay(Capsule().strokeBorder(Theme.line))
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 15)
             .padding(.top, 6)
-            .padding(.bottom, 8)
-            .background(Theme.canvas)
+            .padding(.bottom, searching ? 8 : resting)
+            .background(alignment: .bottom) {
+                Theme.fade(Theme.canvas, from: .bottom)
+                    .padding(.top, -18)
+                    .ignoresSafeArea(edges: .bottom)
+                    .allowsHitTesting(false)
+            }
         }
         .chatActions(renaming: $renaming, deleting: $deleting)
         .onAppear {

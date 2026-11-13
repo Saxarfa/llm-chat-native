@@ -83,9 +83,13 @@ final class ComposerUITests: XCTestCase {
         wait(for: [gone], timeout: 3)
     }
 
-    /// Линия контекста под капсулой: нажатие показывает, сколько занято и сколько свободно.
+    /// Линия контекста по низу карточки ввода (видна с клавиатурой): нажатие показывает,
+    /// сколько занято и сколько свободно.
     func testContextDetails() {
         let app = launch("thread")
+        let input = element(app, "chat.input")
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        input.tap()
         let line = element(app, "composer.context")
         XCTAssertTrue(line.waitForExistence(timeout: 10))
         line.tap()

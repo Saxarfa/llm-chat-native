@@ -69,7 +69,7 @@ struct StudioScreen: View {
             CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: onMenu)
             Spacer()
             Text("Студия")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.ink)
             Spacer()
             ZStack(alignment: .topTrailing) {
@@ -85,8 +85,11 @@ struct StudioScreen: View {
                 model.screen = .chat
             }
         }
-        .padding(.horizontal, 8)
-        .frame(height: 52)
+        // Кнопки на той же высоте, что в чате: сразу под «островом».
+        .padding(.horizontal, 16)
+        .frame(height: 44)
+        .padding(.top, -6)
+        .padding(.bottom, 4)
         .background(Theme.canvas)
     }
 

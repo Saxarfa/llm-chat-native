@@ -33,14 +33,14 @@ struct ProfilePage: View {
                 SectionCaption(text: "Имя")
                 SettingsCard {
                     TextField("", text: $name, prompt: Text(model.user?.username ?? "Имя").foregroundStyle(Theme.subtle))
-                        .font(.system(size: 17))
+                        .font(.system(size: 16))
                         .foregroundStyle(Theme.ink)
                         .textContentType(.nickname)
                         .submitLabel(.done)
                         .focused($typing)
                         .onSubmit(saveName)
                         .padding(.horizontal, 16)
-                        .frame(minHeight: 54)
+                        .frame(minHeight: 46)
                         .accessibilityIdentifier("profile.name")
                 }
                 SettingsNote(text: "Так модель и приложение обращаются к вам.")
@@ -50,7 +50,7 @@ struct ProfilePage: View {
                     ValueRow(title: "Логин", value: model.user?.username ?? "")
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
             .padding(.bottom, 32)
         }
         .scrollDismissesKeyboard(.interactively)
@@ -122,7 +122,7 @@ struct ComputerPage: View {
                     ProgressView().tint(Theme.muted).frame(maxWidth: .infinity, minHeight: 120)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
             .padding(.bottom, 32)
         }
         .refreshable { await load() }
@@ -147,7 +147,7 @@ struct ComputerPage: View {
                         .frame(width: 8, height: 8)
                         .frame(width: 24)
                     Text(service.name)
-                        .font(.system(size: 17))
+                        .font(.system(size: 16))
                         .foregroundStyle(Theme.ink)
                     Spacer()
                     Text(service.online ? "Доступен" : "Нет связи")
@@ -155,7 +155,7 @@ struct ComputerPage: View {
                         .foregroundStyle(Theme.subtle)
                 }
                 .padding(.horizontal, 16)
-                .frame(minHeight: 50)
+                .frame(minHeight: 46)
             }
         }
 
@@ -186,7 +186,7 @@ struct ComputerPage: View {
                 .font(.system(size: 16))
                 .foregroundStyle(Theme.muted)
                 .padding(.horizontal, 16)
-                .frame(minHeight: 54)
+                .frame(minHeight: 46)
             }
             ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                 if index > 0 { CardDivider() }
@@ -306,7 +306,7 @@ struct ModelsPage: View {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(Theme.subtle)
                     TextField("", text: $query, prompt: Text("Название модели").foregroundStyle(Theme.subtle))
-                        .font(.system(size: 17))
+                        .font(.system(size: 16))
                         .foregroundStyle(Theme.ink)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -354,7 +354,7 @@ struct ModelsPage: View {
                                     .foregroundStyle(Theme.subtle)
                             }
                             .padding(.horizontal, 16)
-                            .frame(minHeight: 58)
+                            .frame(minHeight: 56)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(RowPressStyle())
@@ -363,7 +363,7 @@ struct ModelsPage: View {
                 }
                 SettingsNote(text: "Название, фото и описание видны в выборе модели и в чатах — и здесь, и на сайте.")
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
             .padding(.bottom, 32)
         }
         .scrollDismissesKeyboard(.interactively)
@@ -441,7 +441,7 @@ struct ModelProfilePage: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
             .padding(.bottom, 32)
         }
         .scrollDismissesKeyboard(.interactively)
@@ -477,18 +477,18 @@ struct ModelProfilePage: View {
     private func field(_ title: String, text: Binding<String>, prompt: String, which: Field) -> some View {
         HStack(spacing: 12) {
             Text(title)
-                .font(.system(size: 17))
+                .font(.system(size: 16))
                 .foregroundStyle(Theme.ink)
                 .frame(width: 96, alignment: .leading)
             TextField("", text: text, prompt: Text(prompt).foregroundStyle(Theme.subtle))
-                .font(.system(size: 17))
+                .font(.system(size: 16))
                 .foregroundStyle(Theme.ink)
                 .focused($focus, equals: which)
                 .submitLabel(.done)
                 .onSubmit { save(which) }
         }
         .padding(.horizontal, 16)
-        .frame(minHeight: 54)
+        .frame(minHeight: 46)
     }
 
     private func save(_ which: Field) {
@@ -526,7 +526,7 @@ struct SearchPage: View {
                             HStack(spacing: 12) {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(choice.label)
-                                        .font(.system(size: 17))
+                                        .font(.system(size: 16))
                                         .foregroundStyle(Theme.ink)
                                     Text(Self.hints[choice.value] ?? "")
                                         .font(.system(size: 13))
@@ -557,19 +557,19 @@ struct SearchPage: View {
                     }), in: 1...10) {
                         HStack {
                             Text("Количество результатов")
-                                .font(.system(size: 17))
+                                .font(.system(size: 16))
                                 .foregroundStyle(Theme.ink)
                             Spacer()
                             Text("\(count)")
-                                .font(.system(size: 17).monospacedDigit())
+                                .font(.system(size: 16).monospacedDigit())
                                 .foregroundStyle(Theme.muted)
                         }
                     }
                     .padding(.horizontal, 16)
-                    .frame(minHeight: 54)
+                    .frame(minHeight: 46)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
             .padding(.bottom, 32)
         }
     }
@@ -590,7 +590,7 @@ struct InstructionPage: View {
                 }
                 SettingsNote(text: "Для моделей без своей инструкции. Свою задают в «Модели → профиль модели».")
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
             .padding(.bottom, 32)
         }
         .scrollDismissesKeyboard(.interactively)

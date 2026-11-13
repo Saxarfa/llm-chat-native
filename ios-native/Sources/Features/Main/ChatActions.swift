@@ -147,21 +147,22 @@ struct ChatRowLabel: View {
     var showTime = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: chat.pinned ? "pin" : "bubble.left")
-                .font(.system(size: 16))
-                .foregroundStyle(Theme.muted)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 3) {
+        HStack(alignment: showTime ? .top : .center, spacing: 10) {
+            Image(systemName: chat.pinned ? "pin" : "message")
+                .font(.system(size: 15, weight: .light))
+                .foregroundStyle(Theme.ink.opacity(0.8))
+                .frame(width: 22)
+                .padding(.top, showTime ? 1 : 0)
+            VStack(alignment: .leading, spacing: 4) {
                 Text(chat.title)
-                    .font(.system(size: 17))
+                    .font(.system(size: 16))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                 if showTime {
                     let time = RelativeTime.text(chat.updatedAt)
                     if !time.isEmpty {
                         Text(time)
-                            .font(.system(size: 13))
+                            .font(.system(size: 12.5))
                             .foregroundStyle(Theme.subtle)
                     }
                 }

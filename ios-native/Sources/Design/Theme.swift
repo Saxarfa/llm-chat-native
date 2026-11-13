@@ -19,9 +19,13 @@ enum Theme {
     /// Синий акцент, как в настройках iOS: переключатели, галочки выбора, выбранная плитка.
     static let accent = dynamic(dark: 0x4A8DF0, light: 0x2F6FDB)
     /// Поднятая карточка в шторках (группы строк в настройках, меню «+»).
-    static let card = dynamic(dark: 0x2A2A28, light: 0xFFFFFF)
+    static let card = dynamic(dark: 0x222221, light: 0xFFFFFF)
     /// Подложка шторок: в тёмной теме как карточка в настройках Claude, в светлой — тёплый серый.
-    static let sheet = dynamic(dark: 0x1C1C1B, light: 0xF2F0EA)
+    static let sheet = dynamic(dark: 0x181817, light: 0xF2F0EA)
+    /// Пузырь вопроса в ленте.
+    static let bubble = dynamic(dark: 0x272725, light: 0xEBE8E0)
+    /// Коралловая «Отправить», когда есть что отправлять, — как в приложении Claude.
+    static let send = Color(hex: 0xC6613F)
 
     private static func dynamic(dark: UInt32, light: UInt32) -> Color {
         dynamic(UIColor(hex: dark), UIColor(hex: light))
@@ -32,6 +36,18 @@ enum Theme {
     }
 
     static let spring = Animation.spring(response: 0.36, dampingFraction: 0.86)
+    /// Капсула ввода: из строки в карточку и обратно.
+    static let morph = Animation.spring(response: 0.32, dampingFraction: 0.84)
+
+    /// Затухание фона под плавающей шапкой: лента уходит под кнопки и под «остров».
+    static func fade(_ color: Color, from edge: UnitPoint) -> LinearGradient {
+        LinearGradient(stops: [
+            .init(color: color, location: 0),
+            .init(color: color.opacity(0.94), location: 0.42),
+            .init(color: color.opacity(0.6), location: 0.74),
+            .init(color: color.opacity(0), location: 1),
+        ], startPoint: edge, endPoint: edge == .top ? .bottom : .top)
+    }
 
     /// Засечки — только для логотипа и приветствия.
     static func display(_ size: CGFloat) -> Font {
@@ -136,6 +152,17 @@ extension UINavigationController: UIGestureRecognizerDelegate {
     }
 }
 
+/// Размеры экрана, которые нужны раскладке: есть ли внизу полоса «домой».
+enum Screen {
+    @MainActor
+    static var bottomInset: CGFloat {
+        for scene in UIApplication.shared.connectedScenes {
+            if let window = (scene as? UIWindowScene)?.windows.first { return window.safeAreaInsets.bottom }
+        }
+        return 0
+    }
+}
+
 enum Keyboard {
     static func hide() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
@@ -159,7 +186,19 @@ struct Wordmark: View {
     }
 }
 
-/// Круглая кнопка-иконка в шапке: видимый круг 40, зона нажатия 44.
+/// Значок меню, как у Claude: две длинные тонкие линии и короткая.
+struct MenuGlyph: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4.5) {
+            Capsule().frame(width: 16, height: 1.5)
+            Capsule().frame(width: 16, height: 1.5)
+            Capsule().frame(width: 8, height: 1.5)
+        }
+    }
+}
+
+/// Круглая кнопка-иконка в шапке, как у Claude: круг 38 чуть светлее фона с тонкой каймой,
+/// тонкий значок; зона нажатия 44.
 struct CircleIconButton: View {
     let symbol: String
     let label: String
@@ -167,11 +206,18 @@ struct CircleIconButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Theme.ink)
-                .frame(width: 40, height: 40)
-                .background(Theme.fill, in: Circle())
+            Group {
+                if symbol == "line.3.horizontal" {
+                    MenuGlyph()
+                } else {
+                    Image(systemName: symbol)
+                        .font(.system(size: 15, weight: .regular))
+                }
+            }
+                .foregroundStyle(Theme.ink.opacity(0.82))
+                .frame(width: 38, height: 38)
+                .background(Theme.surface, in: Circle())
+                .overlay(Circle().strokeBorder(Theme.line))
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }

@@ -90,6 +90,44 @@ final class ClaudeLookUITests: XCTestCase {
         wait(for: [filtered], timeout: 5)
     }
 
+    /// Капсула: без клавиатуры — строка без модели, с клавиатурой — карточка с моделью,
+    /// с текстом «Отправить» становится доступной.
+    func testComposerStates() {
+        let app = launch("chat")
+        let input = element(app, "chat.input")
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        let chip = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Модель:")).firstMatch
+        let send = app.buttons["Отправить"].firstMatch
+        XCTAssertFalse(chip.exists, "в строке-капсуле модели нет")
+        XCTAssertTrue(send.exists)
+        XCTAssertFalse(send.isEnabled, "отправлять нечего")
+        sleep(1)
+        snap("ui-k1-pill")
+        input.tap()
+        XCTAssertTrue(chip.waitForExistence(timeout: 5), "с клавиатурой — карточка с моделью")
+        sleep(1)
+        snap("ui-k2-keyboard")
+        input.typeText("Привет")
+        XCTAssertTrue(send.isEnabled)
+        sleep(1)
+        snap("ui-k3-text")
+    }
+
+    /// Лента уходит под шапку; когда она отлистана вверх, над полем ввода есть кнопка «вниз».
+    func testFeedDownButtonAndKeyboard() {
+        let app = launch("threadTop")
+        let down = element(app, "feed.down")
+        XCTAssertTrue(down.waitForExistence(timeout: 10), "лента не у низа — кнопка «вниз»")
+        sleep(1)
+        snap("ui-k4-thread-top")
+        down.tap()
+        let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: down)
+        wait(for: [gone], timeout: 5)
+        element(app, "chat.input").tap()
+        sleep(1)
+        snap("ui-k5-thread-keyboard")
+    }
+
     /// «⋯» в шапке чата и ряд значков под ответом.
     func testHeaderMenuAndAnswerActions() {
         let app = launch("thread")

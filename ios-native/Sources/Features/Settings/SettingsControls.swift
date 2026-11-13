@@ -39,16 +39,20 @@ struct SettingsCard<Content: View>: View {
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 }
 
+/// Линия между строками карточки; у строк со значком начинается от текста (`inset: 53`).
 struct CardDivider: View {
+    var inset: CGFloat = 16
+
     var body: some View {
         Rectangle()
             .fill(Theme.line)
             .frame(height: 1)
-            .padding(.leading, 16)
+            .padding(.leading, inset)
+            .padding(.trailing, 16)
     }
 }
 
@@ -58,10 +62,10 @@ struct SectionCaption: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 13, weight: .medium))
+            .font(.system(size: 12.5))
             .foregroundStyle(Theme.subtle)
-            .padding(.horizontal, 4)
-            .padding(.top, 6)
+            .padding(.horizontal, 18)
+            .padding(.top, 10)
     }
 }
 
@@ -99,7 +103,7 @@ struct ValueRow: View {
         }
         .font(.system(size: 16))
         .padding(.horizontal, 16)
-        .frame(minHeight: 52)
+        .frame(minHeight: 46)
     }
 }
 
@@ -120,7 +124,7 @@ struct ToggleRow: View {
                     .foregroundStyle(Theme.ink)
                 if let hint {
                     Text(hint)
-                        .font(.system(size: 13))
+                        .font(.system(size: 12.5))
                         .foregroundStyle(Theme.subtle)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -128,8 +132,8 @@ struct ToggleRow: View {
         }
         .tint(Theme.accent)
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(minHeight: 52)
+        .padding(.vertical, 8)
+        .frame(minHeight: 46)
     }
 }
 
@@ -180,7 +184,7 @@ struct ChoiceRow: View {
             .accessibilityLabel("\(title): \(current)")
         }
         .padding(.horizontal, 16)
-        .frame(minHeight: 52)
+        .frame(minHeight: 46)
     }
 }
 

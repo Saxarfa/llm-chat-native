@@ -35,8 +35,12 @@ struct SettingsSheet: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         CircleIconButton(symbol: "info", label: "О приложении") { showAbout = true }
                     }
+                    ToolbarItem(placement: .principal) {
+                        Text("Настройки")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                    }
                 }
-                .toolbarBackground(Theme.sheet, for: .navigationBar)
                 .navigationDestination(for: SettingsPage.self) { page in
                     destination(page)
                 }
@@ -105,18 +109,18 @@ struct SettingsSheet: View {
                 SectionCaption(text: "Аккаунт")
                 SettingsCard {
                     link("Профиль", symbol: "person", page: .profile)
-                    CardDivider()
+                    CardDivider(inset: 53)
                     link("Компьютер", symbol: "desktopcomputer", value: model.serverLabel, page: .computer)
                 }
 
                 SectionCaption(text: "Приложение")
                 SettingsCard {
                     link("Модели", symbol: "cpu", page: .models)
-                    CardDivider()
+                    CardDivider(inset: 53)
                     link("Веб-поиск", symbol: "globe", value: searchModeLabel, page: .search)
-                    CardDivider()
+                    CardDivider(inset: 53)
                     link("Память", symbol: "brain", page: .memory)
-                    CardDivider()
+                    CardDivider(inset: 53)
                     Button {
                         Haptics.tap()
                         showKnowledge = true
@@ -124,9 +128,9 @@ struct SettingsSheet: View {
                         ToolRowLabel(title: "Базы знаний", symbol: "books.vertical")
                     }
                     .buttonStyle(RowPressStyle())
-                    CardDivider()
+                    CardDivider(inset: 53)
                     link("Общая инструкция", symbol: "text.quote", page: .instruction)
-                    CardDivider()
+                    CardDivider(inset: 53)
                     IconToggleRow(title: "Тактильный отклик", symbol: "iphone.radiowaves.left.and.right",
                                   isOn: model.haptics) { model.haptics = $0 }
                 }
@@ -139,17 +143,18 @@ struct SettingsSheet: View {
                         Haptics.tap()
                         confirmLogout = true
                     } label: {
-                        HStack(spacing: 12) {
+                        HStack(spacing: 14) {
                             Image(systemName: "rectangle.portrait.and.arrow.right")
-                                .font(.system(size: 17))
-                                .frame(width: 24)
+                                .font(.system(size: 15, weight: .light))
+                                .frame(width: 22)
                             Text("Выйти")
-                                .font(.system(size: 17))
+                                .font(.system(size: 16))
                             Spacer()
                         }
                         .foregroundStyle(Theme.danger)
-                        .padding(.horizontal, 16)
-                        .frame(minHeight: 54)
+                        .padding(.leading, 17)
+                        .padding(.trailing, 16)
+                        .frame(minHeight: 46)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(RowPressStyle())
@@ -157,7 +162,7 @@ struct SettingsSheet: View {
                 }
                 .padding(.top, 10)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
             .padding(.top, 8)
             .padding(.bottom, 32)
         }
@@ -183,24 +188,24 @@ struct SettingsSheet: View {
         SettingsCard {
             NavigationLink(value: SettingsPage.profile) {
                 HStack(spacing: 12) {
-                    AvatarView(image: model.user?.avatar, name: model.user?.shownName ?? "?", size: 44)
+                    AvatarView(image: model.user?.avatar, name: model.user?.shownName ?? "?", size: 38)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(model.user?.shownName ?? "")
-                            .font(.system(size: 17, weight: .medium))
+                            .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(Theme.ink)
                             .lineLimit(1)
                         Text(["@" + (model.user?.username ?? ""), model.serverLabel].filter { $0.count > 1 }.joined(separator: " · "))
-                            .font(.system(size: 13))
+                            .font(.system(size: 12.5))
                             .foregroundStyle(Theme.subtle)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Theme.subtle)
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.vertical, 10)
                 .contentShape(Rectangle())
             }
             .buttonStyle(RowPressStyle())
@@ -225,8 +230,12 @@ private struct SettingsPageChrome: ViewModifier {
                 ToolbarItem(placement: .topBarLeading) {
                     CircleIconButton(symbol: "chevron.left", label: "Назад") { dismiss() }
                 }
+                ToolbarItem(placement: .principal) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                }
             }
-            .toolbarBackground(Theme.sheet, for: .navigationBar)
     }
 }
 
@@ -248,19 +257,20 @@ struct IconToggleRow: View {
             onChange(value)
             Haptics.tap()
         })) {
-            HStack(spacing: 12) {
+            HStack(spacing: 14) {
                 Image(systemName: symbol)
-                    .font(.system(size: 17))
-                    .foregroundStyle(Theme.ink)
-                    .frame(width: 24)
+                    .font(.system(size: 15, weight: .light))
+                    .foregroundStyle(Theme.ink.opacity(0.9))
+                    .frame(width: 22)
                 Text(title)
-                    .font(.system(size: 17))
+                    .font(.system(size: 16))
                     .foregroundStyle(Theme.ink)
             }
         }
         .tint(Theme.accent)
-        .padding(.horizontal, 16)
-        .frame(minHeight: 54)
+        .padding(.leading, 17)
+        .padding(.trailing, 16)
+        .frame(minHeight: 46)
     }
 }
 
@@ -269,7 +279,7 @@ struct AppearancePicker: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             ForEach(Appearance.allCases, id: \.self) { option in
                 let selected = model.appearance == option
                 Button {
@@ -278,14 +288,14 @@ struct AppearancePicker: View {
                 } label: {
                     VStack(spacing: 8) {
                         AppearanceSample(option: option)
-                            .frame(height: 74)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .frame(height: 68)
+                            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .strokeBorder(selected ? Theme.accent : Theme.line, lineWidth: selected ? 2 : 1)
+                                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                    .strokeBorder(selected ? Theme.accent : Theme.line, lineWidth: selected ? 1.5 : 1)
                             )
                         Text(option.title)
-                            .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                            .font(.system(size: 11.5, weight: selected ? .medium : .regular))
                             .foregroundStyle(selected ? Theme.accent : Theme.muted)
                     }
                     .contentShape(Rectangle())
@@ -296,8 +306,10 @@ struct AppearancePicker: View {
                 .accessibilityIdentifier("appearance.\(option.rawValue)")
             }
         }
-        .padding(12)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 12)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 }
 
