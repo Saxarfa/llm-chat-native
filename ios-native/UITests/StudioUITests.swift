@@ -107,6 +107,8 @@ final class StudioUITests: XCTestCase {
         prompt.typeText("\n")
         XCTAssertFalse((prompt.value as? String ?? "").contains("\n"), "«Готово» не вставляет перевод строки")
         XCTAssertTrue(element(app, "studio.canvas").waitForExistence(timeout: 3))
+        // Клавиатура ещё уезжает, а поле сжимается: даём студии встать на место.
+        sleep(1)
 
         let create = element(app, "studio.create")
         XCTAssertTrue(create.isEnabled)
