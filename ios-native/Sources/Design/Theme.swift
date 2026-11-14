@@ -50,6 +50,15 @@ enum Theme {
     /// время, что системная клавиатура, иначе две разные кривые (клавиатура и капсула) дёргают логотип.
     static let keyboardMorph = Animation.spring(duration: 0.45, bounce: 0)
 
+    /// Размытие под плавающей шапкой: «остров» и ещё столько pt (замечание 14.11.2026 — было слишком высоко).
+    static let headerReach: CGFloat = 10
+    /// Сколько шапка (кнопки 44 pt, поднятые на 6) выступает ниже размытой полосы — на столько
+    /// лента опускает своё первое содержимое, чтобы оно не начиналось под кнопками.
+    static var headerOverhang: CGFloat {
+        if #available(iOS 26.0, *) { return 38 - headerReach }
+        return 0
+    }
+
     /// Затухание фона под плавающей шапкой: лента уходит под кнопки и под «остров».
     static func fade(_ color: Color, from edge: UnitPoint) -> LinearGradient {
         LinearGradient(stops: [
@@ -225,15 +234,43 @@ struct CircleIconButton: View {
                         .font(.system(size: 15, weight: .regular))
                 }
             }
-                .foregroundStyle(Theme.ink.opacity(0.82))
-                .frame(width: 38, height: 38)
-                .background(Theme.surface, in: Circle())
-                .overlay(Circle().strokeBorder(Theme.line))
+                .foregroundStyle(Theme.ink.opacity(0.9))
+                .frame(width: 40, height: 40)
+                .glassChrome(Circle())
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(PressScaleStyle())
+        .glassPressStyle()
         .accessibilityLabel(label)
+    }
+}
+
+extension View {
+    /// Подложка кнопок шапки, как у Claude на iOS 26: системное «жидкое стекло», которое
+    /// откликается на нажатие (растягивается и подсвечивается). На iOS 17–18 — прежний круг с каймой.
+    /// `tint` — главная кнопка («Новый чат»): стекло, окрашенное в цвет кнопки.
+    @ViewBuilder
+    func glassChrome<S: InsettableShape>(_ shape: S, tint: Color? = nil, interactive: Bool = true) -> some View {
+        if #available(iOS 26.0, *) {
+            let glass: Glass = tint.map { Glass.regular.tint($0) } ?? .regular
+            self.glassEffect(interactive ? glass.interactive() : glass, in: shape)
+        } else if let tint {
+            self.background(tint, in: shape)
+                .shadow(color: .black.opacity(0.25), radius: 10, y: 3)
+        } else {
+            self.background(Theme.surface, in: shape)
+                .overlay(shape.strokeBorder(Theme.line))
+        }
+    }
+
+    /// Нажатие стеклянной кнопки показывает само стекло; на старых iOS — прежнее сжатие.
+    @ViewBuilder
+    func glassPressStyle() -> some View {
+        if #available(iOS 26.0, *) {
+            self.buttonStyle(.plain)
+        } else {
+            self.buttonStyle(PressScaleStyle())
+        }
     }
 }
 
@@ -294,10 +331,20 @@ extension View {
     /// Плавающая панель со штатным постепенным размытием прокручиваемого содержимого.
     /// safeAreaBar связывает эффект с самой прокруткой: отдельного Material поверх неё нет.
     /// Как и safeAreaInset, панель учитывает клавиатуру; контейнеры и .keyboard не игнорируем.
+    /// `reach` — высота размытой полосы под шапкой (только iOS 26, верхний край): шапка тогда
+    /// плавает поверх ленты отдельным слоем, а размытие захватывает лишь «остров» и `reach` pt под ним.
+    /// Высоту шапки сверх `reach` экран добавляет к верхнему отступу своей ленты (`Theme.headerOverhang`).
     @ViewBuilder
     func softEdgeBar<Bar: View>(edge: VerticalEdge, tint: Color, hasScrollContent: Bool = true,
+                               reach: CGFloat? = nil,
                                @ViewBuilder content: () -> Bar) -> some View {
-        if #available(iOS 26.0, *), hasScrollContent {
+        if #available(iOS 26.0, *), hasScrollContent, edge == .top, let reach {
+            self.safeAreaBar(edge: .top, spacing: 0) {
+                Color.clear.frame(height: reach).allowsHitTesting(false)
+            }
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .overlay(alignment: .top, content: content)
+        } else if #available(iOS 26.0, *), hasScrollContent {
             self.safeAreaBar(edge: edge, spacing: 0, content: content)
                 .scrollEdgeEffectStyle(.soft, for: edge == .top ? .top : .bottom)
         } else {

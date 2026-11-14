@@ -323,3 +323,20 @@ enum StudioValue {
         return nil
     }
 }
+
+/// Поле промпта студии: клавиша ввода подписана «Готово» и прячет клавиатуру.
+enum StudioPromptInput {
+    /// Новый текст отличается от прежнего ровно одним вставленным переводом строки —
+    /// это нажатие клавиши ввода, а не вставка многострочного текста.
+    static func isReturnPress(old: String, new: String) -> Bool {
+        guard new.count == old.count + 1 else { return false }
+        var index = new.startIndex
+        var oldIndex = old.startIndex
+        while oldIndex < old.endIndex, new[index] == old[oldIndex] {
+            index = new.index(after: index)
+            oldIndex = old.index(after: oldIndex)
+        }
+        guard new[index].isNewline else { return false }
+        return new[new.index(after: index)...] == old[oldIndex...]
+    }
+}

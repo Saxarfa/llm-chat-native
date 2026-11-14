@@ -11,6 +11,7 @@ struct MessageFeed: View {
     /// Сколько последних сообщений построено.
     @State private var shown = MessageFeed.page
     @State private var touch = TouchClock()
+    @State private var scroll = ScrollHolder()
 
     private static let bottomID = "feed-bottom"
     private static let space = "feed-space"
@@ -24,6 +25,22 @@ struct MessageFeed: View {
     private func follow(_ proxy: ScrollViewProxy) {
         guard atBottom, Date().timeIntervalSince(touch.last) > 0.3 else { return }
         proxy.scrollTo(Self.bottomID, anchor: .bottom)
+    }
+
+    /// Кнопка «вниз». Через сам UIScrollView: остановка инерции и анимированный переход
+    /// к низу надёжно перебивают текущую прокрутку (SwiftUI scrollTo во время инерции терялся).
+    private func jumpToBottom(_ proxy: ScrollViewProxy) {
+        Haptics.tap()
+        atBottom = true
+        touch.jumpUntil = Date().addingTimeInterval(0.6)
+        guard let view = scroll.view else {
+            withAnimation(Theme.spring) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+            return
+        }
+        let inset = view.adjustedContentInset
+        let bottom = max(-inset.top, view.contentSize.height - view.bounds.height + inset.bottom)
+        view.setContentOffset(view.contentOffset, animated: false)
+        view.setContentOffset(CGPoint(x: view.contentOffset.x, y: bottom), animated: true)
     }
 
     /// Что показывать: ленту открытого чата, а пока она не подставлена — копию из кэша.
@@ -106,8 +123,9 @@ struct MessageFeed: View {
                                     .id(Self.bottomID)
                             }
                             .padding(.horizontal, 15)
-                            .padding(.top, 20)
+                            .padding(.top, 20 + Theme.headerOverhang)
                             .padding(.bottom, 14)
+                            .background(ScrollViewCatcher(holder: scroll))
                             // Короткий чат начинается сверху, а не прижимается к полю ввода.
                             .frame(minHeight: box.size.height, alignment: .top)
                             // Анимация — только когда добавился свой вопрос, а не при дописанном ответе.
@@ -118,6 +136,8 @@ struct MessageFeed: View {
                         .scrollDismissesKeyboard(.interactively)
                         .onPreferenceChange(BottomEdgeKey.self) { edge in
                             let near = edge - box.size.height < 80
+                            // Пока лента едет вниз по кнопке, кнопка не возвращается на полпути.
+                            if !near, Date() < touch.jumpUntil { return }
                             if near != atBottom { atBottom = near }
                         }
                         // Пока палец ведёт ленту, она не должна убегать к низу за новым текстом.
@@ -125,30 +145,15 @@ struct MessageFeed: View {
                             touch.last = Date()
                         })
                         // Лента отлистана вверх — кнопка «вниз» над полем ввода, как у Claude.
+                        // Это UIButton (стекло iOS 26): касание не забирает себе UIScrollView, пока
+                        // лента ещё катится по инерции, — прежняя SwiftUI-кнопка срабатывала только после остановки.
                         .overlay(alignment: .bottom) {
                             if !atBottom {
-                                Button {
-                                    Haptics.tap()
-                                    atBottom = true
-                                    withAnimation(Theme.spring) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
-                                } label: {
-                                    Image(systemName: "arrow.down")
-                                        .font(.system(size: 14, weight: .regular))
-                                        .foregroundStyle(Theme.ink.opacity(0.82))
-                                        .frame(width: 34, height: 34)
-                                        .background(Theme.surface, in: Circle())
-                                        .overlay(Circle().strokeBorder(Theme.line))
-                                        .shadow(color: .black.opacity(0.22), radius: 8, y: 2)
-                                        .frame(width: 44, height: 44)
-                                        .contentShape(Rectangle())
-                                }
-                                .buttonStyle(PressScaleStyle())
-                                // Держим кнопку отдельно от капсулы; размытие принадлежит
-                                // прокрутке и не добавляет перехватывающий касания overlay.
-                                .padding(.bottom, 28)
-                                .transition(.opacity.combined(with: .scale(scale: 0.8)))
-                                .accessibilityLabel("К последнему сообщению")
-                                .accessibilityIdentifier("feed.down")
+                                FeedDownButton { jumpToBottom(proxy) }
+                                    .frame(width: 40, height: 40)
+                                    .padding(2)
+                                    .padding(.bottom, 10)
+                                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
                             }
                         }
                         .animation(.easeOut(duration: 0.18), value: atBottom)
@@ -195,6 +200,90 @@ private struct DelayedSpinner: View {
 /// запись не должна перерисовывать ленту.
 private final class TouchClock {
     var last = Date.distantPast
+    /// До этого времени лента едет вниз по кнопке «вниз».
+    var jumpUntil = Date.distantPast
+}
+
+/// UIScrollView ленты — для кнопки «вниз». Слабая ссылка: лента живёт, пока открыт чат.
+final class ScrollHolder {
+    weak var view: UIScrollView?
+}
+
+/// Невидимая подложка содержимого ленты: находит свой UIScrollView среди родителей.
+struct ScrollViewCatcher: UIViewRepresentable {
+    let holder: ScrollHolder
+
+    func makeUIView(context: Context) -> CatcherView {
+        let view = CatcherView()
+        view.holder = holder
+        view.isUserInteractionEnabled = false
+        view.backgroundColor = .clear
+        return view
+    }
+
+    func updateUIView(_ view: CatcherView, context: Context) {
+        view.holder = holder
+        view.attach()
+    }
+
+    final class CatcherView: UIView {
+        weak var holder: ScrollHolder?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            attach()
+        }
+
+        func attach() {
+            var parent = superview
+            while let view = parent {
+                if let scroll = view as? UIScrollView {
+                    holder?.view = scroll
+                    return
+                }
+                parent = view.superview
+            }
+        }
+    }
+}
+
+/// Кнопка «К последнему сообщению» — настоящий UIButton со стеклом iOS 26 (на iOS 17–18 — круг
+/// цвета поверхности). UIKit-кнопка получает касание даже во время инерции ленты.
+struct FeedDownButton: UIViewRepresentable {
+    let action: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(action: action) }
+
+    func makeUIView(context: Context) -> UIButton {
+        var config: UIButton.Configuration
+        if #available(iOS 26.0, *) {
+            config = .glass()
+        } else {
+            config = .filled()
+            config.baseBackgroundColor = UIColor(Theme.surface)
+            config.background.strokeColor = UIColor(Theme.line)
+            config.background.strokeWidth = 1
+        }
+        config.cornerStyle = .capsule
+        config.image = UIImage(systemName: "arrow.down",
+                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .regular))
+        config.baseForegroundColor = UIColor(Theme.ink)
+        config.contentInsets = .zero
+        let coordinator = context.coordinator
+        let button = UIButton(configuration: config, primaryAction: UIAction { _ in coordinator.action() })
+        button.accessibilityLabel = "К последнему сообщению"
+        button.accessibilityIdentifier = "feed.down"
+        return button
+    }
+
+    func updateUIView(_ button: UIButton, context: Context) {
+        context.coordinator.action = action
+    }
+
+    final class Coordinator {
+        var action: () -> Void
+        init(action: @escaping () -> Void) { self.action = action }
+    }
 }
 
 /// Положение нижнего края содержимого относительно видимой области ленты.

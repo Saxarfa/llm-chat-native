@@ -33,4 +33,14 @@ final class StudioDataTests: XCTestCase {
         XCTAssertEqual(lora?.strength, 0)
         XCTAssertEqual(lora?.clip, 1)
     }
+
+    /// Клавиша «Готово» в промпте прячет клавиатуру; вставленный многострочный текст остаётся.
+    func testPromptReturnPress() {
+        XCTAssertTrue(StudioPromptInput.isReturnPress(old: "1girl, sky", new: "1girl, sky\n"))
+        XCTAssertTrue(StudioPromptInput.isReturnPress(old: "1girl, sky", new: "1girl,\n sky"))
+        XCTAssertTrue(StudioPromptInput.isReturnPress(old: "", new: "\n"))
+        XCTAssertFalse(StudioPromptInput.isReturnPress(old: "1girl", new: "1girl,"))
+        XCTAssertFalse(StudioPromptInput.isReturnPress(old: "a", new: "a\nb\nc"))
+        XCTAssertFalse(StudioPromptInput.isReturnPress(old: "abc", new: "ab"))
+    }
 }

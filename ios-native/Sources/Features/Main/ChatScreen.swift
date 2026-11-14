@@ -45,7 +45,8 @@ struct ChatScreen: View {
         }
         .animation(.easeOut(duration: 0.26), value: model.activeChatID)
         // Закрытие клавиатуры привязано только к содержимому, не к контейнеру панелей.
-        .softEdgeBar(edge: .top, tint: Theme.canvas, hasScrollContent: model.activeChatID != nil) {
+        .softEdgeBar(edge: .top, tint: Theme.canvas, hasScrollContent: model.activeChatID != nil,
+                     reach: Theme.headerReach) {
             VStack(spacing: 0) {
                 header
                 if model.offline {
@@ -131,15 +132,14 @@ struct ChatScreen: View {
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Theme.ink.opacity(0.82))
-                            .frame(width: 43, height: 38)
+                            .foregroundStyle(Theme.ink.opacity(0.9))
+                            .frame(width: 44, height: 40)
                             .contentShape(Rectangle())
                     }
                     .accessibilityLabel("Ещё")
                     .accessibilityIdentifier("chat.more")
                 }
-                .background(Theme.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.line))
+                .glassChrome(Capsule())
                 .transition(.opacity.combined(with: .scale(scale: 0.86, anchor: .trailing)))
             } else {
                 CircleIconButton(symbol: "slider.horizontal.3", label: "Настройки модели") {
@@ -153,8 +153,7 @@ struct ChatScreen: View {
         .padding(.horizontal, 16)
         .frame(height: 44)
         .padding(.top, -6)
-        // Высота шапки задаёт и высоту размытой области сверху (safeAreaBar): отрицательный
-        // отступ укорачивает её, кнопки не двигаются. Первое сообщение имеет запас .padding(.top, 20).
+        // В открытом чате (iOS 26) шапка плавает поверх ленты, размытие — только `Theme.headerReach`.
         .padding(.bottom, -6)
     }
 
@@ -169,10 +168,10 @@ struct ChatScreen: View {
                 // Квадрат «карандаша» тяжелее слева-снизу, поэтому по рамке он выглядит смещённым:
                 // оптическая поправка (по замеру снимка рамка глифа стоит ровно по центру половины капсулы).
                 .offset(x: 1.5, y: -0.5)
-                .frame(width: 43, height: 38)
+                .frame(width: 44, height: 40)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(PressScaleStyle())
+        .glassPressStyle()
         .accessibilityLabel(label)
     }
 

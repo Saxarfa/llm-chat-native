@@ -35,12 +35,12 @@ struct SidebarView: View {
                 chatList
             }
             .padding(.horizontal, 14)
-            .padding(.top, 6)
+            .padding(.top, 6 + Theme.headerOverhang)
             .padding(.bottom, 24)
         }
         .refreshable { await model.refreshChats() }
         // Штатное размытие прокрутки без тонированного Material поверх списка.
-        .softEdgeBar(edge: .top, tint: Theme.rail) {
+        .softEdgeBar(edge: .top, tint: Theme.rail, reach: Theme.headerReach) {
             HStack {
                 Wordmark(size: 23)
                 Spacer()
@@ -217,12 +217,14 @@ struct SidebarView: View {
                 Haptics.tap()
                 showSettings = true
             } label: {
-                AvatarView(image: model.user?.avatar, name: model.user?.shownName ?? "?", size: 38)
-                    .overlay(Circle().strokeBorder(Theme.line))
+                // Фото профиля в стеклянном круге, как у Claude.
+                AvatarView(image: model.user?.avatar, name: model.user?.shownName ?? "?", size: 36)
+                    .padding(4)
+                    .glassChrome(Circle())
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(PressScaleStyle())
+            .glassPressStyle()
             .accessibilityLabel("Настройки")
 
             Spacer()
@@ -240,10 +242,9 @@ struct SidebarView: View {
                 .foregroundStyle(Theme.buttonPrimaryText)
                 .padding(.horizontal, 16)
                 .frame(height: 42)
-                .background(Theme.buttonPrimary, in: Capsule())
-                .shadow(color: .black.opacity(0.25), radius: 10, y: 3)
+                .glassChrome(Capsule(), tint: Theme.buttonPrimary)
             }
-            .buttonStyle(PressScaleStyle())
+            .glassPressStyle()
             .accessibilityLabel("Новый чат")
         }
         .padding(.leading, 24)

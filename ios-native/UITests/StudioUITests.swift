@@ -103,9 +103,9 @@ final class StudioUITests: XCTestCase {
         sleep(1)
         XCTAssertFalse(element(app, "studio.canvas").exists, "сцена должна прятаться на время набора")
         snap("ui-03-typing")
-        let done = app.buttons["Скрыть клавиатуру"].firstMatch
-        XCTAssertTrue(done.isHittable, "«Готово» должна быть на панели над клавиатурой")
-        done.tap()
+        // Клавиша ввода подписана «Готово»: нажатие прячет клавиатуру, перевода строки нет.
+        prompt.typeText("\n")
+        XCTAssertFalse((prompt.value as? String ?? "").contains("\n"), "«Готово» не вставляет перевод строки")
         XCTAssertTrue(element(app, "studio.canvas").waitForExistence(timeout: 3))
 
         let create = element(app, "studio.create")

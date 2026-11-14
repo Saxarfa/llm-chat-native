@@ -50,12 +50,12 @@ struct RecentsScreen: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.top, 8)
+            .padding(.top, 8 + Theme.headerOverhang)
             .padding(.bottom, 80)
         }
         .scrollDismissesKeyboard(.interactively)
         .refreshable { await model.refreshChats() }
-        .softEdgeBar(edge: .top, tint: Theme.canvas) {
+        .softEdgeBar(edge: .top, tint: Theme.canvas, reach: Theme.headerReach) {
             ZStack {
                 Text("Недавние")
                     .font(.system(size: 16, weight: .semibold))
@@ -81,10 +81,9 @@ struct RecentsScreen: View {
                     .foregroundStyle(Theme.buttonPrimaryText)
                     .padding(.horizontal, 16)
                     .frame(height: 42)
-                    .background(Theme.buttonPrimary, in: Capsule())
-                    .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
+                    .glassChrome(Capsule(), tint: Theme.buttonPrimary)
             }
-            .buttonStyle(PressScaleStyle())
+            .glassPressStyle()
             .padding(.trailing, 16)
             .padding(.bottom, 10)
         }

@@ -393,10 +393,9 @@ private struct StudioComposer: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             chipRow
+            // Пока идёт набор, поле занимает всё место до «Создать» (а не висит над пустотой).
             prompt
-            if typing.wrappedValue {
-                Spacer(minLength: 0)
-            }
+                .frame(maxHeight: typing.wrappedValue ? .infinity : nil, alignment: .top)
             HStack(spacing: 10) {
                 loopButton
                 createButton
@@ -480,32 +479,33 @@ private struct StudioComposer: View {
     }
 
     private var prompt: some View {
-        TextField("Опиши будущий арт…", text: Binding(
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        return TextField("Опиши будущий арт…", text: Binding(
             get: { studio.draft.prompt },
-            set: { value in studio.edit { $0.prompt = String(value.prefix(16000)) } }
+            set: { value in
+                // Клавиша ввода подписана «Готово» и прячет клавиатуру: промпт — теги через запятую,
+                // абзацы в нём не нужны. Вставленный многострочный текст не трогаем.
+                if StudioPromptInput.isReturnPress(old: studio.draft.prompt, new: value) {
+                    Haptics.tap()
+                    typing.wrappedValue = false
+                    return
+                }
+                studio.edit { $0.prompt = String(value.prefix(16000)) }
+            }
         ), axis: .vertical)
-            .lineLimit(typing.wrappedValue ? 4...7 : 2...6)
+            .lineLimit(typing.wrappedValue ? 3...14 : 2...6)
+            .submitLabel(.done)
             .font(.system(size: 17))
             .foregroundStyle(Theme.ink)
             .focused(typing)
-            // «Готово» стоит на панели над клавиатурой, а не в строке чипов.
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button {
-                        typing.wrappedValue = false
-                    } label: {
-                        Label("Готово", systemImage: "checkmark")
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-                    .accessibilityLabel("Скрыть клавиатуру")
-                    .accessibilityIdentifier("studio.done")
-                }
-            }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.line))
+            .frame(maxWidth: .infinity, maxHeight: typing.wrappedValue ? .infinity : nil, alignment: .topLeading)
+            .background(Theme.surface, in: shape)
+            .overlay(shape.strokeBorder(typing.wrappedValue ? Theme.capsuleLine : Theme.line))
+            // Касание в любом месте рамки (и под текстом) ставит курсор.
+            .contentShape(shape)
+            .onTapGesture { typing.wrappedValue = true }
             .accessibilityLabel("Промпт")
             .accessibilityIdentifier("studio.prompt")
     }
