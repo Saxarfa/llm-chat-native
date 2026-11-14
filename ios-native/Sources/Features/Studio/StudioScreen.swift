@@ -455,34 +455,12 @@ private struct StudioComposer: View {
                 .accessibilityIdentifier("studio.settings")
             }
         }
-        // Пока набирается промпт, справа стоит «Готово» — ленту под ним обрезаем.
-        .scrollClipDisabled(!typing.wrappedValue)
+        .scrollClipDisabled()
         .modifier(DrawerFreeZone())
     }
 
     private var chipRow: some View {
-        HStack(spacing: 8) {
-            chips
-            if typing.wrappedValue {
-                // Вне прокрутки, чтобы не уезжать за край экрана (в 0.7 её не было видно).
-                Button {
-                    typing.wrappedValue = false
-                } label: {
-                    Label("Готово", systemImage: "checkmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                        .padding(.horizontal, 12)
-                        .frame(height: 36)
-                        .background(Theme.fill, in: Capsule())
-                        .overlay(Capsule().strokeBorder(Theme.line))
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(PressScaleStyle())
-                .fixedSize()
-                .accessibilityLabel("Скрыть клавиатуру")
-            }
-        }
+        chips
     }
 
     private var formatName: String {
@@ -510,6 +488,20 @@ private struct StudioComposer: View {
             .font(.system(size: 17))
             .foregroundStyle(Theme.ink)
             .focused(typing)
+            // «Готово» стоит на панели над клавиатурой, а не в строке чипов.
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button {
+                        typing.wrappedValue = false
+                    } label: {
+                        Label("Готово", systemImage: "checkmark")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .accessibilityLabel("Скрыть клавиатуру")
+                    .accessibilityIdentifier("studio.done")
+                }
+            }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))

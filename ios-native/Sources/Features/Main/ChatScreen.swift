@@ -153,7 +153,9 @@ struct ChatScreen: View {
         .padding(.horizontal, 16)
         .frame(height: 44)
         .padding(.top, -6)
-        .padding(.bottom, 4)
+        // Высота шапки задаёт и высоту размытой области сверху (safeAreaBar): отрицательный
+        // отступ укорачивает её, кнопки не двигаются. Первое сообщение имеет запас .padding(.top, 20).
+        .padding(.bottom, -6)
     }
 
     private func headerIcon(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
@@ -164,6 +166,9 @@ struct ChatScreen: View {
             Image(systemName: symbol)
                 .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(Theme.ink.opacity(0.82))
+                // Квадрат «карандаша» тяжелее слева-снизу, поэтому по рамке он выглядит смещённым:
+                // оптическая поправка (по замеру снимка рамка глифа стоит ровно по центру половины капсулы).
+                .offset(x: 1.5, y: -0.5)
                 .frame(width: 43, height: 38)
                 .contentShape(Rectangle())
         }
@@ -258,8 +263,8 @@ struct ComposerBar: View {
         .padding(.top, 6)
         .padding(.bottom, focused ? 8 : (expanded ? 2 : resting))
         // Размытием под капсулой управляет softEdgeBar родительского экрана.
-        .animation(Theme.morph, value: expanded)
-        .animation(Theme.morph, value: focused)
+        .animation(Theme.keyboardMorph, value: expanded)
+        .animation(Theme.keyboardMorph, value: focused)
         .animation(.easeOut(duration: 0.15), value: canSend)
         .animation(.easeOut(duration: 0.18), value: model.sendError)
         .animation(.easeOut(duration: 0.18), value: model.draftAttachments)

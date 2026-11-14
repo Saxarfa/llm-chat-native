@@ -46,6 +46,9 @@ enum Theme {
     static let spring = Animation.spring(response: 0.36, dampingFraction: 0.86)
     /// Капсула ввода: из строки в карточку и обратно.
     static let morph = Animation.spring(response: 0.32, dampingFraction: 0.84)
+    /// Капсула и приветствие при появлении/скрытии клавиатуры: без отскока и примерно за то же
+    /// время, что системная клавиатура, иначе две разные кривые (клавиатура и капсула) дёргают логотип.
+    static let keyboardMorph = Animation.spring(duration: 0.45, bounce: 0)
 
     /// Затухание фона под плавающей шапкой: лента уходит под кнопки и под «остров».
     static func fade(_ color: Color, from edge: UnitPoint) -> LinearGradient {
