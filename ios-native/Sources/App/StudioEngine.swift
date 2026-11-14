@@ -622,8 +622,9 @@ final class StudioModel {
         jobs.insert(job, at: 0)
         selectedID = nil
         Task {
+            // ~3.6 с: автотест успевает увидеть «Создаю арт» (стеклу iOS 26 нужно время «успокоиться»).
             for step in 1...4 {
-                try? await Task.sleep(nanoseconds: 400_000_000)
+                try? await Task.sleep(nanoseconds: 900_000_000)
                 replace(job.id) { $0.progress = step * 25 }
             }
             replace(job.id) { item in
