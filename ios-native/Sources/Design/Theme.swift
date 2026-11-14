@@ -292,8 +292,9 @@ extension View {
     /// safeAreaBar связывает эффект с самой прокруткой: отдельного Material поверх неё нет.
     /// Как и safeAreaInset, панель учитывает клавиатуру; контейнеры и .keyboard не игнорируем.
     @ViewBuilder
-    func softEdgeBar<Bar: View>(edge: VerticalEdge, tint: Color, @ViewBuilder content: () -> Bar) -> some View {
-        if #available(iOS 26.0, *) {
+    func softEdgeBar<Bar: View>(edge: VerticalEdge, tint: Color, hasScrollContent: Bool = true,
+                               @ViewBuilder content: () -> Bar) -> some View {
+        if #available(iOS 26.0, *), hasScrollContent {
             self.safeAreaBar(edge: edge, spacing: 0, content: content)
                 .scrollEdgeEffectStyle(.soft, for: edge == .top ? .top : .bottom)
         } else {
@@ -302,10 +303,12 @@ extension View {
             self.safeAreaInset(edge: edge, spacing: 0) {
                 content()
                     .background(alignment: edge == .top ? .top : .bottom) {
-                        Theme.fade(tint, from: edge == .top ? .top : .bottom)
-                            .ignoresSafeArea(.container, edges: edge == .top ? .top : .bottom)
-                            .allowsHitTesting(false)
-                            .accessibilityHidden(true)
+                        if hasScrollContent {
+                            Theme.fade(tint, from: edge == .top ? .top : .bottom)
+                                .ignoresSafeArea(.container, edges: edge == .top ? .top : .bottom)
+                                .allowsHitTesting(false)
+                                .accessibilityHidden(true)
+                        }
                     }
             }
         }

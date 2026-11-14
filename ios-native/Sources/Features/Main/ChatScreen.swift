@@ -41,7 +41,7 @@ struct ChatScreen: View {
         // Нажатие на пустое место или на текст ленты убирает клавиатуру.
         .contentShape(Rectangle())
         .onTapGesture { Keyboard.hide() }
-        .softEdgeBar(edge: .top, tint: Theme.canvas) {
+        .softEdgeBar(edge: .top, tint: Theme.canvas, hasScrollContent: model.activeChatID != nil) {
             VStack(spacing: 0) {
                 header
                 if model.offline {
@@ -52,7 +52,7 @@ struct ChatScreen: View {
                 }
             }
         }
-        .softEdgeBar(edge: .bottom, tint: Theme.canvas) {
+        .softEdgeBar(edge: .bottom, tint: Theme.canvas, hasScrollContent: model.activeChatID != nil) {
             ComposerBar(text: $draft)
         }
         .task(id: model.activeChatID) {
