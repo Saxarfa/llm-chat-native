@@ -161,6 +161,8 @@ final class ClaudeLookUITests: XCTestCase {
         wait(for: [gone], timeout: 5)
         element(app, "chat.input").tap()
         app.skipKeyboardTip()
+        let chip = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Модель:'")).firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 5), "при фокусе раскрывается карточка с моделью")
         sleep(1)
         assertAboveKeyboard(element(app, "chat.input"), in: app)
         snap("ui-k5-thread-keyboard")

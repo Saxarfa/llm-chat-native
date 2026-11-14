@@ -7,6 +7,8 @@ struct ChatScreen: View {
     @Environment(AppModel.self) private var model
     let onMenu: () -> Void
     @State private var draft = ""
+    // Владелец фокуса — экран, а не меняющая высоту панель safeAreaBar.
+    @FocusState private var composerFocused: Bool
     @State private var showParameters = false
     @State private var showBranches = false
     @State private var renaming: ChatSummary?
@@ -23,6 +25,7 @@ struct ChatScreen: View {
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
+                    .onTapGesture { Keyboard.hide() }
                     .gesture(DragGesture(minimumDistance: 12).onEnded { value in
                         if value.translation.height > 30 { Keyboard.hide() }
                     })
@@ -30,6 +33,8 @@ struct ChatScreen: View {
                                             removal: .opacity))
             } else {
                 MessageFeed()
+                    .contentShape(Rectangle())
+                    .onTapGesture { Keyboard.hide() }
                     // Свой экземпляр ленты на каждый чат: позиция прокрутки не переносится.
                     .id(model.activeChatID)
                     // Переход между чатами: прежний тает, новый проявляется, чуть поднимаясь.
@@ -38,9 +43,7 @@ struct ChatScreen: View {
             }
         }
         .animation(.easeOut(duration: 0.26), value: model.activeChatID)
-        // Нажатие на пустое место или на текст ленты убирает клавиатуру.
-        .contentShape(Rectangle())
-        .onTapGesture { Keyboard.hide() }
+        // Закрытие клавиатуры привязано только к содержимому, не к контейнеру панелей.
         .softEdgeBar(edge: .top, tint: Theme.canvas, hasScrollContent: model.activeChatID != nil) {
             VStack(spacing: 0) {
                 header
@@ -53,7 +56,7 @@ struct ChatScreen: View {
             }
         }
         .softEdgeBar(edge: .bottom, tint: Theme.canvas, hasScrollContent: model.activeChatID != nil) {
-            ComposerBar(text: $draft)
+            ComposerBar(text: $draft, focused: $composerFocused)
         }
         .task(id: model.activeChatID) {
             model.editing = nil
@@ -196,7 +199,7 @@ struct ChatScreen: View {
 struct ComposerBar: View {
     @Environment(AppModel.self) private var model
     @Binding var text: String
-    @FocusState private var focused: Bool
+    @FocusState.Binding var focused: Bool
     @State private var showModels = false
     @State private var showPhotos = false
     @State private var showCamera = false

@@ -95,7 +95,7 @@ jobs:
           # Снимки и полный журнал нужны и при раннем падении, до общей серии preview.
           mkdir -p build/quick-screens
           export TEST_RUNNER_SCREENS_DIR="$PWD/build/quick-screens"
-          xcodebuild test -project ios-native/LLMChat.xcodeproj -scheme LLMChat -configuration Debug             -destination "platform=iOS Simulator,id=$device" -derivedDataPath build/uitest             -only-testing:LLMChatUITests/ComposerUITests/testQueue             -only-testing:LLMChatUITests/PhoneModelsUITests/testPhoneChat             -only-testing:LLMChatUITests/PhoneSettingsUITests/testOffline             CODE_SIGNING_ALLOWED=NO > build-quick.log 2>&1             || { grep -E 'error:|Test Case .* failed|hit point' build-quick.log | tail -n 30; exit 1; }
+          xcodebuild test -project ios-native/LLMChat.xcodeproj -scheme LLMChat -configuration Debug             -destination "platform=iOS Simulator,id=$device" -derivedDataPath build/uitest             -only-testing:LLMChatUITests/ComposerUITests/testQueue             -only-testing:LLMChatUITests/ComposerUITests/testCardWithoutContextLine             -only-testing:LLMChatUITests/PhoneModelsUITests/testPhoneChat             -only-testing:LLMChatUITests/PhoneSettingsUITests/testOffline             CODE_SIGNING_ALLOWED=NO > build-quick.log 2>&1             || { grep -E 'error:|Test Case .* failed|hit point' build-quick.log | tail -n 30; exit 1; }
           grep -E 'Test Case .*(passed|failed)' build-quick.log
       - uses: actions/upload-artifact@v4
         if: always()

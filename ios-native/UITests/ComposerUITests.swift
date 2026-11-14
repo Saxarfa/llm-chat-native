@@ -92,9 +92,11 @@ final class ComposerUITests: XCTestCase {
         let input = element(app, "chat.input")
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         input.tap()
-        XCTAssertFalse(element(app, "composer.context").waitForExistence(timeout: 3), "линии контекста нет")
+        app.skipKeyboardTip()
+        snap("ui-c4a-focus")
         let chip = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Модель:'")).firstMatch
-        XCTAssertTrue(chip.waitForExistence(timeout: 5))
+        XCTAssertTrue(chip.waitForExistence(timeout: 5), "пустое поле с клавиатурой раскрывается в карточку")
+        XCTAssertFalse(element(app, "composer.context").exists, "линии контекста нет")
         sleep(1)
         snap("ui-c4-card")
     }
