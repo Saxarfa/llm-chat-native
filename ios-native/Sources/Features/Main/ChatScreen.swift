@@ -7,8 +7,9 @@ struct ChatScreen: View {
     @Environment(AppModel.self) private var model
     let onMenu: () -> Void
     @State private var draft = ""
-    // Владелец фокуса — экран, а не меняющая высоту панель safeAreaBar.
-    @FocusState private var composerFocused: Bool
+    // Состояние редактирования приходит от самого UITextView: FocusState внутри
+    // safeAreaBar в проверенной версии iOS не обновлялся при появлении курсора.
+    @State private var composerFocused = false
     @State private var showParameters = false
     @State private var showBranches = false
     @State private var renaming: ChatSummary?
@@ -199,7 +200,7 @@ struct ChatScreen: View {
 struct ComposerBar: View {
     @Environment(AppModel.self) private var model
     @Binding var text: String
-    @FocusState.Binding var focused: Bool
+    @Binding var focused: Bool
     @State private var showModels = false
     @State private var showPhotos = false
     @State private var showCamera = false
@@ -327,11 +328,18 @@ struct ComposerBar: View {
             }
             // Одно и то же поле в обоих видах (меняются только отступы) — фокус не теряется.
             ZStack(alignment: .bottom) {
-                TextField("", text: $text, prompt: Text(placeholder).foregroundStyle(Theme.muted), axis: .vertical)
-                    .lineLimit(expanded ? 1...8 : 1...1)
-                    .font(.system(size: 16))
-                    .foregroundStyle(Theme.ink)
-                    .focused($focused)
+                ComposerInput(text: $text, focused: $focused, placeholder: placeholder,
+                              maximumLines: expanded ? 8 : 1)
+                    .overlay(alignment: .topLeading) {
+                        if text.isEmpty {
+                            Text(placeholder)
+                                .font(.system(size: 16))
+                                .foregroundStyle(Theme.muted)
+                                .lineLimit(1)
+                                .allowsHitTesting(false)
+                                .accessibilityHidden(true)
+                        }
+                    }
                     // Пока поле не в фокусе, текст подсказки не ловит касания: иначе палец «таскал»
                     // её вверх-вниз (внутренняя прокрутка поля). Нажатие ловит подложка карточки.
                     .allowsHitTesting(focused)

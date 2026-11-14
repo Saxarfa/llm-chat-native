@@ -99,6 +99,17 @@ final class ComposerUITests: XCTestCase {
         XCTAssertFalse(element(app, "composer.context").exists, "линии контекста нет")
         sleep(1)
         snap("ui-c4-card")
+        // Пустая карточка сворачивается после ухода клавиатуры и раскрывается повторно.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
+        let closed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: chip)
+        wait(for: [closed], timeout: 5)
+        input.tap()
+        XCTAssertTrue(chip.waitForExistence(timeout: 5))
+        input.typeText("Первая строка\nВторая строка")
+        XCTAssertEqual(input.value as? String, "Первая строка\nВторая строка", "перенос строки сохраняется")
+        XCTAssertTrue(app.buttons["Отправить"].firstMatch.isEnabled)
+        XCTAssertLessThanOrEqual(chip.frame.maxY, app.keyboards.firstMatch.frame.minY + 1)
+        snap("ui-c4b-multiline")
     }
 
     /// «⋯» в шапке открывает «Настройки модели»: значения сохраняются за моделью.
