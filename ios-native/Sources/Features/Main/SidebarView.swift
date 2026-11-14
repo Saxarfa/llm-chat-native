@@ -39,8 +39,8 @@ struct SidebarView: View {
             .padding(.bottom, 24)
         }
         .refreshable { await model.refreshChats() }
-        // Шапка и нижние кнопки без подложки: список уходит под них и затухает.
-        .safeAreaInset(edge: .top, spacing: 0) {
+        // Штатное размытие прокрутки без тонированного Material поверх списка.
+        .softEdgeBar(edge: .top, tint: Theme.rail) {
             HStack {
                 Wordmark(size: 23)
                 Spacer()
@@ -54,23 +54,10 @@ struct SidebarView: View {
             .frame(height: 44)
             .padding(.top, -6)
             .padding(.bottom, 4)
-            // Под шапкой список размывается, как в шторке Claude (было простое затемнение).
-            .background(alignment: .top) {
-                Theme.edgeBlur(Theme.rail, from: .top)
-                    .padding(.bottom, -20)
-                    .ignoresSafeArea(.container, edges: .top)
-                    .allowsHitTesting(false)
-            }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .softEdgeBar(edge: .bottom, tint: Theme.rail) {
             footer
                 .padding(.bottom, resting)
-                .background(alignment: .bottom) {
-                    Theme.bottomBlur(Theme.rail)
-                        .padding(.top, -26)
-                        .ignoresSafeArea(.container, edges: .bottom)
-                        .allowsHitTesting(false)
-                }
         }
         .background(Theme.rail.ignoresSafeArea())
         .chatActions(renaming: $renaming, deleting: $deleting)

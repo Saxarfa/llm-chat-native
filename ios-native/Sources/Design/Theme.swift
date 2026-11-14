@@ -57,36 +57,6 @@ enum Theme {
         ], startPoint: edge, endPoint: edge == .top ? .bottom : .top)
     }
 
-    /// Размытие под плавающей шапкой и под нижними кнопками, как у Claude (запись экрана
-    /// пользователя 13.11.2026): содержимое под краем не затемняется, а слегка размывается —
-    /// у края заметнее, к середине экрана сходит на нет. Только SwiftUI:
-    /// слой UIKit с фильтром `variableBlur` (первая сборка 0.14) ломал подъём экрана над
-    /// клавиатурой — капсула ввода оставалась под ней. `solid` — доля высоты с полным размытием.
-    static func edgeBlur(_ tint: Color, from edge: UnitPoint, solid: CGFloat = 0.3) -> some View {
-        let far: UnitPoint = edge == .top ? .bottom : .top
-        // Как на снимке Claude (13.11.2026): размыта только кромка — под часами и под капсулой,
-        // текст рядом с кнопками почти чёткий. Один тонкий материал, быстро сходящий на нет.
-        // Чистое размытие без подложки (материал в тёмной теме белил кромку — замечание 14.11.2026):
-        // сила спадает к ленте за счёт маски.
-        _ = tint
-        return ZStack {
-            PlainBlur()
-                .mask(LinearGradient(stops: [
-                    .init(color: .black, location: 0),
-                    .init(color: .black.opacity(0.6), location: solid),
-                    .init(color: .clear, location: min(1, solid + 0.35)),
-                ], startPoint: edge, endPoint: far))
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    /// То же у нижнего края (капсула ввода, поиск «Недавних», кнопки шторки): размыта только
-    /// полоса под капсулой у полосы «домой».
-    static func bottomBlur(_ tint: Color, solid: CGFloat = 0.22) -> some View {
-        edgeBlur(tint, from: .bottom, solid: solid)
-    }
-
     /// Засечки — только для логотипа и приветствия.
     static func display(_ size: CGFloat) -> Font {
         .system(size: size, weight: .regular, design: .serif)
@@ -317,18 +287,27 @@ struct LabeledField<Content: View>: View {
 }
 
 
-/// Размытие того, что под ним, без тонировки и подсветки материала: у системного вида
-/// убираются слои цвета, остаётся только размытие фона. Касания не принимает.
-struct PlainBlur: UIViewRepresentable {
-    func makeUIView(context: Context) -> UIVisualEffectView {
-        let view = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
-        view.isUserInteractionEnabled = false
-        return view
-    }
-
-    func updateUIView(_ view: UIVisualEffectView, context: Context) {
-        DispatchQueue.main.async {
-            for sub in view.subviews.dropFirst() { sub.alpha = 0 }
+extension View {
+    /// Плавающая панель со штатным постепенным размытием прокручиваемого содержимого.
+    /// safeAreaBar связывает эффект с самой прокруткой: отдельного Material поверх неё нет.
+    /// Как и safeAreaInset, панель учитывает клавиатуру; контейнеры и .keyboard не игнорируем.
+    @ViewBuilder
+    func softEdgeBar<Bar: View>(edge: VerticalEdge, tint: Color, @ViewBuilder content: () -> Bar) -> some View {
+        if #available(iOS 26.0, *) {
+            self.safeAreaBar(edge: edge, spacing: 0, content: content)
+                .scrollEdgeEffectStyle(.soft, for: edge == .top ? .top : .bottom)
+        } else {
+            // На iOS 17–18 нет scroll edge effect. Затухание в цвет текущего фона,
+            // без Material и доступа к недокументированным слоям UIVisualEffectView.
+            self.safeAreaInset(edge: edge, spacing: 0) {
+                content()
+                    .background(alignment: edge == .top ? .top : .bottom) {
+                        Theme.fade(tint, from: edge == .top ? .top : .bottom)
+                            .ignoresSafeArea(.container, edges: edge == .top ? .top : .bottom)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+            }
         }
     }
 }

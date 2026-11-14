@@ -41,7 +41,7 @@ struct ChatScreen: View {
         // Нажатие на пустое место или на текст ленты убирает клавиатуру.
         .contentShape(Rectangle())
         .onTapGesture { Keyboard.hide() }
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .softEdgeBar(edge: .top, tint: Theme.canvas) {
             VStack(spacing: 0) {
                 header
                 if model.offline {
@@ -51,16 +51,8 @@ struct ChatScreen: View {
                         .transition(.opacity)
                 }
             }
-            // Шапка без подложки: лента уходит под кнопки и под «остров» и там размывается
-            // (не затемняется — замечание пользователя 13.11.2026), как у Claude.
-            .background(alignment: .top) {
-                Theme.edgeBlur(Theme.canvas, from: .top)
-                    .padding(.bottom, -24)
-                    .ignoresSafeArea(.container, edges: .top)
-                    .allowsHitTesting(false)
-            }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .softEdgeBar(edge: .bottom, tint: Theme.canvas) {
             ComposerBar(text: $draft)
         }
         .task(id: model.activeChatID) {
@@ -261,14 +253,7 @@ struct ComposerBar: View {
         .padding(.horizontal, expanded ? 8 : 15)
         .padding(.top, 6)
         .padding(.bottom, focused ? 8 : (expanded ? 2 : resting))
-        // Без подложки: лента уходит под капсулу и размывается к низу экрана.
-        .background(alignment: .bottom) {
-            // Размытие здесь держало капсулу под клавиатурой (сборки 0.14 #7–#9, GitHub #1–#4) — внизу растворение.
-                Theme.fade(Theme.canvas, from: .bottom)
-                .padding(.top, -26)
-                .ignoresSafeArea(.container, edges: .bottom)
-                .allowsHitTesting(false)
-        }
+        // Размытием под капсулой управляет softEdgeBar родительского экрана.
         .animation(Theme.morph, value: expanded)
         .animation(Theme.morph, value: focused)
         .animation(.easeOut(duration: 0.15), value: canSend)

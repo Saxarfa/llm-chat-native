@@ -143,8 +143,8 @@ struct MessageFeed: View {
                                         .contentShape(Rectangle())
                                 }
                                 .buttonStyle(PressScaleStyle())
-                                // Выше края размытия над капсулой (оно заходит на 26 pt в ленту):
-                                // в этой полосе нажатие до кнопки не доходило.
+                                // Держим кнопку отдельно от капсулы; размытие принадлежит
+                                // прокрутке и не добавляет перехватывающий касания overlay.
                                 .padding(.bottom, 28)
                                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
                                 .accessibilityLabel("К последнему сообщению")

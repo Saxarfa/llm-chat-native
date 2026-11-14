@@ -14,6 +14,17 @@ final class ClaudeLookUITests: XCTestCase {
         return app
     }
 
+    /// Регрессия 0.14: ввод и отправка не должны оказываться под экранной клавиатурой.
+    private func assertAboveKeyboard(_ control: XCUIElement, in app: XCUIApplication,
+                                     file: StaticString = #filePath, line: UInt = #line) {
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5), file: file, line: line)
+        XCTAssertTrue(control.isHittable, "элемент доступен для нажатия", file: file, line: line)
+        XCTAssertFalse(control.frame.isEmpty, file: file, line: line)
+        XCTAssertLessThanOrEqual(control.frame.maxY, keyboard.frame.minY + 1,
+                                 "элемент целиком над клавиатурой", file: file, line: line)
+    }
+
     private func snap(_ name: String) {
         let shot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: shot)
@@ -107,6 +118,8 @@ final class ClaudeLookUITests: XCTestCase {
         let rows = app.buttons.matching(identifier: "recents.row")
         let filtered = expectation(for: NSPredicate(format: "count == 1"), evaluatedWith: rows)
         wait(for: [filtered], timeout: 5)
+        assertAboveKeyboard(field, in: app)
+        snap("ui-l5b-recents-keyboard")
     }
 
     /// Капсула: без клавиатуры — строка без модели, с клавиатурой — карточка с моделью,
@@ -130,6 +143,7 @@ final class ClaudeLookUITests: XCTestCase {
         input.typeText("Привет")
         XCTAssertTrue(send.isEnabled)
         sleep(1)
+        assertAboveKeyboard(send, in: app)
         snap("ui-k3-text")
     }
 
@@ -146,7 +160,9 @@ final class ClaudeLookUITests: XCTestCase {
         let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: down)
         wait(for: [gone], timeout: 5)
         element(app, "chat.input").tap()
+        app.skipKeyboardTip()
         sleep(1)
+        assertAboveKeyboard(element(app, "chat.input"), in: app)
         snap("ui-k5-thread-keyboard")
     }
 

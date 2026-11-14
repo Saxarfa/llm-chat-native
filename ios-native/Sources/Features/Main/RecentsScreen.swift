@@ -55,7 +55,7 @@ struct RecentsScreen: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .refreshable { await model.refreshChats() }
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .softEdgeBar(edge: .top, tint: Theme.canvas) {
             ZStack {
                 Text("Недавние")
                     .font(.system(size: 16, weight: .semibold))
@@ -69,12 +69,6 @@ struct RecentsScreen: View {
             .frame(height: 44)
             .padding(.top, -6)
             .padding(.bottom, 4)
-            .background(alignment: .top) {
-                Theme.edgeBlur(Theme.canvas, from: .top)
-                    .padding(.bottom, -24)
-                    .ignoresSafeArea(.container, edges: .top)
-                    .allowsHitTesting(false)
-            }
         }
         .overlay(alignment: .bottomTrailing) {
             Button {
@@ -94,7 +88,7 @@ struct RecentsScreen: View {
             .padding(.trailing, 16)
             .padding(.bottom, 10)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .softEdgeBar(edge: .bottom, tint: Theme.canvas) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 14))
@@ -124,13 +118,6 @@ struct RecentsScreen: View {
             .padding(.horizontal, 15)
             .padding(.top, 6)
             .padding(.bottom, searching ? 8 : resting)
-            .background(alignment: .bottom) {
-                // Размытие здесь держало капсулу под клавиатурой (сборки 0.14 #7–#9, GitHub #1–#4) — внизу растворение.
-                Theme.fade(Theme.canvas, from: .bottom)
-                    .padding(.top, -26)
-                    .ignoresSafeArea(.container, edges: .bottom)
-                    .allowsHitTesting(false)
-            }
         }
         .chatActions(renaming: $renaming, deleting: $deleting)
         .onAppear {
