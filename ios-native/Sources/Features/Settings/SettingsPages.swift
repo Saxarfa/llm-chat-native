@@ -264,6 +264,8 @@ struct ComputerPage: View {
     }
 
     private func load() async {
+        // Режим снимков: пример загружается один раз, иначе опрос раз в 5 с возвращал остановленную задачу.
+        if model.preview != nil, overview != nil { return }
         do {
             overview = try await model.systemOverview()
             failure = nil
