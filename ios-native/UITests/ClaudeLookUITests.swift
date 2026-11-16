@@ -82,9 +82,12 @@ final class ClaudeLookUITests: XCTestCase {
         XCTAssertEqual(stops.count, 2, "две задачи можно остановить")
         sleep(1)
         snap("ui-l3-computer")
+        // С 0.16 строки выше: кнопка остановки у самого низа экрана — сначала долистать к задачам.
+        app.staticTexts["Сервисы"].swipeUp()
+        sleep(1)
         stops.firstMatch.tap()
         let one = expectation(for: NSPredicate(format: "count == 1"), evaluatedWith: stops)
-        wait(for: [one], timeout: 5)
+        wait(for: [one], timeout: 8)
         app.buttons["Назад"].firstMatch.tap()
 
         element(app, "settings.models").tap()

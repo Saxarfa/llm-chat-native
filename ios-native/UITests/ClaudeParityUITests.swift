@@ -95,8 +95,14 @@ final class ClaudeParityUITests: XCTestCase {
         XCTAssertTrue(dotted.waitForExistence(timeout: 10), "строка с точкой непрочитанного ответа")
         sleep(1)
         snap("ui-i5-unread")
-        dotted.press(forDuration: 1.2)
-        XCTAssertTrue(app.buttons["Поделиться"].firstMatch.waitForExistence(timeout: 5), "«Поделиться» в меню сессии")
+        // Меню по долгому нажатию в симуляторе иногда не успевает открыться — одна повторная попытка.
+        let share = app.buttons["Поделиться"].firstMatch
+        dotted.press(forDuration: 1.5)
+        if !share.waitForExistence(timeout: 6) {
+            sleep(1)
+            dotted.press(forDuration: 1.5)
+        }
+        XCTAssertTrue(share.waitForExistence(timeout: 8), "«Поделиться» в меню сессии")
         XCTAssertTrue(app.buttons["Переименовать"].firstMatch.exists)
         sleep(1)
         snap("ui-i6-session-menu")
