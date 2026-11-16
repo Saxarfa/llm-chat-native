@@ -1,10 +1,19 @@
 name: Build native iOS app (SwiftUI)
+# Быстрый путь на каждый push (16.11.2026): компиляция Release + IPA и модульные тесты — два задания
+# параллельно, ответ за минуты. Снимки экранов и XCUITest (~25 мин) — только по запросу:
+# ручной запуск (Run workflow) или «[full]» в сообщении коммита.
 on:
   workflow_dispatch:
+    inputs:
+      full:
+        description: 'Снимки экранов и UI-тесты (XCUITest)'
+        type: boolean
+        default: true
   push:
     paths:
       - 'ios-native/**'
       - '.github/workflows/build-ios-native.yml'
+      - '.github/actions/setup-native/**'
 permissions:
   contents: read
 concurrency:
@@ -12,34 +21,12 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
+    name: Release + IPA
     runs-on: macos-latest
-    timeout-minutes: 50
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch llama.cpp (iOS xcframework)
-        run: |
-          set -euo pipefail
-          # Движок моделей на телефоне (этап 8). Релиз зафиксирован; контрольная сумма — из GitHub.
-          tag=b11870
-          sum=5206da648efdb196350da7d6dad2edf34a4290cdbe93c27680ce025f273567e3
-          curl -sSfL -o "$RUNNER_TEMP/llama.zip" "https://github.com/ggml-org/llama.cpp/releases/download/$tag/llama-$tag-xcframework.zip"
-          echo "$sum  $RUNNER_TEMP/llama.zip" | shasum -a 256 -c -
-          rm -rf "$RUNNER_TEMP/llama" && mkdir -p "$RUNNER_TEMP/llama"
-          unzip -q "$RUNNER_TEMP/llama.zip" -d "$RUNNER_TEMP/llama"
-          framework=$(find "$RUNNER_TEMP/llama" -maxdepth 4 -type d -name llama.xcframework | head -n 1)
-          test -n "$framework"
-          # В релизе есть только слои ios-arm64 и macOS (симулятора нет) — берём слой устройства;
-          # project.yml подключает его лишь при сборке под iphoneos, в симуляторе движок — заглушка.
-          rm -rf ios-native/Frameworks && mkdir -p ios-native/Frameworks/iphoneos
-          cp -R "$framework/ios-arm64/llama.framework" ios-native/Frameworks/iphoneos/
-          ls ios-native/Frameworks/iphoneos/llama.framework
-      - name: Generate Xcode project
-        working-directory: ios-native
-        run: |
-          set -euo pipefail
-          brew install xcodegen
-          xcodegen generate
-          xcodebuild -version
+      - uses: ./.github/actions/setup-native
       - name: Verify free-account compatibility
         run: |
           set -euo pipefail
@@ -54,7 +41,6 @@ jobs:
       - name: Compile unsigned Release
         run: |
           set -euo pipefail
-          set -o pipefail
           xcodebuild -project ios-native/LLMChat.xcodeproj -scheme LLMChat -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' \
             -derivedDataPath build/ios CODE_SIGN_IDENTITY="" \
@@ -81,6 +67,45 @@ jobs:
           name: LLM-Chat-native-unsigned
           path: build/LLM-Chat-native-unsigned.ipa
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ios-native-build-log
+          path: build-ios-native.log
+          if-no-files-found: ignore
+
+  unit:
+    name: Unit tests
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-native
+      - name: Unit tests (LLMChatTests) in simulator
+        run: |
+          set -euo pipefail
+          device=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next(d["udid"] for group in json.load(sys.stdin)["devices"].values() for d in group if "iPhone" in d["name"]))')
+          xcodebuild test -project ios-native/LLMChat.xcodeproj -scheme LLMChat -configuration Debug \
+            -destination "platform=iOS Simulator,id=$device" -derivedDataPath build/unit \
+            -only-testing:LLMChatTests CODE_SIGNING_ALLOWED=NO > build-unit.log 2>&1 \
+            || { grep -E 'error:|Test Case .* failed|XCTAssert' build-unit.log | tail -n 60; exit 1; }
+          grep -E 'Executed [0-9]+ test' build-unit.log | tail -n 2
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ios-native-unit-log
+          path: build-unit.log
+          if-no-files-found: ignore
+
+  ui:
+    name: Screens + UI tests
+    needs: build
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.full) || contains(github.event.head_commit.message, '[full]') }}
+    runs-on: macos-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-native
       - name: Keyboard tests first (fast check)
         run: |
           set -euo pipefail
@@ -92,7 +117,6 @@ jobs:
             xcrun simctl spawn "$device" defaults write "$domain" KeyboardContinuousPathEnabled -bool false || true
           done
           # Сначала — тесты капсулы над клавиатурой: ответ за минуты, а не после 14 минут снимков.
-          # Снимки и полный журнал нужны и при раннем падении, до общей серии preview.
           mkdir -p build/quick-screens
           export TEST_RUNNER_SCREENS_DIR="$PWD/build/quick-screens"
           xcodebuild test -project ios-native/LLMChat.xcodeproj -scheme LLMChat -configuration Debug             -destination "platform=iOS Simulator,id=$device" -derivedDataPath build/uitest             -only-testing:LLMChatUITests/ComposerUITests/testQueue             -only-testing:LLMChatUITests/ComposerUITests/testCardWithoutContextLine             -only-testing:LLMChatUITests/PhoneModelsUITests/testPhoneChat             -only-testing:LLMChatUITests/PhoneSettingsUITests/testOffline             CODE_SIGNING_ALLOWED=NO > build-quick.log 2>&1             || { grep -E 'error:|Test Case .* failed|hit point' build-quick.log | tail -n 30; exit 1; }
@@ -137,7 +161,7 @@ jobs:
           mkdir -p build/uitest-screens
           # TEST_RUNNER_* передаётся тестам без приставки: снимки шагов пишутся прямо в папку.
           export TEST_RUNNER_SCREENS_DIR="$PWD/build/uitest-screens"
-          xcodebuild test -project ios-native/LLMChat.xcodeproj -scheme LLMChat -configuration Debug             -destination "platform=iOS Simulator,id=$device" -derivedDataPath build/uitest             -resultBundlePath build/uitest.xcresult CODE_SIGNING_ALLOWED=NO > build-uitest.log 2>&1             || { grep -E 'error:|failed|Failing|XCTAssert|Test Case .* failed' build-uitest.log | tail -n 60; status=1; }
+          xcodebuild test -project ios-native/LLMChat.xcodeproj -scheme LLMChat -configuration Debug             -destination "platform=iOS Simulator,id=$device" -derivedDataPath build/uitest             -only-testing:LLMChatUITests             -resultBundlePath build/uitest.xcresult CODE_SIGNING_ALLOWED=NO > build-uitest.log 2>&1             || { grep -E 'error:|failed|Failing|XCTAssert|Test Case .* failed' build-uitest.log | tail -n 60; status=1; }
           grep -E 'Test Case .*(passed|failed)|Executed [0-9]+ test' build-uitest.log | tail -n 20 || true
           if [ -z "$(ls build/uitest-screens)" ]; then
             xcrun xcresulttool export attachments --path build/uitest.xcresult --output-path build/uitest-screens || true
@@ -153,9 +177,3 @@ jobs:
             build-simulator.log
             build-uitest.log
           if-no-files-found: warn
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: ios-native-build-log
-          path: build-ios-native.log
-          if-no-files-found: ignore

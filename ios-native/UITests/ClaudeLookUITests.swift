@@ -71,10 +71,12 @@ final class ClaudeLookUITests: XCTestCase {
         sleep(1)
         snap("ui-l2b-answer-font")
         app.buttons["Шрифт ответов: С засечками"].firstMatch.tap()
-        root.swipeDown()
-        root.swipeDown()
+        // Листаем вверх, только пока «Компьютер» не виден: лишний свайп вниз у верхнего края
+        // закрывал сам лист настроек (сборка 0.15.0, run 43779695585).
+        let computer = element(app, "settings.computer")
+        for _ in 0..<3 where !computer.isHittable { root.swipeDown() }
 
-        element(app, "settings.computer").tap()
+        computer.tap()
         XCTAssertTrue(app.staticTexts["Сервисы"].waitForExistence(timeout: 5))
         let stops = app.buttons.matching(identifier: "computer.stop")
         XCTAssertEqual(stops.count, 2, "две задачи можно остановить")

@@ -1,0 +1,31 @@
+name: Setup native iOS project
+description: llama.cpp xcframework (device layer) and the Xcode project generated from ios-native/project.yml
+runs:
+  using: composite
+  steps:
+    - name: Fetch llama.cpp (iOS xcframework)
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Движок моделей на телефоне (этап 8). Релиз зафиксирован; контрольная сумма — из GitHub.
+        tag=b11870
+        sum=5206da648efdb196350da7d6dad2edf34a4290cdbe93c27680ce025f273567e3
+        curl -sSfL -o "$RUNNER_TEMP/llama.zip" "https://github.com/ggml-org/llama.cpp/releases/download/$tag/llama-$tag-xcframework.zip"
+        echo "$sum  $RUNNER_TEMP/llama.zip" | shasum -a 256 -c -
+        rm -rf "$RUNNER_TEMP/llama" && mkdir -p "$RUNNER_TEMP/llama"
+        unzip -q "$RUNNER_TEMP/llama.zip" -d "$RUNNER_TEMP/llama"
+        framework=$(find "$RUNNER_TEMP/llama" -maxdepth 4 -type d -name llama.xcframework | head -n 1)
+        test -n "$framework"
+        # В релизе есть только слои ios-arm64 и macOS (симулятора нет) — берём слой устройства;
+        # project.yml подключает его лишь при сборке под iphoneos, в симуляторе движок — заглушка.
+        rm -rf ios-native/Frameworks && mkdir -p ios-native/Frameworks/iphoneos
+        cp -R "$framework/ios-arm64/llama.framework" ios-native/Frameworks/iphoneos/
+        ls ios-native/Frameworks/iphoneos/llama.framework
+    - name: Generate Xcode project
+      shell: bash
+      working-directory: ios-native
+      run: |
+        set -euo pipefail
+        brew install xcodegen
+        xcodegen generate
+        xcodebuild -version
