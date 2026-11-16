@@ -36,7 +36,6 @@ struct PhoneModelsSheet: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 SheetHeader(title: "Модели на телефоне",
                             subtitle: "Память \(PhoneMemory.gigabytes(phone.availableMemory)) · на диске \(PhoneMemory.gigabytes(phone.diskUsed))")
-                    .background(Theme.sheet)
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: String.self) { repo in
@@ -467,7 +466,6 @@ struct PhoneRepoView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             SheetBar(title: HFRepo(id: repo).name, subtitle: HFRepo(id: repo).author,
                      symbol: "chevron.left", label: "Назад", action: { dismiss() })
-                .background(Theme.sheet)
         }
         .toolbar(.hidden, for: .navigationBar)
         .task {

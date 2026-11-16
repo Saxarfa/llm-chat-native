@@ -75,10 +75,8 @@ enum Theme {
     static let headerGlyph: CGFloat = 18
     /// Сколько шапка (ряд 44 pt от безопасной зоны) выступает ниже размытой полосы — на столько
     /// лента опускает своё первое содержимое, чтобы оно не начиналось под кнопками.
-    static var headerOverhang: CGFloat {
-        if #available(iOS 26.0, *) { return headerButton - headerReach }
-        return 0
-    }
+    /// С 17.11.2026 шапка стоит в safeAreaBar целиком (как капсула внизу), лента сама начинается под ней.
+    static var headerOverhang: CGFloat { 0 }
 
     /// Затухание фона под плавающей шапкой: лента уходит под кнопки и под «остров».
     static func fade(_ color: Color, from edge: UnitPoint) -> LinearGradient {
@@ -437,18 +435,11 @@ extension View {
     func softEdgeBar<Bar: View>(edge: VerticalEdge, tint: Color, hasScrollContent: Bool = true,
                                reach: CGFloat? = nil, blurDepth: CGFloat? = nil,
                                @ViewBuilder content: () -> Bar) -> some View {
-        if #available(iOS 26.0, *), hasScrollContent, edge == .top, let reach {
-            self.safeAreaBar(edge: .top, spacing: 0) {
-                Color.clear.frame(height: reach).allowsHitTesting(false)
-            }
-            .scrollEdgeEffectStyle(.soft, for: .top)
-            .overlay(alignment: .top) {
-                if let blurDepth {
-                    ProgressiveTopBlur(depth: blurDepth, tint: tint)
-                }
-            }
-            .overlay(alignment: .top, content: content)
-        } else if #available(iOS 26.0, *), hasScrollContent {
+        // Верх — так же, как низ под капсулой (замечание пользователя 17.11.2026: «верх чата и шторки —
+        // блюр, как сейчас внизу»): шапка целиком в safeAreaBar, системное размытие края прокрутки на всю
+        // её высоту. Прежняя схема (полоса 10 pt + шапка отдельным слоем + `ProgressiveTopBlur` с
+        // затемнением) давала светлую муть вместо размытия. `reach`/`blurDepth` больше не используются.
+        if #available(iOS 26.0, *), hasScrollContent {
             self.safeAreaBar(edge: edge, spacing: 0, content: content)
                 .scrollEdgeEffectStyle(.soft, for: edge == .top ? .top : .bottom)
         } else {
