@@ -246,6 +246,11 @@ private struct CodeBlockView: View {
     }
 }
 
+/// Последняя измеренная ширина ответа — общая для всех таблиц ленты (читается и пишется из вида, на главном потоке).
+enum TableWidth {
+    static var last: CGFloat = 0
+}
+
 /// Таблица ответа. Ширины столбцов считаются заранее по тексту ячеек, а не отдаются Grid:
 /// Grid внутри горизонтальной прокрутки мерял высоту строки по одной строчке текста, и перенесённый
 /// текст налезал на соседние строки (снимок 16.11.2026, Qwen3.5 9B). Узкая таблица лежит в ширину
@@ -258,31 +263,45 @@ private struct TableBlockView: View {
     private static let minColumn: CGFloat = 76
     private static let maxColumn: CGFloat = 240
 
-    private var widths: [CGFloat] {
-        header.indices.map { column in
+    /// Ширины столбцов по тексту: естественная (вся строка ячейки, до `maxColumn`) и наименьшая —
+    /// по самому длинному слову, чтобы при сжатии слова не рвались посередине («поддержива / ется»,
+    /// снимок 0.15.0 (28)).
+    private var measured: (natural: [CGFloat], least: [CGFloat]) {
+        var natural: [CGFloat] = []
+        var least: [CGFloat] = []
+        for column in header.indices {
             var widest: CGFloat = 0
+            var longestWord: CGFloat = 0
             let all = [header[column]] + rows.map { $0.indices.contains(column) ? $0[column] : "" }
             for (index, cell) in all.enumerated() {
                 let font = UIFont.systemFont(ofSize: 15, weight: index == 0 ? .semibold : .regular)
                 let plain = String(InlineMarkdown.render(TableCell.clean(cell)).characters)
                 for line in plain.split(separator: "\n", omittingEmptySubsequences: false) {
                     widest = max(widest, (String(line) as NSString).size(withAttributes: [.font: font]).width)
+                    for word in line.split(separator: " ") {
+                        longestWord = max(longestWord, (String(word) as NSString).size(withAttributes: [.font: font]).width)
+                    }
                 }
             }
             let wanted = ceil(widest * 1.04) + Self.padding * 2 + 2
-            return min(max(wanted, Self.minColumn), Self.maxColumn)
+            let full = min(max(wanted, Self.minColumn), Self.maxColumn)
+            natural.append(full)
+            least.append(min(full, max(Self.minColumn, ceil(longestWord * 1.04) + Self.padding * 2 + 2)))
         }
+        return (natural, least)
     }
 
-    /// Ширина ответа, измеренная по месту (0 — ещё не измерена).
-    @State private var available: CGFloat = 0
+    /// Ширина ответа, измеренная по месту. Начальное значение — последняя измеренная (у всех ответов она
+    /// одна): таблица, заново появившаяся при прокрутке, сразу рисуется в своём размере, без рывка высоты
+    /// (из-за рывка лента «не доезжала до низа» и кнопка «вниз» не пропадала, run 43787353104).
+    @State private var available: CGFloat = TableWidth.last
 
     var body: some View {
-        let natural = widths
-        // Шире ответа — широкие столбцы сужаются под его ширину (текст переносится); прокрутка вбок —
-        // только если не влезает даже при минимальных столбцах. `ViewThatFits` в ленте выбирал прокрутку
+        let (natural, least) = measured
+        // Шире ответа — широкие столбцы сужаются под его ширину (текст переносится по словам); прокрутка вбок —
+        // только если не влезает даже при наименьших столбцах. `ViewThatFits` в ленте выбирал прокрутку
         // и для таблиц, которые помещались (0.15.0, run 43785551079), поэтому ширина меряется явно.
-        let fitted = Self.fit(natural, into: available)
+        let fitted = Self.fit(natural, least: least, into: available)
         let fits = available > 0 && fitted.reduce(0, +) <= available + 0.5
         Group {
             if fits {
@@ -296,22 +315,28 @@ private struct TableBlockView: View {
         .background {
             GeometryReader { geo in
                 Color.clear
-                    .onAppear { available = geo.size.width }
-                    .onChange(of: geo.size.width) { _, width in available = width }
+                    .onAppear { remember(geo.size.width) }
+                    .onChange(of: geo.size.width) { _, width in remember(width) }
             }
         }
     }
 
-    /// Ширины под доступное место: лишнее сверх минимума снимается со столбцов пропорционально.
-    /// Не помещается и при минимуме — возвращаются минимальные (вызывающий уходит в прокрутку).
-    static func fit(_ columns: [CGFloat], into width: CGFloat) -> [CGFloat] {
+    private func remember(_ width: CGFloat) {
+        guard width > 0 else { return }
+        TableWidth.last = width
+        if abs(width - available) > 0.5 { available = width }
+    }
+
+    /// Ширины под доступное место: лишнее сверх наименьшей ширины снимается со столбцов пропорционально.
+    /// Не помещается и при наименьших — возвращаются наименьшие (вызывающий уходит в прокрутку).
+    static func fit(_ columns: [CGFloat], least: [CGFloat], into width: CGFloat) -> [CGFloat] {
         let total = columns.reduce(0, +)
         guard width > 0, total > width else { return columns }
-        let floor = CGFloat(columns.count) * minColumn
-        let extra = columns.reduce(0) { $0 + max(0, $1 - minColumn) }
-        guard width > floor, extra > 0 else { return columns.map { _ in minColumn } }
+        let floor = least.reduce(0, +)
+        let extra = zip(columns, least).reduce(0) { $0 + max(0, $1.0 - $1.1) }
+        guard width > floor, extra > 0 else { return least }
         let factor = (width - floor) / extra
-        return columns.map { (minColumn + max(0, $0 - minColumn) * factor).rounded(.down) }
+        return zip(columns, least).map { ($0.1 + max(0, $0.0 - $0.1) * factor).rounded(.down) }
     }
 
     private func grid(_ columns: [CGFloat]) -> some View {

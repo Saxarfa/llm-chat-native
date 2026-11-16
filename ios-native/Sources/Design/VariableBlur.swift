@@ -23,13 +23,14 @@ struct VariableBlur: UIViewRepresentable {
 final class VariableBlurUIView: UIVisualEffectView {
     private let maxRadius: CGFloat
     private var filter: NSObject?
+    /// Запасной путь на открытом API: обычное размытие, растворённое маской-градиентом.
+    private var fallbackMask: GradientMaskView?
 
     init(maxRadius: CGFloat) {
         self.maxRadius = maxRadius
         super.init(effect: UIBlurEffect(style: .regular))
         isUserInteractionEnabled = false
         filter = Self.makeFilter(maxRadius: maxRadius)
-        if filter == nil { effect = nil }
         apply()
     }
 
@@ -37,8 +38,9 @@ final class VariableBlurUIView: UIVisualEffectView {
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        guard let window, let backdrop = subviews.first?.layer else { return }
-        backdrop.setValue(window.traitCollection.displayScale, forKey: "scale")
+        if let window, let backdrop = backdropView {
+            backdrop.layer.setValue(window.traitCollection.displayScale, forKey: "scale")
+        }
         apply()
     }
 
@@ -46,14 +48,32 @@ final class VariableBlurUIView: UIVisualEffectView {
         super.layoutSubviews()
         // UIKit пересобирает подложку при смене темы — фильтр и скрытие тонировки возвращаем.
         apply()
+        fallbackMask?.frame = bounds
+    }
+
+    /// Слой-подложка эффекта (`_UIVisualEffectBackdropView`). В iOS 26 он уже не обязательно первый
+    /// среди подвидов — в 0.15.0 (28) фильтр лёг не туда, и размытия не было совсем.
+    private var backdropView: UIView? {
+        subviews.first { String(describing: type(of: $0)).contains("Backdrop") }
     }
 
     private func apply() {
-        guard let filter, let backdrop = subviews.first else { return }
+        guard let filter, let backdrop = backdropView else {
+            useFallback()
+            return
+        }
         if (backdrop.layer.filters as? [NSObject])?.first !== filter {
             backdrop.layer.filters = [filter]
         }
-        for view in subviews.dropFirst() where view.alpha != 0 { view.alpha = 0 }
+        // Тонировка и прочие слои эффекта — прочь: только размытие, без пелены.
+        for view in subviews where view !== backdrop && view.alpha != 0 { view.alpha = 0 }
+    }
+
+    private func useFallback() {
+        guard fallbackMask == nil else { return }
+        let mask = GradientMaskView(frame: bounds)
+        fallbackMask = mask
+        self.mask = mask
     }
 
     /// `CAFilter.filterWithType("variableBlur")` через рантайм Objective-C — без заголовков.
@@ -86,6 +106,23 @@ final class VariableBlurUIView: UIVisualEffectView {
         }
         return image.cgImage
     }
+}
+
+/// Маска запасного пути: сверху непрозрачно, книзу — прозрачно (форма та же, что у маски фильтра).
+final class GradientMaskView: UIView {
+    override class var layerClass: AnyClass { CAGradientLayer.self }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        guard let gradient = layer as? CAGradientLayer else { return }
+        gradient.colors = [UIColor.black.cgColor, UIColor.black.withAlphaComponent(0.85).cgColor,
+                           UIColor.black.withAlphaComponent(0).cgColor]
+        gradient.locations = [0, 0.35, 1]
+        gradient.startPoint = CGPoint(x: 0.5, y: 0)
+        gradient.endPoint = CGPoint(x: 0.5, y: 1)
+    }
+
+    required init?(coder: NSCoder) { nil }
 }
 
 /// Размытие верхнего края экрана: под «островом» и строкой состояния и ещё `depth` pt ниже.
