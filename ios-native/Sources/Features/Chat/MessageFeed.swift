@@ -316,7 +316,9 @@ private struct LiveAnswerView: View {
             // Отдельная «Искра» не нужна, пока искра уже стоит в строке рассуждений (раньше статус был двойным).
             if (live.text.isEmpty || live.stopping) && !(working && !live.stopping) {
                 SparkStatus(text: live.stopping ? "Останавливаю" : live.phase)
-                    .transition(.opacity)
+                    // Уходит сразу: растворяясь 0,3 с на прежнем месте, статус ложился поверх первых
+                    // строк ответа (замечание 16.11.2026). Появляется — плавно.
+                    .transition(.asymmetric(insertion: .opacity, removal: .identity))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

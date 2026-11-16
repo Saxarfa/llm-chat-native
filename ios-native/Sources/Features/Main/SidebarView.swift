@@ -41,7 +41,7 @@ struct SidebarView: View {
         }
         .refreshable { await model.refreshChats() }
         // Штатное размытие прокрутки без тонированного Material поверх списка.
-        .softEdgeBar(edge: .top, tint: Theme.rail, reach: Theme.headerReach) {
+        .softEdgeBar(edge: .top, tint: Theme.rail, reach: Theme.headerReach, blurDepth: Theme.drawerBlurDepth) {
             HStack {
                 Wordmark(size: 23)
                 Spacer()

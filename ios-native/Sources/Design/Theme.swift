@@ -52,6 +52,10 @@ enum Theme {
 
     /// Размытие под плавающей шапкой: «остров» и ещё столько pt (замечание 14.11.2026 — было слишком высоко).
     static let headerReach: CGFloat = 10
+    /// Прогрессивное размытие сверху (16.11.2026, по референсам Claude): в чате — под строкой состояния
+    /// и чуть ниже (текст у кнопок шапки уже чёткий), в шторке и «Недавних» — до низа шапки.
+    static let chatBlurDepth: CGFloat = 14
+    static let drawerBlurDepth: CGFloat = 52
     /// Сколько шапка (кнопки 44 pt, поднятые на 6) выступает ниже размытой полосы — на столько
     /// лента опускает своё первое содержимое, чтобы оно не начиналось под кнопками.
     static var headerOverhang: CGFloat {
@@ -334,15 +338,22 @@ extension View {
     /// `reach` — высота размытой полосы под шапкой (только iOS 26, верхний край): шапка тогда
     /// плавает поверх ленты отдельным слоем, а размытие захватывает лишь «остров» и `reach` pt под ним.
     /// Высоту шапки сверх `reach` экран добавляет к верхнему отступу своей ленты (`Theme.headerOverhang`).
+    /// `blurDepth` — на сколько pt ниже безопасной зоны тянется прогрессивное размытие (`ProgressiveTopBlur`,
+    /// 16.11.2026): в чате — чуть ниже строки состояния, в шторке — до низа шапки, как у Claude.
     @ViewBuilder
     func softEdgeBar<Bar: View>(edge: VerticalEdge, tint: Color, hasScrollContent: Bool = true,
-                               reach: CGFloat? = nil,
+                               reach: CGFloat? = nil, blurDepth: CGFloat? = nil,
                                @ViewBuilder content: () -> Bar) -> some View {
         if #available(iOS 26.0, *), hasScrollContent, edge == .top, let reach {
             self.safeAreaBar(edge: .top, spacing: 0) {
                 Color.clear.frame(height: reach).allowsHitTesting(false)
             }
             .scrollEdgeEffectStyle(.soft, for: .top)
+            .overlay(alignment: .top) {
+                if let blurDepth {
+                    ProgressiveTopBlur(depth: blurDepth, tint: tint)
+                }
+            }
             .overlay(alignment: .top, content: content)
         } else if #available(iOS 26.0, *), hasScrollContent {
             self.safeAreaBar(edge: edge, spacing: 0, content: content)
