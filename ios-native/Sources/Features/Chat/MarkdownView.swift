@@ -259,7 +259,7 @@ private struct TableBlockView: View {
     let header: [String]
     let rows: [[String]]
 
-    private static let padding: CGFloat = 14
+    private static let padding: CGFloat = 12
     private static let minColumn: CGFloat = 76
     private static let maxColumn: CGFloat = 240
 
@@ -307,7 +307,8 @@ private struct TableBlockView: View {
             if fits {
                 grid(fitted)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) { grid(natural) }
+                // Не влезает — столбцы самые узкие без разрыва слов: за краем прячется как можно меньше.
+                ScrollView(.horizontal, showsIndicators: false) { grid(fitted) }
                     .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
             }
         }
@@ -388,7 +389,8 @@ private struct TableCell: View {
             .lineSpacing(3)
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 14)
+            // Поля ячейки — 12 pt, как у Claude (было 14: таблица из трёх столбцов не влезала на 5 pt).
+            .padding(.horizontal, 12)
             .padding(.vertical, 11)
     }
 }
