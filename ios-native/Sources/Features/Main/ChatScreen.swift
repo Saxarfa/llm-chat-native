@@ -192,18 +192,16 @@ struct ChatScreen: View {
         .glassChrome(Capsule())
     }
 
-    /// Режим «Инкогнито»: тот же прозрачный стеклянный круг, что у остальных кнопок шапки, призрак залит.
-    /// Не светлая заливка: на снимке Claude круг светлый только из‑за размытого текста за стеклом
-    /// (замечание пользователя 17.11.2026 — цвета из‑под блюра не переносить).
+    /// Режим «Инкогнито»: светлый круг с призраком, как у Claude; нажатие выходит из режима.
     private var incognitoButton: some View {
         Button {
             model.toggleIncognito()
         } label: {
-            GhostGlyph(filled: true)
+            GhostGlyph(lineWidth: 1.6)
                 .frame(width: 17, height: 19)
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(Theme.buttonPrimaryText)
                 .frame(width: Theme.headerButton, height: Theme.headerButton)
-                .glassChrome(Circle())
+                .glassChrome(Circle(), tint: Theme.buttonPrimary)
                 .contentShape(Circle())
         }
         .glassPressStyle()
