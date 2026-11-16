@@ -53,14 +53,18 @@ struct ProgressiveTopBlur: View {
     let depth: CGFloat
     let tint: Color
     var body: some View {
-        ZStack(alignment: .top) {
-            VariableBlur()
-            LinearGradient(colors: [tint.opacity(0.5), tint.opacity(0)], startPoint: .top, endPoint: .bottom)
+        // Полоса сама ставит себя от верха экрана на «строка состояния + depth»: где начинается слой,
+        // в который её положили, у экранов разное (в 0.15.0 (30–31) она бралась от верха экрана высотой
+        // только `depth`, и размыта была лишь полоска в 14 pt над часами).
+        GeometryReader { geo in
+            let top = geo.frame(in: .global).minY
+            ZStack(alignment: .top) {
+                VariableBlur()
+                LinearGradient(colors: [tint.opacity(0.5), tint.opacity(0)], startPoint: .top, endPoint: .bottom)
+            }
+            .frame(width: geo.size.width, height: Screen.topInset + depth)
+            .offset(y: -top)
         }
-        // Высота — `depth` ниже безопасной зоны; ignoresSafeArea дотягивает её до верха экрана.
-        .frame(height: depth)
-        .frame(maxWidth: .infinity)
-        .ignoresSafeArea(edges: .top)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }

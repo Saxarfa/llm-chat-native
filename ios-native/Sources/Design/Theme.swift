@@ -178,6 +178,15 @@ extension UINavigationController: UIGestureRecognizerDelegate {
 
 /// Размеры экрана, которые нужны раскладке: есть ли внизу полоса «домой».
 enum Screen {
+    /// Верхняя безопасная зона окна («остров» и строка состояния).
+    @MainActor
+    static var topInset: CGFloat {
+        for scene in UIApplication.shared.connectedScenes {
+            if let window = (scene as? UIWindowScene)?.windows.first { return window.safeAreaInsets.top }
+        }
+        return 0
+    }
+
     @MainActor
     static var bottomInset: CGFloat {
         for scene in UIApplication.shared.connectedScenes {
