@@ -588,9 +588,11 @@ final class LlamaRunner: @unchecked Sendable {
         }
         if sampling.dryMultiplier > 0, sampling.dryPenaltyLastN > 0 {
             // Разрыв последовательностей, как в llama.cpp по умолчанию: перевод строки, двоеточие, кавычка, звёздочка.
-            let breakers = ["\n", ":", "\"", "*"].map { strdup($0) }
+            // Типы указаны явно: без них Swift пытался превратить строки литерала прямо в указатели (сборка 0.15.0).
+            let words: [String] = ["\n", ":", "\"", "*"]
+            let breakers: [UnsafeMutablePointer<CChar>?] = words.map { word in strdup(word) }
             defer { breakers.forEach { free($0) } }
-            var pointers: [UnsafePointer<CChar>?] = breakers.map { $0.map { UnsafePointer($0) } }
+            var pointers: [UnsafePointer<CChar>?] = breakers.map { copy in copy.map { UnsafePointer<CChar>($0) } }
             llama_sampler_chain_add(chain, llama_sampler_init_dry(
                 vocab, sampling.dryMultiplier, sampling.dryBase, sampling.dryAllowedLength,
                 sampling.dryPenaltyLastN, &pointers, pointers.count))
