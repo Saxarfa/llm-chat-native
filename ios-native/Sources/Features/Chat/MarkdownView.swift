@@ -274,19 +274,44 @@ private struct TableBlockView: View {
         }
     }
 
+    /// Ширина ответа, измеренная по месту (0 — ещё не измерена).
+    @State private var available: CGFloat = 0
+
     var body: some View {
-        let columns = widths
-        // Чуть шире ответа — сначала сужаем широкие столбцы (текст переносится), и только если
-        // не влезает и так — прокрутка вбок (в 0.15.0 таблица на 2 pt шире экрана уходила в прокрутку,
-        // а прокрутка съедала касание, которым убирают клавиатуру).
-        ViewThatFits(in: .horizontal) {
-            grid(columns)
-            grid(Self.squeezed(columns, to: 0.85))
-            grid(Self.squeezed(columns, to: 0.7))
-            ScrollView(.horizontal, showsIndicators: false) { grid(columns) }
-                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        let natural = widths
+        // Шире ответа — широкие столбцы сужаются под его ширину (текст переносится); прокрутка вбок —
+        // только если не влезает даже при минимальных столбцах. `ViewThatFits` в ленте выбирал прокрутку
+        // и для таблиц, которые помещались (0.15.0, run 43785551079), поэтому ширина меряется явно.
+        let fitted = Self.fit(natural, into: available)
+        let fits = available > 0 && fitted.reduce(0, +) <= available + 0.5
+        Group {
+            if fits {
+                grid(fitted)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) { grid(natural) }
+                    .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { available = geo.size.width }
+                    .onChange(of: geo.size.width) { _, width in available = width }
+            }
+        }
+    }
+
+    /// Ширины под доступное место: лишнее сверх минимума снимается со столбцов пропорционально.
+    /// Не помещается и при минимуме — возвращаются минимальные (вызывающий уходит в прокрутку).
+    static func fit(_ columns: [CGFloat], into width: CGFloat) -> [CGFloat] {
+        let total = columns.reduce(0, +)
+        guard width > 0, total > width else { return columns }
+        let floor = CGFloat(columns.count) * minColumn
+        let extra = columns.reduce(0) { $0 + max(0, $1 - minColumn) }
+        guard width > floor, extra > 0 else { return columns.map { _ in minColumn } }
+        let factor = (width - floor) / extra
+        return columns.map { (minColumn + max(0, $0 - minColumn) * factor).rounded(.down) }
     }
 
     private func grid(_ columns: [CGFloat]) -> some View {
@@ -302,11 +327,6 @@ private struct TableBlockView: View {
         .background(Theme.surface.opacity(0.55), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    /// Сжатые ширины: каждый столбец теряет часть ширины сверх минимума, узкие не меняются.
-    static func squeezed(_ columns: [CGFloat], to factor: CGFloat) -> [CGFloat] {
-        columns.map { width in max(minColumn, minColumn + (width - minColumn) * factor).rounded(.down) }
     }
 }
 
