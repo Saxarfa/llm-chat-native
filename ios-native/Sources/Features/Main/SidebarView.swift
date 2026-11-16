@@ -40,7 +40,9 @@ struct SidebarView: View {
             .padding(.leading, 18)
             .padding(.trailing, 19)
             .padding(.top, 14 + Theme.headerOverhang)
-            .padding(.bottom, 24)
+            // Строки 50 pt: без запаса «Показать все» оставалось под фото профиля и «Новой сессией»
+            // и не нажималось (UI-тест сборки 33).
+            .padding(.bottom, 72)
         }
         .refreshable { await model.refreshChats() }
         // Штатное размытие прокрутки без тонированного Material поверх списка.
@@ -256,17 +258,20 @@ struct SidebarView: View {
                         .font(.system(size: 17, weight: .regular))
                     Text("Новая сессия")
                         .font(.system(size: 17, weight: .medium))
+                        .lineLimit(1)
                 }
+                // На узком экране (шторка 295 pt) надпись переносилась на две строки.
+                .fixedSize()
                 .foregroundStyle(Theme.buttonPrimaryText)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 18)
                 .frame(height: 46)
                 .glassChrome(Capsule(), tint: Theme.buttonPrimary)
             }
             .glassPressStyle()
             .accessibilityLabel("Новая сессия")
         }
-        .padding(.leading, 28)
-        .padding(.trailing, 28)
+        .padding(.leading, 24)
+        .padding(.trailing, 24)
         .padding(.top, 6)
     }
 }

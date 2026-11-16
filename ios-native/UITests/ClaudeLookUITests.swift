@@ -127,6 +127,9 @@ final class ClaudeLookUITests: XCTestCase {
         let app = launch("sidebar")
         let all = app.buttons["sidebar.all"].firstMatch
         XCTAssertTrue(all.waitForExistence(timeout: 10))
+        // «Показать все» — в конце списка, под нижними кнопками шторки: сначала долистать.
+        app.swipeUp()
+        sleep(1)
         all.tap()
         let field = element(app, "recents.search")
         XCTAssertTrue(field.waitForExistence(timeout: 5))
