@@ -100,7 +100,11 @@ final class ComposerUITests: XCTestCase {
         sleep(1)
         snap("ui-c4-card")
         // Пустая карточка сворачивается после ухода клавиатуры и раскрывается повторно.
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
+        // Клавиатуру убирает свайп вниз по ленте: касание в точку попадало в таблицу ответа,
+        // её прокрутка съедала касание, и тест падал через раз (run 43783145183).
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+            .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)))
         let closed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: chip)
         wait(for: [closed], timeout: 5)
         input.tap()

@@ -276,8 +276,22 @@ private struct TableBlockView: View {
 
     var body: some View {
         let columns = widths
+        // Чуть шире ответа — сначала сужаем широкие столбцы (текст переносится), и только если
+        // не влезает и так — прокрутка вбок (в 0.15.0 таблица на 2 pt шире экрана уходила в прокрутку,
+        // а прокрутка съедала касание, которым убирают клавиатуру).
+        ViewThatFits(in: .horizontal) {
+            grid(columns)
+            grid(Self.squeezed(columns, to: 0.85))
+            grid(Self.squeezed(columns, to: 0.7))
+            ScrollView(.horizontal, showsIndicators: false) { grid(columns) }
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func grid(_ columns: [CGFloat]) -> some View {
         let total = columns.reduce(0, +)
-        let grid = VStack(alignment: .leading, spacing: 0) {
+        return VStack(alignment: .leading, spacing: 0) {
             TableLine(cells: header, widths: columns, isHeader: true)
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 Rectangle().fill(Theme.line).frame(width: total, height: 1)
@@ -288,13 +302,11 @@ private struct TableBlockView: View {
         .background(Theme.surface.opacity(0.55), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
 
-        ViewThatFits(in: .horizontal) {
-            grid
-            ScrollView(.horizontal, showsIndicators: false) { grid }
-                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    /// Сжатые ширины: каждый столбец теряет часть ширины сверх минимума, узкие не меняются.
+    static func squeezed(_ columns: [CGFloat], to factor: CGFloat) -> [CGFloat] {
+        columns.map { width in max(minColumn, minColumn + (width - minColumn) * factor).rounded(.down) }
     }
 }
 
