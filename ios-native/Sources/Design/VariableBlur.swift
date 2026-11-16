@@ -28,16 +28,18 @@ final class VariableBlurUIView: UIVisualEffectView {
     }
 }
 
-/// Маска размытия: сверху непрозрачно (первая треть почти полностью), книзу — прозрачно.
+/// Маска размытия: сверху непрозрачно (до 60% высоты почти полностью), книзу — прозрачно.
 final class GradientMaskView: UIView {
     override class var layerClass: AnyClass { CAGradientLayer.self }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         guard let gradient = layer as? CAGradientLayer else { return }
-        gradient.colors = [UIColor.black.cgColor, UIColor.black.withAlphaComponent(0.85).cgColor,
+        // Полная сила до 60% высоты: у Claude текст на уровне часов размыт целиком, а чётким становится
+        // уже у кнопок шапки (при 35% «python» под часами читался, снимки 0.15.0 (30)).
+        gradient.colors = [UIColor.black.cgColor, UIColor.black.withAlphaComponent(0.92).cgColor,
                            UIColor.black.withAlphaComponent(0).cgColor]
-        gradient.locations = [0, 0.35, 1]
+        gradient.locations = [0, 0.6, 1]
         gradient.startPoint = CGPoint(x: 0.5, y: 0)
         gradient.endPoint = CGPoint(x: 0.5, y: 1)
     }
