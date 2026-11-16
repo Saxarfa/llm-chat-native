@@ -80,13 +80,14 @@ struct ChatBranch: Identifiable, Equatable {
 
 struct ModelOption: Identifiable, Equatable {
     enum Group: Int, CaseIterable {
-        case local, phone, studio
+        case local, phone, studio, hosted
 
         var title: String {
             switch self {
             case .local: return "Локальные"
             case .phone: return "На телефоне"
             case .studio: return "AI Studio"
+            case .hosted: return "API"
             }
         }
     }
@@ -96,6 +97,40 @@ struct ModelOption: Identifiable, Equatable {
     let group: Group
     /// Локальная модель уже загружена в память.
     let loaded: Bool
+}
+
+/// Бесплатные OpenAI-совместимые сервисы (`hosted_providers.py`, на сайте — вкладка «API» и
+/// `hostedProviders`/`hostedName` в `domain.ts`): модель — `<сервис>/<id каталога>`.
+/// Ключи и выбор моделей настраиваются на сайте; приложение только показывает включённые модели.
+enum HostedService: String, CaseIterable {
+    case nvidia, openrouter, groq
+
+    var title: String {
+        switch self {
+        case .nvidia: return "NVIDIA"
+        case .openrouter: return "OpenRouter"
+        case .groq: return "Groq"
+        }
+    }
+
+    static func of(_ id: String) -> HostedService? {
+        allCases.first { id.hasPrefix($0.rawValue + "/") }
+    }
+
+    /// Как `hosted_providers.display_name`: «openrouter/nvidia/nemotron-3-ultra-550b-a55b:free» →
+    /// «Nemotron 3 Ultra 550B A55B».
+    static func name(_ id: String) -> String {
+        let last = id.split(separator: "/").last.map(String.init) ?? id
+        var name = String(last.split(separator: ":", maxSplits: 1).first ?? Substring(last))
+        name = name.replacingOccurrences(of: "-", with: " ").replacingOccurrences(of: "_", with: " ")
+        name = name.replacingOccurrences(of: "\\b(\\d+(?:\\.\\d+)?)b\\b", with: "$1B",
+                                         options: [.regularExpression, .caseInsensitive])
+        name = name.replacingOccurrences(of: "\\ba(\\d+)b\\b", with: "A$1B", options: [.regularExpression, .caseInsensitive])
+        let upper: Set<String> = ["gpt", "oss", "it", "vl", "moe", "r1"]
+        return name.split(whereSeparator: \.isWhitespace).map { word in
+            upper.contains(word.lowercased()) ? word.uppercased() : word.prefix(1).uppercased() + word.dropFirst()
+        }.joined(separator: " ")
+    }
 }
 
 /// Перенос логики сайта (`frontend/src/domain.ts`, `store.ts: inferencePayload`):
@@ -179,12 +214,14 @@ enum ChatConfig {
     static func group(of id: String) -> ModelOption.Group {
         if PhoneModelID.isPhone(id) { return .phone }
         if id.hasPrefix("aistudio/") { return .studio }
+        if HostedService.of(id) != nil { return .hosted }
         return .local
     }
 
     static func modelName(_ id: String, profiles: [String: Any]) -> String {
         if let alias = text(dict(profiles[id])["alias"]) { return alias }
         if PhoneModelID.isPhone(id) { return PhoneModelNames.display(id) }
+        if HostedService.of(id) != nil { return HostedService.name(id) }
 
         if id.hasPrefix("aistudio/") {
             return studioNames[id] ?? String(id.dropFirst("aistudio/".count))
@@ -216,6 +253,14 @@ enum ChatConfig {
     private static func modelDefaults(_ model: String) -> [String: Any] {
         if model.hasPrefix("aistudio/") {
             return ["temperature": 1, "top_p": 0.95, "top_k": 64, "thinking": true, "max_tokens": -1]
+        }
+        // Облачные сервисы, как `modelDefaults` в `domain.ts`: Groq — без штрафов (отвергает лишние поля).
+        if model.hasPrefix("groq/") {
+            return ["temperature": 0.6, "top_p": 0.95, "thinking": true, "max_tokens": -1]
+        }
+        if HostedService.of(model) != nil {
+            return ["temperature": 0.6, "top_p": 0.95, "presence_penalty": 0, "frequency_penalty": 0,
+                    "thinking": true, "max_tokens": -1]
         }
         switch model {
         case "gemma-12b-uncensored":
@@ -317,7 +362,7 @@ enum ChatConfig {
 
         let mode = text(over["searchMode"]) ?? text(shared["searchMode"]) ?? "auto"
         var thinking = true
-        if toggleModels.contains(model) {
+        if toggleModels.contains(model) || HostedService.of(model) != nil {
             thinking = (values["thinking"] as? Bool) ?? (over["thinking"] as? Bool) ?? true
         }
 

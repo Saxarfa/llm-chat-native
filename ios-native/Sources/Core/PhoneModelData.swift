@@ -100,6 +100,12 @@ struct HFFile: Identifiable, Equatable {
         guard name.hasSuffix(".gguf") else { return false }
         if name.contains("mmproj") { return false }
         if name.range(of: #"-\d{5}-of-\d{5}\.gguf$"#, options: .regularExpression) != nil { return false }
+        // Отдельные «головы» MTP (`MTP/mtp-gemma-4-…gguf`, ~77 МБ) — не модель: сами по себе не отвечают
+        // (снимок пользователя 16.11.2026: их предлагали скачать как Q4_0). Модели со встроенным MTP
+        // (`…-MTP-Q4_K_M.gguf`) остаются.
+        if name.hasPrefix("mtp-") || name.hasPrefix("mtp_") { return false }
+        let folders = (path as NSString).deletingLastPathComponent.lowercased().split(separator: "/")
+        if folders.contains(where: { $0 == "mtp" }) { return false }
         return true
     }
 }
@@ -123,6 +129,9 @@ enum PhoneModelNames {
         if let quant = quant(file), let range = name.range(of: quant, options: [.caseInsensitive, .backwards]) {
             name.removeSubrange(range)
         }
+        // Разделитель перед квантованием может быть и точкой («Qwen3.5-9B.Q4_K_M.gguf»): без этого
+        // в имени оставалась точка — «Qwen3.5 9B. · Q4_K_M» (снимок пользователя 16.11.2026).
+        name = name.trimmingCharacters(in: CharacterSet(charactersIn: "-_. "))
         name = name.replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ")
         name = name.split(separator: " ").joined(separator: " ")
         return name.isEmpty ? file : name

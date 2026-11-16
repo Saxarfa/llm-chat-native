@@ -21,7 +21,27 @@ final class AppModel {
     var chatsError: String?
     /// Ошибка действия над чатом в шторке (переименование, закрепление, удаление).
     var chatsNotice: String?
-    var activeChatID: String?
+    var activeChatID: String? {
+        didSet {
+            guard oldValue != activeChatID else { return }
+            // Ушли из сессии «Инкогнито» — она закрывается на сервере и больше не открывается (как на сайте).
+            if let old = oldValue, chats.first(where: { $0.id == old })?.temporary == true {
+                closeTemporary(old)
+                incognito = false
+            }
+            markSeen()
+        }
+    }
+    /// «Инкогнито» для новой сессии: первый вопрос создаст временную сессию сервера,
+    /// которая не попадает в историю, память и поиск (`POST /api/temporary-chats`).
+    var incognito = false
+    /// Сессии, ответ в которых пришёл, пока их не открывали: синяя точка в шторке и «Недавних».
+    var unread: Set<String> = Set(UserDefaults.standard.stringArray(forKey: AppModel.unreadKey) ?? []) {
+        didSet {
+            guard preview == nil, unread != oldValue else { return }
+            UserDefaults.standard.set(Array(unread), forKey: AppModel.unreadKey)
+        }
+    }
 
     enum ThreadState: Equatable {
         case idle, loading, loaded, failed(String)
@@ -89,7 +109,9 @@ final class AppModel {
     /// Базы знаний аккаунта (для выбора в «Параметрах чата»).
     var knowledgeLibraries: [KnowledgeLibrary] = []
     /// Что открыто справа от шторки: чат или студия картинок.
-    var screen: MainScreen = .chat
+    var screen: MainScreen = .chat {
+        didSet { if screen != oldValue { markSeen() } }
+    }
     /// Тема (Настройки → Внешний вид). В режиме снимков не сохраняется.
     var appearance: Appearance = .dark {
         didSet {
@@ -139,8 +161,12 @@ final class AppModel {
     @ObservationIgnored var pendingFinish: [String: (chat: [String: Any]?, notify: Bool)] = [:]
     @ObservationIgnored var lastEventAt: [String: Date] = [:]
     @ObservationIgnored var watching: Set<String> = []
+    /// Сессии, в которых ответ запросили с этого телефона: только их готовый ответ отмечается
+    /// непрочитанным (ответы, начатые на сайте, точку не ставят).
+    @ObservationIgnored var askedHere: Set<String> = []
 
     static let draftModelKey = "draft_model"
+    static let unreadKey = "unread_chats"
 
     private static let serverKey = "server_url"
     private static let tokenKey = "token"
@@ -159,6 +185,16 @@ final class AppModel {
 
     var activeChat: ChatSummary? {
         chats.first { $0.id == activeChatID }
+    }
+
+    /// Сессии для шторки, «Недавних» и поиска — без временной («Инкогнито»).
+    var listedChats: [ChatSummary] {
+        chats.filter { !$0.temporary }
+    }
+
+    /// Открыта сессия «Инкогнито» или новая сессия в этом режиме.
+    var incognitoMode: Bool {
+        activeChatID == nil ? incognito : activeChat?.temporary == true
     }
 
     /// Адрес без схемы — для подписи на экране входа.
@@ -244,6 +280,9 @@ final class AppModel {
         pendingFinish = [:]
         lastEventAt = [:]
         watching = []
+        askedHere = []
+        incognito = false
+        unread = []
         chatMeta = [:]
         draftOverrides = [:]
         imageCatalog = [:]
@@ -291,12 +330,17 @@ final class AppModel {
             // иначе вопрос исчезал и открывался пустой чат (баг 13.11.2026).
             let known = Set(fresh.map(\.id))
             let now = Date().timeIntervalSince1970 * 1000
+            // Временную сессию («Инкогнито») сервер в списке не отдаёт — она остаётся, пока открыта.
             let creating = chats.filter { chat in
                 !known.contains(chat.id)
-                    && (lives[chat.id] != nil || (chat.id == activeChatID && now - chat.updatedAt < 120_000))
+                    && (chat.temporary || lives[chat.id] != nil
+                        || (chat.id == activeChatID && now - chat.updatedAt < 120_000))
             }
             chats = creating + fresh
             chatsError = nil
+            // Точки у сессий, которых больше нет (удалены на сайте), не копятся.
+            let alive = Set(chats.map(\.id))
+            if !unread.isSubset(of: alive) { unread = unread.intersection(alive) }
             if let active = activeChatID, !chats.contains(where: { $0.id == active }) {
                 activeChatID = nil
             }
@@ -337,7 +381,7 @@ final class AppModel {
         case .chat, .sidebar, .thread, .threadTop, .streaming, .models, .media, .parameters, .nano, .settings,
              .branches, .memory, .knowledge, .omni, .studio, .studioSettings, .studioHistory, .studioArt,
              .phoneModels, .phoneChat, .phoneSettings, .phoneParameters, .tools, .queue,
-             .recents, .light, .settingsLight, .computer, .modelProfile:
+             .recents, .light, .settingsLight, .computer, .modelProfile, .incognito, .sources:
             user = PreviewScene.user
             chats = PreviewScene.chats
             models = PreviewScene.modelOptions
@@ -362,6 +406,16 @@ final class AppModel {
                 draftAttachments = PreviewScene.mediaDraft()
             }
             if scene == .recents { screen = .recents }
+            // Точка «новый ответ» у второй сессии — в шторке и на «Недавних».
+            if scene == .sidebar || scene == .recents, chats.count > 2 { unread = [chats[2].id] }
+            if scene == .incognito { incognito = true }
+            if scene == .sources {
+                activeChatID = "7"
+                thread = PreviewScene.sourcesFeed
+                threadState = .loaded
+                threadChatID = "7"
+                chatMeta["7"] = ChatMeta(overrides: ["searchMode": "auto"], branch: "main")
+            }
             if [.thread, .threadTop, .streaming, .tools, .queue, .light].contains(scene) {
                 activeChatID = "7"
                 thread = scene == .streaming || scene == .queue ? Array(PreviewScene.feed.prefix(3)) : PreviewScene.feed

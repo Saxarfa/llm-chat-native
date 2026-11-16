@@ -17,7 +17,7 @@ struct ModelSettingsSheet: View {
                     ModelParameters(modelID: id)
                 }
                 .id(id)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, RowMetrics.plainLeading)
                 .padding(.bottom, 32)
                 // Без «нажатия по пустому месту»: оно срабатывало и от нажатия по полю ввода
                 // и сразу прятало клавиатуру. Клавиатура уходит, если потянуть список.
@@ -267,7 +267,7 @@ private struct PhoneAbilitiesSection: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Зрение")
-                        .font(.system(size: 16))
+                        .font(.system(size: RowMetrics.text))
                         .foregroundStyle(Theme.ink)
                     Text(sees ? "Видит картинки из вопроса" : fetching ? "Скачиваю файл зрения…" : "Понимает только текст")
                         .font(.system(size: 13))
@@ -289,7 +289,7 @@ private struct PhoneAbilitiesSection: View {
                     .accessibilityIdentifier("phone.vision.add")
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, RowMetrics.plainLeading)
             .frame(minHeight: 58)
         }
         if !hasMTP {

@@ -80,7 +80,7 @@ struct KnowledgeSheet: View {
                                             .frame(width: 22)
                                         VStack(alignment: .leading, spacing: 3) {
                                             Text(library.name)
-                                                .font(.system(size: 16))
+                                                .font(.system(size: RowMetrics.text))
                                                 .foregroundStyle(Theme.ink)
                                                 .lineLimit(1)
                                             Text(Plural.knowledge(library.documents, .document))
@@ -92,7 +92,7 @@ struct KnowledgeSheet: View {
                                             .font(.system(size: 13, weight: .semibold))
                                             .foregroundStyle(Theme.subtle)
                                     }
-                                    .padding(.horizontal, 16)
+                                    .padding(.horizontal, RowMetrics.plainLeading)
                                     .frame(minHeight: 60)
                                     .contentShape(Rectangle())
                                 }
@@ -107,7 +107,7 @@ struct KnowledgeSheet: View {
                         creating = true
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, RowMetrics.plainLeading)
                 .padding(.bottom, 32)
             }
         }
@@ -168,26 +168,10 @@ private struct LibraryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 4) {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(PressScaleStyle())
-                .accessibilityLabel("Все базы")
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(library.name)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                        .lineLimit(1)
-                    Text(Plural.knowledge(documents?.count ?? library.documents, .document))
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.muted)
-                }
-                Spacer()
+            // Шапка как у Claude: круглая «‹», название базы по центру, «⋯» в стеклянном круге справа.
+            SheetBar(title: library.name, subtitle: Plural.knowledge(documents?.count ?? library.documents, .document),
+                     symbol: "chevron.left", label: "Все базы", action: onBack) {
+                HStack(spacing: 6) {
                 if busy {
                     ProgressView().controlSize(.small).tint(Theme.muted)
                 }
@@ -205,18 +189,15 @@ private struct LibraryView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(Theme.ink)
-                        .frame(width: 40, height: 40)
-                        .background(Theme.fill, in: Circle())
-                        .frame(width: 44, height: 44)
+                        .font(.system(size: Theme.headerGlyph, weight: .medium))
+                        .foregroundStyle(Theme.ink.opacity(0.92))
+                        .frame(width: Theme.headerButton, height: Theme.headerButton)
+                        .glassChrome(Circle())
+                        .contentShape(Circle())
                 }
                 .accessibilityLabel("Действия с базой")
+                }
             }
-            .padding(.leading, 8)
-            .padding(.trailing, 14)
-            .padding(.top, 20)
-            .padding(.bottom, 10)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -244,7 +225,7 @@ private struct LibraryView: View {
                             .frame(maxWidth: .infinity, minHeight: 100)
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, RowMetrics.plainLeading)
                 .padding(.bottom, 32)
             }
         }
@@ -312,7 +293,7 @@ private struct LibraryView: View {
                 .padding(.trailing, 8)
             VStack(alignment: .leading, spacing: 3) {
                 Text(document.title)
-                    .font(.system(size: 16))
+                    .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(2)
                 HStack(spacing: 6) {
@@ -442,7 +423,7 @@ private struct NoteEditor: View {
                 .foregroundStyle(canSave ? Theme.ink : Theme.subtle)
                 .disabled(!canSave)
             }
-            .font(.system(size: 16))
+            .font(.system(size: RowMetrics.text))
             .frame(minHeight: 44)
             .padding(.top, 14)
 
@@ -456,13 +437,13 @@ private struct NoteEditor: View {
             ZStack(alignment: .topLeading) {
                 if text.isEmpty {
                     Text("Текст заметки. Поддерживается Markdown.")
-                        .font(.system(size: 16))
+                        .font(.system(size: RowMetrics.text))
                         .foregroundStyle(Theme.subtle)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 14)
                 }
                 TextEditor(text: $text)
-                    .font(.system(size: 16))
+                    .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
                     .scrollContentBackground(.hidden)
                     .padding(.horizontal, 9)
@@ -471,7 +452,7 @@ private struct NoteEditor: View {
             .frame(maxHeight: .infinity)
             .background(Theme.fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, RowMetrics.plainLeading)
         .padding(.bottom, 16)
         .presentationDetents([.large])
         .presentationBackground(Theme.sheet)

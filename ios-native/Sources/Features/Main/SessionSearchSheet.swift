@@ -17,8 +17,8 @@ struct SessionSearchSheet: View {
     private var text: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private var results: [ChatSummary] {
-        guard !text.isEmpty else { return Array(model.chats.prefix(Self.recentLimit)) }
-        return model.chats.filter { $0.title.localizedCaseInsensitiveContains(text) }
+        guard !text.isEmpty else { return Array(model.listedChats.prefix(Self.recentLimit)) }
+        return model.listedChats.filter { $0.title.localizedCaseInsensitiveContains(text) }
     }
 
     var body: some View {
@@ -27,10 +27,10 @@ struct SessionSearchSheet: View {
             HStack(spacing: 10) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 14))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(Theme.subtle)
                     TextField("", text: $query, prompt: Text("Поиск по сессиям").foregroundStyle(Theme.subtle))
-                        .font(.system(size: 16))
+                        .font(.system(size: 17))
                         .foregroundStyle(Theme.ink)
                         .focused($focused)
                         .submitLabel(.search)
@@ -61,19 +61,20 @@ struct SessionSearchSheet: View {
                 }
             }
             .animation(Theme.morph, value: query.isEmpty)
-            .padding(.leading, 14)
-            .padding(.trailing, 10)
+            .padding(.leading, 12)
+            .padding(.trailing, 12)
             .padding(.top, 18)
             .padding(.bottom, 6)
 
+            // Как у Claude: строки 48 pt, значок с центром в 36 pt, текст с 60 pt от края.
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     if text.isEmpty, !list.isEmpty {
                         Text("Недавние")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Theme.subtle)
-                            .padding(.horizontal, 8)
-                            .padding(.top, 14)
+                            .font(.system(size: 15))
+                            .foregroundStyle(Theme.caption)
+                            .padding(.horizontal, 10)
+                            .padding(.top, 12)
                             .padding(.bottom, 6)
                     }
                     if list.isEmpty {
@@ -90,9 +91,10 @@ struct SessionSearchSheet: View {
                             onOpen(chat)
                             dismiss()
                         } label: {
-                            ChatRowLabel(chat: chat)
-                                .padding(.horizontal, 8)
-                                .frame(minHeight: 50)
+                            ChatRowLabel(chat: chat, gap: 11)
+                                .padding(.leading, 9)
+                                .padding(.trailing, 8)
+                                .frame(minHeight: 48)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                         }

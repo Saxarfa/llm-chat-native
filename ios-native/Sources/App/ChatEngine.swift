@@ -59,7 +59,10 @@ extension AppModel {
         ]
         async let local = try? await api.json("/api/inference/probe", method: "POST", body: probe)
         async let studio = try? await api.json("/api/providers/aistudio")
-        let answers = await [local, studio]
+        // Включённые на сайте модели NVIDIA, OpenRouter и Groq (`hosted_providers.py`).
+        async let hosted = try? await api.json("/api/providers/hosted")
+        // Порядок важен: [0] — модели ПК, [1] — AI Studio (её список картинок ниже берётся по индексу 1).
+        let answers = await [local, studio, hosted]
 
         var entries: [[String: Any]] = []
         var catalog: [String: [String: Any]] = [:]
@@ -93,7 +96,7 @@ extension AppModel {
         if !result.isEmpty || answers.contains(where: { $0 != nil }) {
             models = result
         }
-        // Список картинок AI Studio — во втором ответе (после удаления «Подписки»/Gemini Web их два).
+        // Список картинок AI Studio — во втором ответе ([1]); третий — облачные сервисы, у них картинок нет.
         if answers[1] != nil { imageCatalog = catalog }
     }
 
@@ -254,7 +257,19 @@ extension AppModel {
                 return false
             }
         }
-        let isNew = activeChatID == nil
+        var isNew = activeChatID == nil
+        if isNew, incognito {
+            // «Инкогнито» — временная сессия сервера; модели телефона и работа без ПК её не знают.
+            guard !onPhone, !offline else {
+                sendError = onPhone
+                    ? "Инкогнито работает с моделями компьютера и облака. Выключите режим или выберите другую модель."
+                    : "Инкогнито недоступно без связи с ПК."
+                Haptics.error()
+                return false
+            }
+            guard await startTemporary(model: activeModelID) != nil else { return false }
+            isNew = false
+        }
         let id = activeChatID ?? "chat_" + UUID().uuidString.lowercased()
         guard lives[id] == nil else { return false }
 
@@ -310,6 +325,7 @@ extension AppModel {
             _ = try await api.json("/api/chat/generate", method: "POST", body: body, timeout: 60)
             lives[id]?.sending = false
             lastEventAt[id] = Date()
+            askedHere.insert(id)
             if eventsTask == nil { restartEvents() }
             watch(id)
             return true
@@ -398,6 +414,7 @@ extension AppModel {
             let answer = try await api.json(path, method: "POST", body: body, timeout: 60)
             lives[id]?.sending = false
             lastEventAt[id] = Date()
+            askedHere.insert(id)
             if let chat = answer["chat"] as? [String: Any] { await apply(chat: chat, to: id) }
             if eventsTask == nil { restartEvents() }
             watch(id)
@@ -534,6 +551,7 @@ extension AppModel {
         switch type {
         case "chat_deleted":
             store.remove(id)
+            unread.remove(id)
             chats.removeAll { $0.id == id }
             lives[id] = nil
             liveRaw[id] = nil
@@ -595,6 +613,11 @@ extension AppModel {
         let wasLive = lives[id] != nil
         lives[id] = nil
         liveRaw[id] = nil
+        if notify, wasLive, error == nil {
+            markUnreadIfHidden(id)
+        } else if !notify {
+            askedHere.remove(id)
+        }
         if let index = chats.firstIndex(where: { $0.id == id }), index != 0, !chats[index].pinned {
             let item = chats.remove(at: index)
             chats.insert(item, at: 0)

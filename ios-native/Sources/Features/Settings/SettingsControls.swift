@@ -1,61 +1,95 @@
 import SwiftUI
 
-/// Заголовок шторки настроек.
+/// Размеры строк и карточек в шторках — замер снимков приложения Claude 16.11.2026 (3 px = 1 pt):
+/// текст 17 pt, строка настроек ~52 pt, строка меню «+» ~54 pt, значок ~19 pt с центром в 32 pt
+/// от края карточки, текст — в 60 pt от края, карточка в 20 pt от края экрана.
+/// Толщину текста по снимкам не сравнивать: они сняты с системным «Жирным шрифтом».
+enum RowMetrics {
+    static let height: CGFloat = 52
+    static let toolHeight: CGFloat = 54
+    static let text: CGFloat = 17
+    static let icon: CGFloat = 19
+    static let iconFrame: CGFloat = 28
+    /// От края карточки до рамки значка; рамка 28 → центр значка в 32 pt.
+    static let leading: CGFloat = 18
+    /// Рамка значка → текст: текст начинается в 60 pt от края карточки.
+    static let iconGap: CGFloat = 14
+    /// Строка без значка.
+    static let plainLeading: CGFloat = 20
+    static let trailing: CGFloat = 20
+    /// Линия между строками со значком начинается от текста.
+    static let textInset: CGFloat = 60
+    static let cardRadius: CGFloat = 26
+    /// Отступ карточек от краёв шторки.
+    static let cardInset: CGFloat = 20
+    static let chevron: CGFloat = 14
+}
+
+/// Шапка шторки — та же, что `SheetBar`: круглая ✕ слева, заголовок по центру (как у Claude),
+/// под ним — подзаголовок, справа — индикатор загрузки. Закрывает окно, в котором стоит.
 struct SheetHeader: View {
     let title: String
     var subtitle: String?
     var busy = false
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 3) {
+        SheetBar(title: title, subtitle: subtitle, symbol: "xmark", label: "Закрыть", action: { dismiss() }) {
+            if busy {
+                ProgressView().controlSize(.small).tint(Theme.muted)
+                    .frame(width: Theme.headerButton, height: Theme.headerButton)
+            }
+        }
+    }
+}
+
+/// Шапка шторки, как у Claude: стеклянный круг 44 pt слева (✕ или ‹) в 20 pt от края,
+/// заголовок 17 pt по центру, справа — своя кнопка. Центр кнопок — в 42 pt от верха шторки.
+/// Без подложки: содержимое уходит под неё и затухает.
+struct SheetBar<Trailing: View>: View {
+    let title: String
+    var subtitle: String?
+    let symbol: String
+    let label: String
+    let action: () -> Void
+    let trailing: Trailing
+
+    init(title: String, subtitle: String? = nil, symbol: String, label: String, action: @escaping () -> Void,
+         @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.subtitle = subtitle
+        self.symbol = symbol
+        self.label = label
+        self.action = action
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        ZStack {
+            VStack(spacing: 1) {
                 Text(title)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.ink)
-                if let subtitle {
+                    .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
+                if let subtitle, !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(.system(size: 14))
+                        .font(.system(size: 13))
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                 }
             }
-            Spacer()
-            if busy {
-                ProgressView().controlSize(.small).tint(Theme.muted)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 26)
-        .padding(.bottom, 12)
-    }
-}
-
-/// Шапка шторки, как у Claude: круглая кнопка слева, заголовок по центру, справа — своя кнопка.
-/// Без подложки: содержимое уходит под неё и затухает.
-struct SheetBar<Trailing: View>: View {
-    let title: String
-    let symbol: String
-    let label: String
-    let action: () -> Void
-    @ViewBuilder let trailing: Trailing
-
-    var body: some View {
-        ZStack {
-            Text(title)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Theme.ink)
-                .lineLimit(1)
-                .padding(.horizontal, 52)
-                .accessibilityAddTraits(.isHeader)
+            .padding(.horizontal, Theme.headerButton + 14)
             HStack {
                 CircleIconButton(symbol: symbol, label: label, action: action)
                 Spacer()
                 trailing
             }
         }
-        .padding(.horizontal, 15)
-        .padding(.top, 14)
-        .padding(.bottom, 8)
+        .frame(minHeight: Theme.headerButton)
+        .padding(.horizontal, Theme.headerInset)
+        .padding(.top, 20)
+        .padding(.bottom, 10)
         .background(alignment: .top) {
             Theme.fade(Theme.sheet, from: .top)
                 .padding(.bottom, -14)
@@ -66,8 +100,8 @@ struct SheetBar<Trailing: View>: View {
 }
 
 extension SheetBar where Trailing == EmptyView {
-    init(title: String, symbol: String, label: String, action: @escaping () -> Void) {
-        self.init(title: title, symbol: symbol, label: label, action: action) { EmptyView() }
+    init(title: String, subtitle: String? = nil, symbol: String, label: String, action: @escaping () -> Void) {
+        self.init(title: title, subtitle: subtitle, symbol: symbol, label: label, action: action) { EmptyView() }
     }
 }
 
@@ -80,33 +114,34 @@ struct SettingsCard<Content: View>: View {
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: RowMetrics.cardRadius, style: .continuous))
     }
 }
 
-/// Линия между строками карточки; у строк со значком начинается от текста (`inset: 53`).
+/// Линия между строками карточки; у строк со значком начинается от текста (`RowMetrics.textInset`).
 struct CardDivider: View {
-    var inset: CGFloat = 16
+    var inset: CGFloat = RowMetrics.plainLeading
 
     var body: some View {
         Rectangle()
             .fill(Theme.line)
             .frame(height: 1)
             .padding(.leading, inset)
-            .padding(.trailing, 16)
+            .padding(.trailing, RowMetrics.trailing)
     }
 }
 
-/// Подпись над группой.
+/// Подпись над группой («Аккаунт», «Приложение»): у Claude 15 pt вторичным цветом, в 20 pt от края карточки.
 struct SectionCaption: View {
     let text: String
 
     var body: some View {
         Text(text)
-            .font(.system(size: 12.5))
-            .foregroundStyle(Theme.subtle)
-            .padding(.horizontal, 18)
-            .padding(.top, 10)
+            .font(.system(size: 15))
+            .foregroundStyle(Theme.muted)
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
+            .padding(.bottom, 2)
     }
 }
 
@@ -142,9 +177,23 @@ struct ValueRow: View {
                 .foregroundStyle(Theme.muted)
                 .lineLimit(1)
         }
-        .font(.system(size: 16))
-        .padding(.horizontal, 16)
-        .frame(minHeight: 46)
+        .font(.system(size: RowMetrics.text))
+        .padding(.horizontal, RowMetrics.plainLeading)
+        .frame(minHeight: RowMetrics.height)
+    }
+}
+
+/// Значок строки карточки, как у Claude: ~19 pt в рамке 28 (центр в 32 pt от края карточки).
+struct RowIcon: View {
+    let symbol: String
+    var enabled = true
+    var tint: Color?
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: RowMetrics.icon, weight: .regular))
+            .foregroundStyle(tint ?? (enabled ? Theme.ink.opacity(0.92) : Theme.subtle))
+            .frame(width: RowMetrics.iconFrame)
     }
 }
 
@@ -161,20 +210,17 @@ struct ToggleRow: View {
             Haptics.tap()
             onChange(value)
         })) {
-            HStack(spacing: 14) {
+            HStack(spacing: RowMetrics.iconGap) {
                 if let symbol {
-                    Image(systemName: symbol)
-                        .font(.system(size: 15, weight: .light))
-                        .foregroundStyle(Theme.ink.opacity(0.9))
-                        .frame(width: 22)
+                    RowIcon(symbol: symbol)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 16))
+                        .font(.system(size: RowMetrics.text))
                         .foregroundStyle(Theme.ink)
                     if let hint {
                         Text(hint)
-                            .font(.system(size: 12.5))
+                            .font(.system(size: 13))
                             .foregroundStyle(Theme.subtle)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -182,10 +228,10 @@ struct ToggleRow: View {
             }
         }
         .tint(Theme.accent)
-        .padding(.leading, symbol == nil ? 16 : 17)
-        .padding(.trailing, 16)
+        .padding(.leading, symbol == nil ? RowMetrics.plainLeading : RowMetrics.leading)
+        .padding(.trailing, RowMetrics.trailing)
         .padding(.vertical, 8)
-        .frame(minHeight: 46)
+        .frame(minHeight: symbol == nil ? RowMetrics.height : RowMetrics.toolHeight)
     }
 }
 
@@ -203,7 +249,7 @@ struct ChoiceRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(title)
-                .font(.system(size: 16))
+                .font(.system(size: RowMetrics.text))
                 .foregroundStyle(Theme.ink)
             Spacer(minLength: 8)
             Menu {
@@ -221,12 +267,12 @@ struct ChoiceRow: View {
                     }
                 }
             } label: {
-                HStack(spacing: 5) {
+                HStack(spacing: 6) {
                     Text(current)
-                        .font(.system(size: 15))
+                        .font(.system(size: RowMetrics.text))
                         .lineLimit(1)
                     Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                 }
                 .foregroundStyle(Theme.muted)
                 .frame(minHeight: 44)
@@ -235,8 +281,8 @@ struct ChoiceRow: View {
             .menuOrder(.fixed)
             .accessibilityLabel("\(title): \(current)")
         }
-        .padding(.horizontal, 16)
-        .frame(minHeight: 46)
+        .padding(.horizontal, RowMetrics.plainLeading)
+        .frame(minHeight: RowMetrics.height)
     }
 }
 
@@ -250,7 +296,7 @@ struct SegmentRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.system(size: 16))
+                .font(.system(size: RowMetrics.text))
                 .foregroundStyle(Theme.ink)
             HStack(spacing: 4) {
                 ForEach(choices) { choice in
@@ -275,7 +321,7 @@ struct SegmentRow: View {
             .padding(4)
             .background(Theme.fill, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, RowMetrics.plainLeading)
         .padding(.vertical, 12)
     }
 }
@@ -308,7 +354,7 @@ struct ParameterRow: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 2) {
                 Text(spec.label)
-                    .font(.system(size: 16))
+                    .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
                 Button {
                     withAnimation(Theme.spring) { help.toggle() }
@@ -438,7 +484,7 @@ struct ParameterRow: View {
                 .foregroundStyle(Theme.subtle)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, RowMetrics.plainLeading)
         .padding(.vertical, 12)
         .onAppear { sync(value) }
         .onChange(of: value) { _, new in sync(new) }

@@ -73,14 +73,14 @@ struct StudioScreen: View {
             CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: onMenu)
             Spacer()
             Text("Студия")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Theme.ink)
             Spacer()
             ZStack(alignment: .topTrailing) {
                 CircleIconButton(symbol: "clock.arrow.circlepath", label: "История артов") { open(.history) }
                     .accessibilityIdentifier("studio.history")
                 if !studio.completed.isEmpty {
-                    Circle().fill(Theme.ink).frame(width: 7, height: 7).offset(x: -6, y: 6)
+                    Circle().fill(Theme.ink).frame(width: 7, height: 7).offset(x: -4, y: 4)
                         .allowsHitTesting(false)
                 }
             }
@@ -89,10 +89,9 @@ struct StudioScreen: View {
                 model.screen = .chat
             }
         }
-        // Кнопки на той же высоте, что в чате: сразу под «островом».
-        .padding(.horizontal, 16)
-        .frame(height: 44)
-        .padding(.top, -6)
+        // Кнопки там же, где в чате (как у Claude): круги 44 pt, центр в 22 pt под безопасной зоной.
+        .padding(.horizontal, Theme.headerInset)
+        .frame(height: Theme.headerButton)
         .padding(.bottom, 4)
         .background(Theme.canvas)
     }

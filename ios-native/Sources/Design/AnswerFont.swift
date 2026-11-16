@@ -110,6 +110,6 @@ struct AnswerFontPicker: View {
                 .padding(.horizontal, 2)
         }
         .padding(16)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: RowMetrics.cardRadius, style: .continuous))
     }
 }

@@ -24,7 +24,7 @@ struct BranchesSheet: View {
                     }
                     SettingsNote(text: "Новая ветка появляется, когда вы меняете своё сообщение или выбираете «Новая ветка отсюда». Прежнее продолжение сохраняется в старой ветке.")
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, RowMetrics.plainLeading)
                 .padding(.bottom, 32)
             }
         }

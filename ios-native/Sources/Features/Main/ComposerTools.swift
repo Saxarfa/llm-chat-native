@@ -35,7 +35,7 @@ struct ComposerToolsSheet: View {
                         if UIImagePickerController.isSourceTypeAvailable(.camera) || model.preview != nil {
                             ToolRow(title: "Камера", symbol: "camera", enabled: !onPhone || seesImages) { pick(.camera) }
                                 .accessibilityIdentifier("tools.camera")
-                            CardDivider(inset: 53)
+                            CardDivider(inset: RowMetrics.textInset)
                         }
                         ToolRow(title: "Добавить файлы", symbol: "doc.badge.plus", enabled: !onPhone) { pick(.file) }
                             .accessibilityIdentifier("tools.file")
@@ -45,13 +45,13 @@ struct ComposerToolsSheet: View {
                     } else if !nano {
                         SettingsCard {
                             searchRow(id)
-                            CardDivider(inset: 53)
+                            CardDivider(inset: RowMetrics.textInset)
                             knowledgeRow
                         }
                         SettingsCard {
                             if let reasoning = ChatParameters.reasoning(id) {
                                 ReasoningRow(modelID: id, reasoning: reasoning)
-                                CardDivider(inset: 53)
+                                CardDivider(inset: RowMetrics.textInset)
                             }
                             ToggleRow(title: "Память", symbol: "brain",
                                       isOn: model.memoryEnabled(id)) { value in
@@ -60,7 +60,7 @@ struct ComposerToolsSheet: View {
                         }
                     }
                 }
-                .padding(.horizontal, 18)
+                .padding(.horizontal, RowMetrics.cardInset)
                 .padding(.top, 4)
                 .padding(.bottom, 24)
             }
@@ -81,26 +81,15 @@ struct ComposerToolsSheet: View {
     }
 
     private var header: some View {
-        ZStack {
-            Text("Добавление в сессию")
-                .font(.system(size: 16, weight: .semibold))
+        SheetBar(title: "Добавление в сессию", symbol: "xmark", label: "Закрыть", action: { dismiss() }) {
+            Button("Фото") { pick(.photo) }
+                .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(Theme.ink)
-            HStack {
-                CircleIconButton(symbol: "xmark", label: "Закрыть") { dismiss() }
-                Spacer()
-                Button("Фото") { pick(.photo) }
-                    .font(.system(size: 16))
-                    .foregroundStyle(Theme.ink)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .disabled(PhoneModelID.isPhone(model.activeModelID)
-                              && model.phone.visionFile(for: PhoneModelID.file(of: model.activeModelID)) == nil)
-                    .accessibilityIdentifier("tools.photo")
-            }
+                .frame(minWidth: 44, minHeight: 44)
+                .disabled(PhoneModelID.isPhone(model.activeModelID)
+                          && model.phone.visionFile(for: PhoneModelID.file(of: model.activeModelID)) == nil)
+                .accessibilityIdentifier("tools.photo")
         }
-        .padding(.leading, 15)
-        .padding(.trailing, 18)
-        .padding(.top, 14)
-        .padding(.bottom, 8)
         .background(Theme.sheet)
     }
 
@@ -151,33 +140,34 @@ struct ToolRowLabel: View {
     var value: String?
     var chevron: String? = "chevron.right"
     var enabled = true
+    /// Высота строки: в меню «+» у Claude ~54 pt, в настройках ~52.
+    var height: CGFloat = RowMetrics.toolHeight
 
     var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .light))
-                .foregroundStyle(enabled ? Theme.ink.opacity(0.9) : Theme.subtle)
-                .frame(width: 22)
+        HStack(spacing: RowMetrics.iconGap) {
+            RowIcon(symbol: symbol, enabled: enabled)
             Text(title)
-                .font(.system(size: 16))
+                .font(.system(size: RowMetrics.text))
                 .foregroundStyle(enabled ? Theme.ink : Theme.subtle)
                 .lineLimit(1)
             Spacer(minLength: 8)
-            if let value {
-                Text(value)
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.subtle)
-                    .lineLimit(1)
-            }
-            if let chevron {
-                Image(systemName: chevron)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.subtle)
+            HStack(spacing: 8) {
+                if let value {
+                    Text(value)
+                        .font(.system(size: RowMetrics.text))
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                }
+                if let chevron {
+                    Image(systemName: chevron)
+                        .font(.system(size: chevron == "chevron.right" ? RowMetrics.chevron : 12, weight: .semibold))
+                        .foregroundStyle(Theme.subtle)
+                }
             }
         }
-        .padding(.leading, 17)
-        .padding(.trailing, 16)
-        .frame(minHeight: 46)
+        .padding(.leading, RowMetrics.leading)
+        .padding(.trailing, RowMetrics.trailing)
+        .frame(minHeight: height)
         .contentShape(Rectangle())
     }
 }
@@ -210,12 +200,14 @@ private struct PhotoStrip: View {
     @State private var allowed = true
     @State private var loading: String?
 
-    private static let side: CGFloat = 90
+    /// Плитки ленты, как у Claude: ~102×105 pt почти без зазора (3 pt), скруглены только края ленты.
+    private static let width: CGFloat = 102
+    private static let height: CGFloat = 105
     private static let manager = PHCachingImageManager()
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: 3) {
                 if !allowed || (assets.isEmpty && thumbs.isEmpty) {
                     tile("Фото", symbol: "photo.on.rectangle", action: onLibrary)
                 }
@@ -230,9 +222,10 @@ private struct PhotoStrip: View {
                     }
                 }
             }
-            .padding(.horizontal, 18)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(.horizontal, RowMetrics.cardInset)
         }
-        .padding(.horizontal, -18)
+        .padding(.horizontal, -RowMetrics.cardInset)
         .modifier(DrawerFreeZone())
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.45)
@@ -249,9 +242,9 @@ private struct PhotoStrip: View {
                     .font(.system(size: 14))
             }
             .foregroundStyle(Theme.ink)
-            .frame(width: Self.side, height: Self.side)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .frame(width: Self.width, height: Self.height)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressScaleStyle())
     }
@@ -266,8 +259,8 @@ private struct PhotoStrip: View {
                         Theme.card
                     }
                 }
-                .frame(width: Self.side, height: Self.side)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .frame(width: Self.width, height: Self.height)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 if added.contains(key) || loading == key {
                     Group {
                         if loading == key {
@@ -312,7 +305,7 @@ private struct PhotoStrip: View {
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
         options.isNetworkAccessAllowed = true
-        let size = CGSize(width: Self.side * 3, height: Self.side * 3)
+        let size = CGSize(width: Self.width * 3, height: Self.height * 3)
         Self.manager.requestImage(for: asset, targetSize: size, contentMode: .aspectFill, options: options) { image, _ in
             guard let image else { return }
             DispatchQueue.main.async { thumbs[asset.localIdentifier] = image }
@@ -398,29 +391,12 @@ private struct KnowledgeChoice: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 4) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel("Назад")
-                Text("Базы знаний")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
-                Spacer()
-            }
-            .padding(.horizontal, 8)
-            .padding(.top, 12)
+            SheetBar(title: "Базы знаний", symbol: "chevron.left", label: "Назад", action: { dismiss() })
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     KnowledgePicker()
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, RowMetrics.cardInset)
                 .padding(.bottom, 24)
             }
         }
@@ -465,19 +441,19 @@ struct KnowledgePicker: View {
                             Image(systemName: chosen ? "checkmark.circle.fill" : "circle")
                                 .font(.system(size: 20))
                                 .foregroundStyle(chosen ? Theme.buttonPrimary : Theme.subtle)
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: 3) {
                                 Text(library.name)
-                                    .font(.system(size: 16))
+                                    .font(.system(size: RowMetrics.text))
                                     .foregroundStyle(Theme.ink)
                                     .lineLimit(1)
                                 Text(Plural.knowledge(library.documents, .document))
-                                    .font(.system(size: 13))
+                                    .font(.system(size: 14))
                                     .foregroundStyle(Theme.subtle)
                             }
                             Spacer()
                         }
-                        .padding(.horizontal, 16)
-                        .frame(minHeight: 56)
+                        .padding(.horizontal, RowMetrics.plainLeading)
+                        .frame(minHeight: 60)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(RowPressStyle())

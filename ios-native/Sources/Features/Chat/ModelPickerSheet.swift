@@ -8,6 +8,7 @@ struct ModelPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var path: [Page] = []
     @State private var showPhone = false
+    @State private var showSettings = false
 
     enum Page: Hashable { case reasoning, other }
 
@@ -17,12 +18,13 @@ struct ModelPickerSheet: View {
     }
 
     private var mainModels: [ModelOption] {
-        model.models.filter { $0.group != .phone && !Self.isImageModel($0.id) }
+        model.models.filter { [.studio, .local].contains($0.group) && !Self.isImageModel($0.id) }
             .sorted { $0.group.rawValue > $1.group.rawValue }   // сначала AI Studio, затем ПК
     }
 
+    /// Модели телефона, картинок и облачных сервисов (NVIDIA, OpenRouter, Groq).
     private var otherModels: [ModelOption] {
-        model.allModels.filter { $0.group == .phone || Self.isImageModel($0.id) }
+        model.allModels.filter { $0.group == .phone || $0.group == .hosted || Self.isImageModel($0.id) }
     }
 
     var body: some View {
@@ -41,6 +43,9 @@ struct ModelPickerSheet: View {
         .presentationBackground(Theme.sheet)
         .presentationCornerRadius(28)
         .task { await model.refreshModels() }
+        .sheet(isPresented: $showSettings) {
+            ModelSettingsSheet()
+        }
         .sheet(isPresented: $showPhone) {
             PhoneModelsSheet { id in
                 Task { await model.selectModel(id) }
@@ -73,14 +78,16 @@ struct ModelPickerSheet: View {
                     } else {
                         SettingsCard {
                             ForEach(Array(mainModels.enumerated()), id: \.element.id) { index, item in
-                                if index > 0 { CardDivider(inset: 16) }
+                                if index > 0 { CardDivider() }
                                 row(item)
                             }
                         }
                     }
                     if let reasoning = reasoningSummary {
                         SettingsCard {
-                            navRow(title: "Рассуждения", value: reasoning, identifier: "picker.reasoning") {
+                            navRow(title: "Рассуждения", value: reasoning.label,
+                                   badge: reasoning.recommended ? "Рекомендуется" : nil,
+                                   identifier: "picker.reasoning") {
                                 path.append(.reasoning)
                             }
                         }
@@ -91,8 +98,15 @@ struct ModelPickerSheet: View {
                             path.append(.other)
                         }
                     }
+                    // Параметры ответа выбранной модели (то же окно, что «⋯ → Настройки модели»):
+                    // в «Инкогнито» шапка без кнопки настроек, отсюда до них всегда один шаг.
+                    SettingsCard {
+                        navRow(title: "Настройки модели", value: nil, identifier: "picker.settings") {
+                            showSettings = true
+                        }
+                    }
                 }
-                .padding(.horizontal, 18)
+                .padding(.horizontal, RowMetrics.cardInset)
                 .padding(.top, 6)
                 .padding(.bottom, 24)
             }
@@ -102,19 +116,21 @@ struct ModelPickerSheet: View {
     }
 
     /// Что стоит в строке «Рассуждения»: уровень, «Вкл.»/«Выкл.» или ничего (модель не рассуждает).
-    private var reasoningSummary: String? {
+    /// `recommended` — выбран уровень по умолчанию: у Claude рядом стоит отметка «Рекомендуется».
+    private var reasoningSummary: (label: String, recommended: Bool)? {
         let id = model.activeModelID
         let config = model.modelConfig(id)
         if PhoneModelID.isPhone(id) {
             guard model.phone.infos[PhoneModelID.file(of: id)]?.thinking.canToggle == true else { return nil }
-            return (config["thinking"] as? Bool) == true ? "Вкл." : "Выкл."
+            return ((config["thinking"] as? Bool) == true ? "Вкл." : "Выкл.", false)
         }
         switch ChatParameters.reasoning(id) {
         case .toggle:
-            return (config["thinking"] as? Bool) ?? true ? "Вкл." : "Выкл."
+            return ((config["thinking"] as? Bool) ?? true ? "Вкл." : "Выкл.", false)
         case .levels(let levels):
             let value = ChatConfig.text(config["reasoning_strength"]) ?? "high"
-            return levels.first { $0.value == value }?.label ?? value
+            return (levels.first { $0.value == value }?.label ?? value,
+                    value == ChatParameters.recommendedLevel(id))
         case nil:
             return nil
         }
@@ -129,10 +145,10 @@ struct ModelPickerSheet: View {
                     SettingsCard {
                         let phone = otherModels.filter { $0.group == .phone }
                         ForEach(Array(phone.enumerated()), id: \.element.id) { index, item in
-                            if index > 0 { CardDivider(inset: 16) }
+                            if index > 0 { CardDivider() }
                             row(item)
                         }
-                        if !phone.isEmpty { CardDivider(inset: 16) }
+                        if !phone.isEmpty { CardDivider() }
                         managePhone
                     }
                     let images = otherModels.filter { Self.isImageModel($0.id) }
@@ -141,13 +157,27 @@ struct ModelPickerSheet: View {
                             .padding(.top, 10)
                         SettingsCard {
                             ForEach(Array(images.enumerated()), id: \.element.id) { index, item in
-                                if index > 0 { CardDivider(inset: 16) }
+                                if index > 0 { CardDivider() }
                                 row(item)
                             }
                         }
                     }
+                    // Облачные сервисы — по разделу на каждый, как вкладка «API» на сайте.
+                    ForEach(HostedService.allCases, id: \.self) { service in
+                        let list = otherModels.filter { HostedService.of($0.id) == service }
+                        if !list.isEmpty {
+                            SectionLabel(service.title)
+                                .padding(.top, 10)
+                            SettingsCard {
+                                ForEach(Array(list.enumerated()), id: \.element.id) { index, item in
+                                    if index > 0 { CardDivider() }
+                                    row(item)
+                                }
+                            }
+                        }
+                    }
                 }
-                .padding(.horizontal, 18)
+                .padding(.horizontal, RowMetrics.cardInset)
                 .padding(.top, 6)
                 .padding(.bottom, 24)
             }
@@ -157,28 +187,32 @@ struct ModelPickerSheet: View {
         .toolbar(.hidden, for: .navigationBar)
     }
 
-    private func navRow(title: String, value: String?, identifier: String, action: @escaping () -> Void) -> some View {
+    private func navRow(title: String, value: String?, badge: String? = nil, identifier: String,
+                        action: @escaping () -> Void) -> some View {
         Button {
             Haptics.tap()
             action()
         } label: {
             HStack(spacing: 8) {
                 Text(title)
-                    .font(.system(size: 17))
+                    .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
                 Spacer(minLength: 8)
+                if let badge {
+                    RecommendedBadge(text: badge)
+                }
                 if let value {
                     Text(value)
-                        .font(.system(size: 17))
+                        .font(.system(size: RowMetrics.text))
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                 }
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: RowMetrics.chevron, weight: .semibold))
                     .foregroundStyle(Theme.subtle)
             }
-            .padding(.horizontal, 18)
-            .frame(minHeight: 54)
+            .padding(.horizontal, RowMetrics.plainLeading)
+            .frame(minHeight: 51)
             .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())
@@ -190,24 +224,22 @@ struct ModelPickerSheet: View {
             Haptics.tap()
             showPhone = true
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "iphone")
-                    .font(.system(size: 15, weight: .light))
-                    .foregroundStyle(Theme.ink.opacity(0.9))
-                    .frame(width: 22)
+            HStack(spacing: RowMetrics.iconGap) {
+                RowIcon(symbol: "iphone")
                 Text(model.phone.installed.isEmpty ? "Скачать модель на телефон" : "Модели на телефоне")
-                    .font(.system(size: 16))
+                    .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
                 Spacer(minLength: 8)
                 if !model.phone.downloads.isEmpty {
                     ProgressView().controlSize(.small).tint(Theme.muted)
                 }
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: RowMetrics.chevron, weight: .semibold))
                     .foregroundStyle(Theme.subtle)
             }
-            .padding(.horizontal, 16)
-            .frame(minHeight: 50)
+            .padding(.leading, RowMetrics.leading)
+            .padding(.trailing, RowMetrics.trailing)
+            .frame(minHeight: RowMetrics.height)
             .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())
@@ -248,9 +280,12 @@ struct ModelPickerSheet: View {
         case .local: return item.loaded ? "На компьютере · загружена в память" : "На компьютере"
         case .phone: return "Работает на iPhone без компьютера"
         case .studio: return Self.isImageModel(item.id) ? "AI Studio · создаёт изображения" : "AI Studio"
+        case .hosted: return "\(HostedService.of(item.id)?.title ?? "API") · бесплатный API"
         }
     }
 
+    /// Строка модели, как у Claude (замер 16.11.2026): шаг 71 pt, название 17, описание 15, текст в 20 pt
+    /// от края карточки, синяя галочка у выбранной.
     private func row(_ item: ModelOption) -> some View {
         let selected = item.id == model.activeModelID
         return Button {
@@ -259,26 +294,27 @@ struct ModelPickerSheet: View {
         } label: {
             HStack(spacing: 12) {
                 // Как у Claude: название и описание без аватарки (фото модели видно на её странице в настройках).
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(item.name)
                         .font(.system(size: 17))
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
                     Text(detail(item))
-                        .font(.system(size: 14))
+                        .font(.system(size: 15))
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
                 if selected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 18, weight: .medium))
+                        .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(Theme.accent)
+                        .transition(.scale.combined(with: .opacity))
                 }
             }
-            .padding(.leading, 16)
-            .padding(.trailing, 18)
-            .frame(minHeight: 66)
+            .padding(.leading, RowMetrics.plainLeading)
+            .padding(.trailing, RowMetrics.trailing)
+            .frame(minHeight: 71)
             .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())
@@ -293,10 +329,25 @@ private struct SectionLabel: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 13))
-            .foregroundStyle(Theme.subtle)
-            .padding(.horizontal, 18)
+            .font(.system(size: 15))
+            .foregroundStyle(Theme.muted)
+            .padding(.horizontal, 20)
             .padding(.top, 6)
+    }
+}
+
+/// Серая капсула «Рекомендуется» у уровня рассуждений по умолчанию, как у Claude.
+struct RecommendedBadge: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Theme.muted)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Theme.fillActive, in: Capsule())
+            .fixedSize()
     }
 }
 
@@ -317,9 +368,10 @@ private struct ReasoningPage: View {
                         switch reasoning {
                         case .levels(let levels)?:
                             let value = ChatConfig.text(config["reasoning_strength"]) ?? "high"
+                            let recommended = ChatParameters.recommendedLevel(modelID)
                             ForEach(Array(levels.enumerated()), id: \.element.id) { index, level in
                                 if index > 0 { CardDivider() }
-                                levelRow(level, selected: level.value == value)
+                                levelRow(level, selected: level.value == value, recommended: level.value == recommended)
                             }
                         case .toggle?, nil:
                             ToggleRow(title: "Рассуждения", hint: "Больше времени на обдумывание ответа",
@@ -329,12 +381,12 @@ private struct ReasoningPage: View {
                         }
                     }
                     Text("Чем выше уровень, тем дольше модель думает перед ответом и тем точнее ответ. Действует во всех сессиях с \(model.activeModelName).")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.subtle)
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 18)
+                        .padding(.horizontal, 20)
                 }
-                .padding(.horizontal, 18)
+                .padding(.horizontal, RowMetrics.cardInset)
                 .padding(.top, 6)
                 .padding(.bottom, 24)
             }
@@ -348,25 +400,28 @@ private struct ReasoningPage: View {
         PhoneModelID.isPhone(modelID) ? .toggle : ChatParameters.reasoning(modelID)
     }
 
-    private func levelRow(_ level: Choice, selected: Bool) -> some View {
+    private func levelRow(_ level: Choice, selected: Bool, recommended: Bool) -> some View {
         Button {
             Haptics.selection()
             Task { await model.setModelValue("reasoning_strength", level.value, model: modelID) }
             back()
         } label: {
-            HStack {
+            HStack(spacing: 8) {
                 Text(level.label)
                     .font(.system(size: 17))
                     .foregroundStyle(Theme.ink)
+                if recommended {
+                    RecommendedBadge(text: "Рекомендуется")
+                }
                 Spacer()
                 if selected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 18, weight: .medium))
+                        .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(Theme.accent)
                 }
             }
-            .padding(.horizontal, 18)
-            .frame(minHeight: 52)
+            .padding(.horizontal, RowMetrics.plainLeading)
+            .frame(minHeight: 58)
             .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())

@@ -33,7 +33,7 @@ struct MemorySheet: View {
                             .frame(maxWidth: .infinity, minHeight: 120)
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, RowMetrics.plainLeading)
                 .padding(.bottom, 32)
             }
             .scrollDismissesKeyboard(.interactively)
@@ -90,7 +90,7 @@ struct MemorySheet: View {
         SettingsCard {
             HStack(alignment: .bottom, spacing: 8) {
                 TextField("Например: живу в Казани", text: $draft, axis: .vertical)
-                    .font(.system(size: 16))
+                    .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1...4)
                     .focused($typing)
@@ -138,7 +138,7 @@ struct MemorySheet: View {
         HStack(alignment: .top, spacing: 4) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(fact.text)
-                    .font(.system(size: 16))
+                    .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 let tags = [fact.scope.isEmpty ? nil : "Только в сессиях пресета",

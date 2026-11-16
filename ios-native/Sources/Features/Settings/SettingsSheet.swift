@@ -99,18 +99,18 @@ struct SettingsSheet: View {
                 SectionCaption(text: "Аккаунт")
                 SettingsCard {
                     link("Профиль", symbol: "person", page: .profile)
-                    CardDivider(inset: 53)
+                    CardDivider(inset: RowMetrics.textInset)
                     link("Компьютер", symbol: "desktopcomputer", value: model.serverLabel, page: .computer)
                 }
 
                 SectionCaption(text: "Приложение")
                 SettingsCard {
                     link("Модели", symbol: "cpu", page: .models)
-                    CardDivider(inset: 53)
+                    CardDivider(inset: RowMetrics.textInset)
                     link("Веб-поиск", symbol: "globe", value: searchModeLabel, page: .search)
-                    CardDivider(inset: 53)
+                    CardDivider(inset: RowMetrics.textInset)
                     link("Память", symbol: "brain", page: .memory)
-                    CardDivider(inset: 53)
+                    CardDivider(inset: RowMetrics.textInset)
                     Button {
                         Haptics.tap()
                         showKnowledge = true
@@ -118,7 +118,7 @@ struct SettingsSheet: View {
                         ToolRowLabel(title: "Базы знаний", symbol: "books.vertical")
                     }
                     .buttonStyle(RowPressStyle())
-                    CardDivider(inset: 53)
+                    CardDivider(inset: RowMetrics.textInset)
                     IconToggleRow(title: "Тактильный отклик", symbol: "iphone.radiowaves.left.and.right",
                                   isOn: model.haptics) { model.haptics = $0 }
                 }
@@ -134,18 +134,16 @@ struct SettingsSheet: View {
                         Haptics.tap()
                         confirmLogout = true
                     } label: {
-                        HStack(spacing: 14) {
-                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                                .font(.system(size: 15, weight: .light))
-                                .frame(width: 22)
+                        HStack(spacing: RowMetrics.iconGap) {
+                            RowIcon(symbol: "rectangle.portrait.and.arrow.right", tint: Theme.danger)
                             Text("Выйти")
-                                .font(.system(size: 16))
+                                .font(.system(size: RowMetrics.text))
                             Spacer()
                         }
                         .foregroundStyle(Theme.danger)
-                        .padding(.leading, 17)
-                        .padding(.trailing, 16)
-                        .frame(minHeight: 46)
+                        .padding(.leading, RowMetrics.leading)
+                        .padding(.trailing, RowMetrics.trailing)
+                        .frame(minHeight: RowMetrics.height)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(RowPressStyle())
@@ -153,7 +151,7 @@ struct SettingsSheet: View {
                 }
                 .padding(.top, 10)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, RowMetrics.cardInset)
             .padding(.top, 8)
             .padding(.bottom, 32)
         }
@@ -168,7 +166,7 @@ struct SettingsSheet: View {
 
     private func link(_ title: String, symbol: String, value: String? = nil, page: SettingsPage) -> some View {
         NavigationLink(value: page) {
-            ToolRowLabel(title: title, symbol: symbol, value: value)
+            ToolRowLabel(title: title, symbol: symbol, value: value, height: RowMetrics.height)
         }
         .buttonStyle(RowPressStyle())
         .accessibilityIdentifier("settings.\(String(describing: page))")
@@ -178,25 +176,27 @@ struct SettingsSheet: View {
     private var account: some View {
         SettingsCard {
             NavigationLink(value: SettingsPage.profile) {
+                // Как «Личный аккаунт» у Claude: фото 40, имя 17, ниже логин и компьютер 15 вторичным цветом.
                 HStack(spacing: 12) {
-                    AvatarView(image: model.user?.avatar, name: model.user?.shownName ?? "?", size: 38)
-                    VStack(alignment: .leading, spacing: 2) {
+                    AvatarView(image: model.user?.avatar, name: model.user?.shownName ?? "?", size: 40)
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(model.user?.shownName ?? "")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: RowMetrics.text, weight: .medium))
                             .foregroundStyle(Theme.ink)
                             .lineLimit(1)
                         Text(["@" + (model.user?.username ?? ""), model.serverLabel].filter { $0.count > 1 }.joined(separator: " · "))
-                            .font(.system(size: 12.5))
-                            .foregroundStyle(Theme.subtle)
+                            .font(.system(size: 15))
+                            .foregroundStyle(Theme.muted)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: RowMetrics.chevron, weight: .semibold))
                         .foregroundStyle(Theme.subtle)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.leading, 16)
+                .padding(.trailing, RowMetrics.trailing)
+                .padding(.vertical, 14)
                 .contentShape(Rectangle())
             }
             .buttonStyle(RowPressStyle())
@@ -244,20 +244,17 @@ struct IconToggleRow: View {
             onChange(value)
             Haptics.tap()
         })) {
-            HStack(spacing: 14) {
-                Image(systemName: symbol)
-                    .font(.system(size: 15, weight: .light))
-                    .foregroundStyle(Theme.ink.opacity(0.9))
-                    .frame(width: 22)
+            HStack(spacing: RowMetrics.iconGap) {
+                RowIcon(symbol: symbol)
                 Text(title)
-                    .font(.system(size: 16))
+                    .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
             }
         }
         .tint(Theme.accent)
-        .padding(.leading, 17)
-        .padding(.trailing, 16)
-        .frame(minHeight: 46)
+        .padding(.leading, RowMetrics.leading)
+        .padding(.trailing, RowMetrics.trailing)
+        .frame(minHeight: RowMetrics.height)
     }
 }
 
@@ -275,14 +272,14 @@ struct AppearancePicker: View {
                 } label: {
                     VStack(spacing: 8) {
                         AppearanceSample(option: option)
-                            .frame(height: 68)
+                            .frame(height: 76)
                             .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 11, style: .continuous)
                                     .strokeBorder(selected ? Theme.accent : Theme.line, lineWidth: selected ? 1.5 : 1)
                             )
                         Text(option.title)
-                            .font(.system(size: 11.5, weight: selected ? .medium : .regular))
+                            .font(.system(size: 15, weight: selected ? .medium : .regular))
                             .foregroundStyle(selected ? Theme.accent : Theme.muted)
                     }
                     .contentShape(Rectangle())
@@ -293,10 +290,10 @@ struct AppearancePicker: View {
                 .accessibilityIdentifier("appearance.\(option.rawValue)")
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, RowMetrics.plainLeading)
         .padding(.top, 14)
         .padding(.bottom, 12)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: RowMetrics.cardRadius, style: .continuous))
     }
 }
 

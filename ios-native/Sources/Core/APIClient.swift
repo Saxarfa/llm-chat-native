@@ -36,6 +36,10 @@ struct APIError: LocalizedError, Equatable {
 
 /// Запросы к серверу LLM Chat на ПК. Вход — по bearer-токену, как у сайта.
 final class APIClient: @unchecked Sendable {
+    /// Ключ временных сессий («Инкогнито») этого запуска приложения — как `X-Temporary-Session`
+    /// у вкладки сайта: сервер отдаёт временный чат и его события только с тем же ключом.
+    static let temporarySession: String = (0..<24).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined()
+
     let baseURL: URL
     var token: String?
     private let session: URLSession
@@ -80,6 +84,7 @@ final class APIClient: @unchecked Sendable {
         if let token, !token.isEmpty {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
+        request.setValue(Self.temporarySession, forHTTPHeaderField: "X-Temporary-Session")
         if let json {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject: json)

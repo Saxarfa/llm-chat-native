@@ -7,11 +7,22 @@ enum Theme {
     static let canvas = dynamic(dark: 0x151515, light: 0xF7F5F0)
     static let surface = dynamic(dark: 0x20201F, light: 0xFFFDF8)
     static let rail = dynamic(dark: 0x111111, light: 0xEEEBE3)
-    static let ink = dynamic(dark: 0xE8E6DF, light: 0x302E28)
-    static let muted = dynamic(dark: 0xA3A29A, light: 0x686256)
+    /// Тёмные текстовые цвета — замер снимков Claude 16.11.2026 (PNG с iPhone, без сжатия):
+    /// основной #F9F9F7, вторичный #96958D (подсказка поля, значки под ответом, подписи разделов),
+    /// третичный #888781 (даты, «…может ошибаться»).
+    static let ink = dynamic(dark: 0xF9F9F7, light: 0x302E28)
+    static let muted = dynamic(dark: 0x96958D, light: 0x686256)
     /// Самый бледный текст (подписи, даты). Контраст не ниже 4,5:1 и на карточках, и на фоне шторок
     /// (аудит 13.11.2026: было 3,6–3,8).
-    static let subtle = dynamic(dark: 0x8C8B85, light: 0x736C5F)
+    static let subtle = dynamic(dark: 0x888781, light: 0x736C5F)
+    /// Подпись раздела в шторке («Недавние», «Показать все») — у Claude светлее остальных подписей.
+    static let caption = dynamic(dark: 0xC3C2B8, light: 0x5E594E)
+    /// Выбранная строка шторки — плашка #404040 (замер снимка Claude).
+    static let rowSelected = dynamic(UIColor(hex: 0x404040), UIColor(hex: 0x514832, alpha: 0.12))
+    /// Фон страницы «Недавние»: у Claude темнее чата (#0B0B0B).
+    static let page = dynamic(dark: 0x0B0B0B, light: 0xF2F0EA)
+    /// Синяя точка у сессии, ответ в которой пришёл, пока её не открывали.
+    static let unread = dynamic(dark: 0x4076CF, light: 0x2F6FDB)
     static let line = dynamic(UIColor.white.withAlphaComponent(0.075), UIColor(hex: 0x514832, alpha: 0.11))
     static let fill = dynamic(UIColor.white.withAlphaComponent(0.06), UIColor(hex: 0x514832, alpha: 0.06))
     static let fillActive = dynamic(UIColor.white.withAlphaComponent(0.11), UIColor(hex: 0x514832, alpha: 0.11))
@@ -20,10 +31,10 @@ enum Theme {
     static let danger = dynamic(dark: 0xD5968A, light: 0xB4513F)
     /// Синий акцент, как в настройках iOS: переключатели, галочки выбора, выбранная плитка.
     static let accent = dynamic(dark: 0x4A8DF0, light: 0x2F6FDB)
-    /// Поднятая карточка в шторках (группы строк в настройках, меню «+»).
-    static let card = dynamic(dark: 0x222221, light: 0xFFFFFF)
-    /// Подложка шторок: в тёмной теме как карточка в настройках Claude, в светлой — тёплый серый.
-    static let sheet = dynamic(dark: 0x181817, light: 0xF2F0EA)
+    /// Поднятая карточка в шторках (группы строк в настройках, меню «+»): у Claude #20201F.
+    static let card = dynamic(dark: 0x20201F, light: 0xFFFFFF)
+    /// Подложка шторок: у Claude как фон чата (#151515), в светлой теме — тёплый серый.
+    static let sheet = dynamic(dark: 0x151515, light: 0xF2F0EA)
     /// Пузырь вопроса в ленте.
     static let bubble = dynamic(dark: 0x272725, light: 0xEBE8E0)
     /// Коралловая «Отправить», когда есть что отправлять, — как в приложении Claude.
@@ -56,10 +67,16 @@ enum Theme {
     /// и чуть ниже (текст у кнопок шапки уже чёткий), в шторке и «Недавних» — до низа шапки.
     static let chatBlurDepth: CGFloat = 14
     static let drawerBlurDepth: CGFloat = 52
-    /// Сколько шапка (кнопки 44 pt, поднятые на 6) выступает ниже размытой полосы — на столько
+    /// Круглые кнопки шапок и шторок: у Claude стеклянный круг 44 pt, центр на 22 pt ниже
+    /// безопасной зоны, поле 20 pt от края экрана (замер снимков 16.11.2026).
+    static let headerButton: CGFloat = 44
+    static let headerInset: CGFloat = 20
+    /// Значки в круглых кнопках шапки: у Claude глиф ~18 pt.
+    static let headerGlyph: CGFloat = 18
+    /// Сколько шапка (ряд 44 pt от безопасной зоны) выступает ниже размытой полосы — на столько
     /// лента опускает своё первое содержимое, чтобы оно не начиналось под кнопками.
     static var headerOverhang: CGFloat {
-        if #available(iOS 26.0, *) { return 38 - headerReach }
+        if #available(iOS 26.0, *) { return headerButton - headerReach }
         return 0
     }
 
@@ -219,22 +236,88 @@ struct Wordmark: View {
     }
 }
 
-/// Значок меню, как у Claude: две длинные тонкие линии и короткая.
+/// Значок меню, как у Claude: две длинные линии и короткая (глиф ~18 pt, замер 16.11.2026).
 struct MenuGlyph: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 4.5) {
-            Capsule().frame(width: 16, height: 1.5)
-            Capsule().frame(width: 16, height: 1.5)
-            Capsule().frame(width: 8, height: 1.5)
+        VStack(alignment: .leading, spacing: 5) {
+            Capsule().frame(width: 18, height: 1.75)
+            Capsule().frame(width: 18, height: 1.75)
+            Capsule().frame(width: 9, height: 1.75)
         }
     }
 }
 
-/// Круглая кнопка-иконка в шапке, как у Claude: круг 38 чуть светлее фона с тонкой каймой,
-/// тонкий значок; зона нажатия 44.
+/// Призрак «Инкогнито», как у Claude: купол с волнистым низом и двумя глазами.
+/// В SF Symbols призрака нет — рисуем сами. `filled` — залитый (приветствие), иначе контур (кнопка).
+struct GhostGlyph: View {
+    var filled = false
+    var lineWidth: CGFloat = 1.6
+
+    var body: some View {
+        GeometryReader { geo in
+            let rect = CGRect(origin: .zero, size: geo.size)
+            ZStack {
+                if filled {
+                    GhostShape().fill(style: FillStyle(eoFill: true))
+                } else {
+                    GhostShape(eyes: false).stroke(style: StrokeStyle(lineWidth: lineWidth, lineJoin: .round))
+                    GhostEyes().fill()
+                }
+            }
+            .frame(width: rect.width, height: rect.height)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private struct GhostShape: Shape {
+        var eyes = true
+
+        func path(in rect: CGRect) -> Path {
+            let w = rect.width, h = rect.height
+            var path = Path()
+            let top = rect.minY
+            let dome = w / 2
+            path.move(to: CGPoint(x: rect.minX, y: rect.minY + h))
+            path.addLine(to: CGPoint(x: rect.minX, y: top + dome))
+            path.addArc(center: CGPoint(x: rect.midX, y: top + dome), radius: dome,
+                        startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + h))
+            // Волнистый низ: три «языка» справа налево.
+            let bottom = rect.minY + h, rise = h * 0.13
+            for index in 0..<3 {
+                let right = rect.maxX - CGFloat(index) * w / 3
+                let left = right - w / 3
+                path.addQuadCurve(to: CGPoint(x: (left + right) / 2, y: bottom - rise),
+                                  control: CGPoint(x: right - w / 12, y: bottom - rise))
+                path.addQuadCurve(to: CGPoint(x: left, y: bottom),
+                                  control: CGPoint(x: left + w / 12, y: bottom - rise))
+            }
+            path.closeSubpath()
+            if eyes { path.addPath(GhostEyes().path(in: rect)) }
+            return path
+        }
+    }
+
+    private struct GhostEyes: Shape {
+        func path(in rect: CGRect) -> Path {
+            let w = rect.width, h = rect.height
+            let size = CGSize(width: w * 0.15, height: h * 0.2)
+            var path = Path()
+            for x in [0.34, 0.66] {
+                path.addEllipse(in: CGRect(x: rect.minX + w * x - size.width / 2, y: rect.minY + h * 0.36,
+                                           width: size.width, height: size.height))
+            }
+            return path
+        }
+    }
+}
+
+/// Круглая кнопка-иконка в шапке, как у Claude: стеклянный круг 44 pt со значком ~18 pt.
+/// `active` — включённый режим (инкогнито): светлый круг с тёмным значком, как у Claude.
 struct CircleIconButton: View {
     let symbol: String
     let label: String
+    var active = false
     let action: () -> Void
 
     var body: some View {
@@ -244,17 +327,18 @@ struct CircleIconButton: View {
                     MenuGlyph()
                 } else {
                     Image(systemName: symbol)
-                        .font(.system(size: 15, weight: .regular))
+                        .font(.system(size: symbol == "xmark" || symbol == "chevron.left" ? 17 : Theme.headerGlyph,
+                                      weight: .regular))
                 }
             }
-                .foregroundStyle(Theme.ink.opacity(0.9))
-                .frame(width: 40, height: 40)
-                .glassChrome(Circle())
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+                .foregroundStyle(active ? Theme.buttonPrimaryText : Theme.ink.opacity(0.92))
+                .frame(width: Theme.headerButton, height: Theme.headerButton)
+                .glassChrome(Circle(), tint: active ? Theme.buttonPrimary : nil)
+                .contentShape(Circle())
         }
         .glassPressStyle()
         .accessibilityLabel(label)
+        .accessibilityAddTraits(active ? .isSelected : [])
     }
 }
 

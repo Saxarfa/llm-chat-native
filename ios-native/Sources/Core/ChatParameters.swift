@@ -123,6 +123,11 @@ enum ChatParameters {
         if (model == "aistudio/gemini-4-argon" || model == "aistudio/gemini-4-carbon") && key != "max_tokens" {
             return false
         }
+        // Облачные сервисы (`parameterSupported` сайта): Groq не принимает штрафы.
+        if model.hasPrefix("groq/") { return ["temperature", "top_p", "max_tokens"].contains(key) }
+        if HostedService.of(model) != nil {
+            return ["temperature", "top_p", "presence_penalty", "frequency_penalty", "max_tokens"].contains(key)
+        }
         return !model.hasPrefix("aistudio/") || ["temperature", "top_p", "top_k", "max_tokens"].contains(key)
     }
 
@@ -159,9 +164,17 @@ enum ChatParameters {
         "gemma-4-e4b-uncensored", "qwen-3.8-27b-it", "qwen-3.6-35b-a3b-mtp",
     ]
 
+    /// Уровень рассуждений по умолчанию (как `reasoningStrength` в `ChatConfig` без сохранённого выбора) —
+    /// у Claude рядом с ним отметка «Рекомендуется».
+    static func recommendedLevel(_ model: String) -> String {
+        let defaults = ["aistudio/gemini-4-hydrogen": "high", "aistudio/gemini-3.5-flash-lite": "minimal",
+                        "aistudio/gemini-4-argon": "medium", "aistudio/gemini-4-carbon": "medium"]
+        return defaults[model] ?? "high"
+    }
+
     static func reasoning(_ model: String) -> Reasoning? {
         if let levels = studioLevels[model] { return .levels(levels) }
-        if toggleModels.contains(model) { return .toggle }
+        if toggleModels.contains(model) || HostedService.of(model) != nil { return .toggle }
         if model == "muse-glimmer-30b" {
             return .levels([Choice("low", "Минимальные"), Choice("medium", "Средние"), Choice("high", "Высокие"), Choice("xhigh", "Максимальные")])
         }

@@ -20,20 +20,24 @@ struct PhoneModelsSheet: View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    SheetHeader(title: "Модели на телефоне",
-                                subtitle: "Доступно памяти \(PhoneMemory.gigabytes(phone.availableMemory)) · на диске \(PhoneMemory.gigabytes(phone.diskUsed))")
-                        .padding(.horizontal, -20)
                     installedSection
                     downloadsSection
                     searchSection
                     toolsSection
                     SettingsNote(text: "Ответ считает сам телефон — llama.cpp на Metal. Переписка сохраняется на ПК, как у других сессий. Быстрее всего работают модели до 4 млрд параметров в квантовании Q4_K_M.")
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, RowMetrics.cardInset)
+                .padding(.top, 4)
                 .padding(.bottom, 32)
             }
             .scrollDismissesKeyboard(.interactively)
             .background(Theme.sheet)
+            // Шапка как у Claude: круглая ✕, заголовок по центру, под ним память и место на диске.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                SheetHeader(title: "Модели на телефоне",
+                            subtitle: "Память \(PhoneMemory.gigabytes(phone.availableMemory)) · на диске \(PhoneMemory.gigabytes(phone.diskUsed))")
+                    .background(Theme.sheet)
+            }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: String.self) { repo in
                 PhoneRepoView(repo: repo)
@@ -224,7 +228,7 @@ struct PhoneModelsSheet: View {
                 ProgressView().controlSize(.small).tint(Theme.muted)
             }
         }
-        .font(.system(size: 16))
+        .font(.system(size: RowMetrics.text))
         .padding(.horizontal, 14)
         .frame(minHeight: 48)
         .background(Theme.fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -243,7 +247,7 @@ struct PhoneModelsSheet: View {
                         HStack(spacing: 10) {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(repo.name)
-                                    .font(.system(size: 16))
+                                    .font(.system(size: RowMetrics.text))
                                     .foregroundStyle(Theme.ink)
                                     .lineLimit(2)
                                     .multilineTextAlignment(.leading)
@@ -257,7 +261,7 @@ struct PhoneModelsSheet: View {
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(Theme.subtle)
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, RowMetrics.plainLeading)
                         .padding(.vertical, 10)
                         .frame(minHeight: 56)
                         .contentShape(Rectangle())
@@ -287,8 +291,8 @@ struct PhoneModelsSheet: View {
                         .foregroundStyle(Theme.ink)
                     Spacer()
                 }
-                .font(.system(size: 16))
-                .padding(.horizontal, 16)
+                .font(.system(size: RowMetrics.text))
+                .padding(.horizontal, RowMetrics.plainLeading)
                 .frame(minHeight: 52)
                 .contentShape(Rectangle())
             }
@@ -305,8 +309,8 @@ struct PhoneModelsSheet: View {
                     Text(phone.hasToken ? "Задан" : "Не задан")
                         .foregroundStyle(Theme.muted)
                 }
-                .font(.system(size: 16))
-                .padding(.horizontal, 16)
+                .font(.system(size: RowMetrics.text))
+                .padding(.horizontal, RowMetrics.plainLeading)
                 .frame(minHeight: 52)
                 .contentShape(Rectangle())
             }
@@ -328,7 +332,7 @@ private struct DownloadRow: View {
                                   : PhoneModelNames.title(item.file)
             HStack(spacing: 8) {
                 Text(title)
-                    .font(.system(size: 16))
+                    .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                 if !projector, let quant = PhoneModelNames.quant(item.file) {
@@ -373,7 +377,7 @@ private struct DownloadRow: View {
                 .frame(minHeight: 36)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, RowMetrics.plainLeading)
         .padding(.vertical, 12)
         .accessibilityIdentifier("phone.download")
     }
@@ -435,28 +439,6 @@ struct PhoneRepoView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 4) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Label("Назад", systemImage: "chevron.left")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(Theme.ink)
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(PressScaleStyle())
-                    Spacer()
-                }
-                .padding(.top, 14)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(HFRepo(id: repo).name)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                    Text(HFRepo(id: repo).author)
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.muted)
-                }
                 if let list = phone.files[repo] {
                     if !list.isEmpty {
                         SettingsCard {
@@ -476,10 +458,17 @@ struct PhoneRepoView: View {
                     ProgressView().tint(Theme.muted).frame(maxWidth: .infinity).padding(.top, 30)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, RowMetrics.cardInset)
+            .padding(.top, 4)
             .padding(.bottom, 32)
         }
         .background(Theme.sheet)
+        // Как страницы шторок Claude: круглая «‹» и название репозитория по центру, автор под ним.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            SheetBar(title: HFRepo(id: repo).name, subtitle: HFRepo(id: repo).author,
+                     symbol: "chevron.left", label: "Назад", action: { dismiss() })
+                .background(Theme.sheet)
+        }
         .toolbar(.hidden, for: .navigationBar)
         .task {
             if phone.files[repo] == nil { await phone.loadFiles(repo) }
@@ -525,7 +514,7 @@ struct PhoneRepoView: View {
                 downloadButton(file, title: "Скачать")
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, RowMetrics.plainLeading)
         .padding(.vertical, 10)
         .frame(minHeight: 60)
         .accessibilityElement(children: .contain)

@@ -104,71 +104,121 @@ struct ChatScreen: View {
         }
     }
 
-    /// Шапка как у Claude: слева меню, справа «Новая сессия» и «⋯» в общей капсуле; названия чата нет.
-    /// Кнопки стоят сразу под «островом» и плавают над лентой.
+    /// Шапка как у Claude (замер 16.11.2026): стеклянные кнопки 44 pt в 20 pt от краёв, центр — в 22 pt
+    /// ниже безопасной зоны. Слева меню; в открытой сессии справа «Новая сессия» и «⋯» в общей капсуле;
+    /// в новой — «Настройки модели» и призрак «Инкогнито»; в режиме инкогнито — заголовок
+    /// «Инкогнито» и светлый круг с призраком (нажатие выходит из режима). Названия сессии нет.
     private var header: some View {
-        HStack(spacing: 8) {
-            CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: onMenu)
-            Spacer()
-            if let chat = model.activeChat {
-                HStack(spacing: 0) {
-                    headerIcon("square.and.pencil", label: "Новая сессия") {
-                        model.activeChatID = nil
-                    }
-                    Menu {
-                        Button {
-                            openParameters()
-                        } label: {
-                            Label("Настройки модели", systemImage: "slider.horizontal.3")
-                        }
-                        Button {
-                            Keyboard.hide()
-                            showBranches = true
-                        } label: {
-                            Label("Ветки сессии", systemImage: "arrow.triangle.branch")
-                        }
-                        Divider()
-                        ChatMenuItems(chat: chat, onRename: { renaming = chat }, onDelete: { deleting = chat })
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Theme.ink.opacity(0.9))
-                            .frame(width: 44, height: 40)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel("Ещё")
-                    .accessibilityIdentifier("chat.more")
+        let incognito = model.incognitoMode
+        return ZStack {
+            if incognito {
+                Text("Инкогнито")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                    .transition(.opacity)
+                    .accessibilityIdentifier("chat.incognitoTitle")
+            }
+            HStack(spacing: 8) {
+                CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: onMenu)
+                Spacer()
+                if let chat = model.activeChat, !chat.temporary {
+                    openChatCapsule(chat)
+                        .transition(.opacity.combined(with: .scale(scale: 0.86, anchor: .trailing)))
+                } else if !incognito {
+                    newChatCapsule
+                        .transition(.opacity.combined(with: .scale(scale: 0.86, anchor: .trailing)))
+                } else {
+                    incognitoButton
+                        .transition(.opacity.combined(with: .scale(scale: 0.86, anchor: .trailing)))
                 }
-                .glassChrome(Capsule())
-                .transition(.opacity.combined(with: .scale(scale: 0.86, anchor: .trailing)))
-            } else {
-                CircleIconButton(symbol: "slider.horizontal.3", label: "Настройки модели") {
-                    openParameters()
-                }
-                .padding(.trailing, -3)
-                .transition(.opacity.combined(with: .scale(scale: 0.86, anchor: .trailing)))
             }
         }
         .animation(Theme.spring, value: model.activeChatID == nil)
-        .padding(.horizontal, 16)
-        .frame(height: 44)
-        .padding(.top, -6)
-        // В открытом чате (iOS 26) шапка плавает поверх ленты, размытие — только `Theme.headerReach`.
-        .padding(.bottom, -6)
+        .animation(Theme.spring, value: incognito)
+        .padding(.horizontal, Theme.headerInset)
+        .frame(height: Theme.headerButton)
     }
 
-    private func headerIcon(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
+    /// Открытая сессия: «Новая сессия» и «⋯» в общей стеклянной капсуле (у Claude ~97×44 pt).
+    private func openChatCapsule(_ chat: ChatSummary) -> some View {
+        HStack(spacing: 0) {
+            headerIcon(label: "Новая сессия", action: { model.activeChatID = nil }) {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: Theme.headerGlyph, weight: .regular))
+                    // Квадрат «карандаша» тяжелее слева-снизу: оптическая поправка к центру половины капсулы.
+                    .offset(x: 1.5, y: -1)
+            }
+            Menu {
+                Button {
+                    openParameters()
+                } label: {
+                    Label("Настройки модели", systemImage: "slider.horizontal.3")
+                }
+                Button {
+                    Keyboard.hide()
+                    showBranches = true
+                } label: {
+                    Label("Ветки сессии", systemImage: "arrow.triangle.branch")
+                }
+                Divider()
+                ChatMenuItems(chat: chat, onRename: { renaming = chat }, onDelete: { deleting = chat })
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: Theme.headerGlyph, weight: .medium))
+                    .foregroundStyle(Theme.ink.opacity(0.92))
+                    .frame(width: 48, height: Theme.headerButton)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Ещё")
+            .accessibilityIdentifier("chat.more")
+        }
+        .glassChrome(Capsule())
+    }
+
+    /// Новая сессия: «Настройки модели» и призрак «Инкогнито» в общей капсуле.
+    private var newChatCapsule: some View {
+        HStack(spacing: 0) {
+            headerIcon(label: "Настройки модели", action: { openParameters() }) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: Theme.headerGlyph - 1, weight: .regular))
+            }
+            .accessibilityIdentifier("chat.parameters")
+            headerIcon(label: "Инкогнито", action: { model.toggleIncognito() }) {
+                GhostGlyph(lineWidth: 1.5)
+                    .frame(width: 17, height: 19)
+            }
+            .accessibilityIdentifier("chat.incognito")
+        }
+        .glassChrome(Capsule())
+    }
+
+    /// Режим «Инкогнито»: светлый круг с призраком, как у Claude; нажатие выходит из режима.
+    private var incognitoButton: some View {
+        Button {
+            model.toggleIncognito()
+        } label: {
+            GhostGlyph(lineWidth: 1.6)
+                .frame(width: 17, height: 19)
+                .foregroundStyle(Theme.buttonPrimaryText)
+                .frame(width: Theme.headerButton, height: Theme.headerButton)
+                .glassChrome(Circle(), tint: Theme.buttonPrimary)
+                .contentShape(Circle())
+        }
+        .glassPressStyle()
+        .accessibilityLabel(model.activeChatID == nil ? "Выключить инкогнито" : "Закрыть сессию инкогнито")
+        .accessibilityIdentifier("chat.incognitoOff")
+    }
+
+    /// Половина капсулы шапки: 48×44, глиф ~18 pt.
+    private func headerIcon<Glyph: View>(label: String, action: @escaping () -> Void,
+                                        @ViewBuilder content: () -> Glyph) -> some View {
         Button {
             Haptics.tap()
             action()
         } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .regular))
-                .foregroundStyle(Theme.ink.opacity(0.82))
-                // Квадрат «карандаша» тяжелее слева-снизу, поэтому по рамке он выглядит смещённым:
-                // оптическая поправка (по замеру снимка рамка глифа стоит ровно по центру половины капсулы).
-                .offset(x: 1.5, y: -0.5)
-                .frame(width: 44, height: 40)
+            content()
+                .foregroundStyle(Theme.ink.opacity(0.92))
+                .frame(width: 48, height: Theme.headerButton)
                 .contentShape(Rectangle())
         }
         .glassPressStyle()
@@ -181,14 +231,35 @@ struct ChatScreen: View {
         showParameters = true
     }
 
+    /// Приветствие новой сессии; в режиме «Инкогнито» — призрак и пояснение, как у Claude.
     private var welcome: some View {
-        VStack(spacing: 12) {
-            Wordmark(size: 30)
-            Text(greeting)
-                .font(Theme.display(21))
-                .foregroundStyle(Theme.muted)
-                .multilineTextAlignment(.center)
+        ZStack {
+            if model.incognito {
+                VStack(spacing: 16) {
+                    GhostGlyph(filled: true)
+                        .frame(width: 30, height: 33)
+                        .foregroundStyle(Theme.ink)
+                    Text("Сессии в режиме инкогнито не попадают в историю и поиск. Память, базы знаний и создание картинок в них выключены.")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.muted)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 8)
+                .accessibilityIdentifier("chat.incognitoWelcome")
+                .transition(.opacity.combined(with: .scale(scale: 0.97)))
+            } else {
+                VStack(spacing: 12) {
+                    Wordmark(size: 30)
+                    Text(greeting)
+                        .font(Theme.display(21))
+                        .foregroundStyle(Theme.muted)
+                        .multilineTextAlignment(.center)
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.97)))
+            }
         }
+        .animation(.easeOut(duration: 0.22), value: model.incognito)
     }
 
     private var greeting: String {

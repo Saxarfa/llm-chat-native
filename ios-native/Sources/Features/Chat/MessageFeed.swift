@@ -108,8 +108,16 @@ struct MessageFeed: View {
                                     LiveAnswerView(live: live)
                                         .transition(.asymmetric(insertion: .opacity, removal: .identity))
                                 } else if let last = items.last, !last.isUser {
+                                    // Варианты продолжения — как на сайте, если они не выключены в его настройках.
+                                    if !last.suggestions.isEmpty, (model.settings.shared["chatSuggestions"] as? Bool) != false,
+                                       model.activeChat?.temporary != true {
+                                        SuggestionsView(messageID: last.rawID, items: last.suggestions)
+                                            .padding(.top, -8)
+                                            .transition(.opacity)
+                                    }
+                                    // Как у Claude: 13 pt третичным цветом (#888781).
                                     Text("\(last.model.isEmpty ? "Модель" : ChatConfig.modelName(last.model, profiles: model.settings.modelProfiles)) — это ИИ, который может ошибаться.")
-                                        .font(.system(size: 12))
+                                        .font(.system(size: 13))
                                         .foregroundStyle(Theme.subtle)
                                         .padding(.top, -10)
                                         .transition(.identity)
@@ -538,6 +546,9 @@ private struct AssistantMessageView: View {
             ForEach(message.arts) { art in
                 ArtView(art: art)
             }
+            if !message.sources.isEmpty {
+                SourcesButton(sources: message.sources)
+            }
             if !message.text.isEmpty || !message.arts.isEmpty {
                 // Как под ответом у Claude: скопировать, поделиться, прочитать вслух, ответить заново.
                 HStack(spacing: 0) {
@@ -580,9 +591,10 @@ private struct AnswerIcon: View {
     var active = false
 
     var body: some View {
+        // Как у Claude: глиф ~15 pt вторичным цветом #96958D, шаг 32 pt.
         Image(systemName: symbol)
-            .font(.system(size: 13.5, weight: .regular))
-            .foregroundStyle(active ? Theme.accent : Theme.muted.opacity(0.85))
+            .font(.system(size: 14.5, weight: .regular))
+            .foregroundStyle(active ? Theme.accent : Theme.muted)
             // Зона нажатия 32×44 (было 29×38 — мимо легко промахнуться, аудит 13.11.2026).
             .frame(width: 32, height: 44)
             .contentShape(Rectangle())

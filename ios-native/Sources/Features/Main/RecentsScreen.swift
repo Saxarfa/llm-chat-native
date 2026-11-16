@@ -33,14 +33,16 @@ struct RecentsScreen: View {
     @State private var deleting: ChatSummary?
 
     private var shown: [ChatSummary] {
-        filter == .pinned ? model.chats.filter(\.pinned) : model.chats
+        filter == .pinned ? model.listedChats.filter(\.pinned) : model.listedChats
     }
 
     var body: some View {
-        // Поиск стоит как строка-капсула в чате: чуть ниже безопасной зоны, у полосы «домой».
-        let resting: CGFloat = Screen.bottomInset > 0 ? -4 : 8
+        // Поиск стоит как у Claude: низ капсулы на 5 pt ниже безопасной зоны, у полосы «домой».
+        let resting: CGFloat = Screen.bottomInset > 0 ? -5 : 8
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 3) {
+            // Замер снимков Claude: строка 71 pt (название 17, время 15), значок с центром в 40 pt,
+            // текст с 68 pt от края экрана.
+            LazyVStack(alignment: .leading, spacing: 0) {
                 let chats = shown
                 if chats.isEmpty {
                     Text(filter == .pinned ? "Закрепленных сессий нет" : "Сессий пока нет")
@@ -56,10 +58,11 @@ struct RecentsScreen: View {
                         model.activeChatID = chat.id
                         model.screen = .chat
                     } label: {
-                        ChatRowLabel(chat: chat, showTime: true)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .frame(minHeight: 60)
+                        ChatRowLabel(chat: chat, showTime: true, unread: model.unread.contains(chat.id), gap: 15)
+                            .padding(.leading, 13)
+                            .padding(.trailing, 12)
+                            .padding(.vertical, 12)
+                            .frame(minHeight: 71)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                     }
@@ -72,16 +75,16 @@ struct RecentsScreen: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.top, 8 + Theme.headerOverhang)
+            .padding(.top, 12 + Theme.headerOverhang)
             .padding(.bottom, 80)
             // Переключение фильтра перестраивает список плавно, а не рывком.
             .animation(Theme.spring, value: shown.map(\.id))
         }
         .refreshable { await model.refreshChats() }
-        .softEdgeBar(edge: .top, tint: Theme.canvas, reach: Theme.headerReach, blurDepth: Theme.drawerBlurDepth) {
+        .softEdgeBar(edge: .top, tint: Theme.page, reach: Theme.headerReach, blurDepth: Theme.drawerBlurDepth) {
             ZStack {
                 Text("Недавние")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 HStack {
                     CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: onMenu)
@@ -89,10 +92,8 @@ struct RecentsScreen: View {
                     filterMenu
                 }
             }
-            .padding(.horizontal, 16)
-            .frame(height: 44)
-            .padding(.top, -6)
-            .padding(.bottom, 4)
+            .padding(.horizontal, Theme.headerInset)
+            .frame(height: Theme.headerButton)
         }
         .overlay(alignment: .bottomTrailing) {
             Button {
@@ -100,45 +101,51 @@ struct RecentsScreen: View {
                 model.activeChatID = nil
                 model.screen = .chat
             } label: {
-                Label("Новая сессия", systemImage: "plus")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Theme.buttonPrimaryText)
-                    .padding(.horizontal, 16)
-                    .frame(height: 42)
-                    .glassChrome(Capsule(), tint: Theme.buttonPrimary)
+                HStack(spacing: 9) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 17, weight: .regular))
+                    Text("Новая сессия")
+                        .font(.system(size: 17, weight: .medium))
+                }
+                .foregroundStyle(Theme.buttonPrimaryText)
+                .padding(.horizontal, 20)
+                .frame(height: 42)
+                .glassChrome(Capsule(), tint: Theme.buttonPrimary)
             }
             .glassPressStyle()
-            .padding(.trailing, 16)
-            .padding(.bottom, 10)
+            .accessibilityLabel("Новая сессия")
+            .padding(.trailing, 24)
+            .padding(.bottom, 13)
         }
-        .softEdgeBar(edge: .bottom, tint: Theme.canvas) {
+        .softEdgeBar(edge: .bottom, tint: Theme.page) {
+            // Поиск, как у Claude: стеклянная капсула 47 pt в 28 pt от краёв.
             Button {
                 guard !DrawerSwipe.blocksTaps else { return }
                 Haptics.tap()
                 showSearch = true
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.ink.opacity(0.9))
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.ink.opacity(0.92))
                     Text("Поиск")
-                        .font(.system(size: 16))
-                        .foregroundStyle(Theme.subtle)
+                        .font(.system(size: 17))
+                        .foregroundStyle(Theme.muted)
                     Spacer()
                 }
-                .padding(.horizontal, 15)
-                .frame(height: 44)
-                .background(Theme.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.line))
+                .padding(.horizontal, 16)
+                .frame(height: 47)
+                .glassChrome(Capsule())
                 .contentShape(Capsule())
             }
-            .buttonStyle(PressScaleStyle())
+            .glassPressStyle()
             .accessibilityLabel("Поиск сессий")
             .accessibilityIdentifier("recents.search")
-            .padding(.horizontal, 15)
+            .padding(.horizontal, 28)
             .padding(.top, 6)
             .padding(.bottom, resting)
         }
+        .background(Theme.page.ignoresSafeArea())
         .chatActions(renaming: $renaming, deleting: $deleting)
         .sheet(isPresented: $showSearch) {
             SessionSearchSheet { chat in
@@ -158,12 +165,11 @@ struct RecentsScreen: View {
             }
         } label: {
             Image(systemName: "ellipsis")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Theme.ink.opacity(0.9))
-                .frame(width: 40, height: 40)
+                .font(.system(size: Theme.headerGlyph, weight: .medium))
+                .foregroundStyle(Theme.ink.opacity(0.92))
+                .frame(width: Theme.headerButton, height: Theme.headerButton)
                 .glassChrome(Circle())
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+                .contentShape(Circle())
         }
         .accessibilityLabel("Фильтр сессий")
         .accessibilityIdentifier("recents.filter")

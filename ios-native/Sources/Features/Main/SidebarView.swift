@@ -17,8 +17,10 @@ struct SidebarView: View {
     var body: some View {
         // Нижние кнопки стоят чуть ниже безопасной зоны, у полосы «домой», как у Claude.
         let resting: CGFloat = Screen.bottomInset > 0 ? -8 : 8
+        // Замер снимков Claude 16.11.2026 (шторка 320 pt на экране 440): строки 17 pt с шагом 50 pt,
+        // плашка выбранной — 48 pt от 18 pt до края минус 19, значок с центром в 36 pt, текст с 60 pt.
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 3) {
+            LazyVStack(alignment: .leading, spacing: 2) {
                 if model.offline {
                     OfflineBanner()
                         .padding(.bottom, 6)
@@ -35,26 +37,25 @@ struct SidebarView: View {
                 .accessibilityIdentifier("sidebar.phone")
                 chatList
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 6 + Theme.headerOverhang)
+            .padding(.leading, 18)
+            .padding(.trailing, 19)
+            .padding(.top, 14 + Theme.headerOverhang)
             .padding(.bottom, 24)
         }
         .refreshable { await model.refreshChats() }
         // Штатное размытие прокрутки без тонированного Material поверх списка.
         .softEdgeBar(edge: .top, tint: Theme.rail, reach: Theme.headerReach, blurDepth: Theme.drawerBlurDepth) {
             HStack {
-                Wordmark(size: 23)
+                Wordmark(size: 25)
                 Spacer()
                 CircleIconButton(symbol: "magnifyingglass", label: "Поиск сессий") {
                     guard !DrawerSwipe.blocksTaps else { return }
                     showSearch = true
                 }
             }
-            .padding(.leading, 15)
-            .padding(.trailing, 12)
-            .frame(height: 44)
-            .padding(.top, -6)
-            .padding(.bottom, 4)
+            .padding(.leading, 16)
+            .padding(.trailing, 16)
+            .frame(height: Theme.headerButton)
         }
         .softEdgeBar(edge: .bottom, tint: Theme.rail) {
             footer
@@ -104,7 +105,7 @@ struct SidebarView: View {
 
     @ViewBuilder
     private var chatList: some View {
-        if model.chats.isEmpty {
+        if model.listedChats.isEmpty {
             VStack(spacing: 12) {
                 if model.chatsLoading {
                     ProgressView().tint(Theme.muted)
@@ -129,8 +130,8 @@ struct SidebarView: View {
             .padding(.top, 40)
             .frame(maxWidth: .infinity)
         } else {
-            let pinned = model.chats.filter { $0.pinned }
-            let recent = model.chats.filter { !$0.pinned }
+            let pinned = model.listedChats.filter { $0.pinned }
+            let recent = model.listedChats.filter { !$0.pinned }
             if !pinned.isEmpty {
                 sectionTitle("Закреплённые")
                 ForEach(pinned) { chat in
@@ -146,18 +147,19 @@ struct SidebarView: View {
                 Haptics.tap()
                 open(.recents)
             } label: {
-                HStack(spacing: 5) {
+                HStack(spacing: 8) {
                     Text("Показать все")
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 14, weight: .semibold))
                 }
-                .font(.system(size: 12.5))
-                .foregroundStyle(Theme.subtle)
-                .padding(.horizontal, 8)
-                .frame(minHeight: 40)
+                .font(.system(size: 17))
+                .foregroundStyle(Theme.caption)
+                .padding(.leading, 7)
+                .frame(minHeight: 48)
                 .contentShape(Rectangle())
             }
             .buttonStyle(PressScaleStyle())
+            .padding(.top, 6)
             .accessibilityIdentifier("sidebar.all")
         }
     }
@@ -169,13 +171,13 @@ struct SidebarView: View {
             Haptics.tap()
             action()
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: ChatRowLabel.drawerGap) {
                 Image(systemName: symbol)
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(Theme.ink.opacity(0.9))
-                    .frame(width: 22)
+                    .font(.system(size: ChatRowLabel.iconSize, weight: .regular))
+                    .foregroundStyle(Theme.ink.opacity(0.92))
+                    .frame(width: ChatRowLabel.iconFrame)
                 Text(title)
-                    .font(.system(size: 16))
+                    .font(.system(size: 17))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                 Spacer(minLength: 0)
@@ -183,22 +185,24 @@ struct SidebarView: View {
                     ProgressView().controlSize(.mini).tint(Theme.muted)
                 }
             }
-            .padding(.leading, 7)
-            .padding(.trailing, 10)
-            .frame(minHeight: 42)
-            .background(active ? Theme.fillActive : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .padding(.leading, 5)
+            .padding(.trailing, 12)
+            .frame(minHeight: 48)
+            .background(active ? Theme.rowSelected : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 15, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())
     }
 
+    /// Подпись раздела, как «Недавние» у Claude: 15 pt светлым цветом, в 25 pt от края шторки.
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 12.5))
-            .foregroundStyle(Theme.subtle)
-            .padding(.horizontal, 8)
-            .padding(.top, 14)
-            .padding(.bottom, 5)
+            .font(.system(size: 15))
+            .foregroundStyle(Theme.caption)
+            .padding(.horizontal, 7)
+            .padding(.top, 18)
+            .padding(.bottom, 9)
     }
 
     private func row(_ chat: ChatSummary) -> some View {
@@ -209,15 +213,16 @@ struct SidebarView: View {
             model.activeChatID = chat.id
             open(.chat)
         } label: {
-            ChatRowLabel(chat: chat)
-                .padding(.leading, 7)
-                .padding(.trailing, 10)
-                .frame(minHeight: 42)
-                .background(active ? Theme.fillActive : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            ChatRowLabel(chat: chat, unread: model.unread.contains(chat.id))
+                .padding(.leading, 5)
+                .padding(.trailing, 12)
+                .frame(minHeight: 48)
+                .background(active ? Theme.rowSelected : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                 .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())
+        .accessibilityLabel(model.unread.contains(chat.id) ? "\(chat.title), Новый ответ" : chat.title)
         .contextMenu {
             ChatMenuItems(chat: chat, onRename: { renaming = chat }, onDelete: { deleting = chat })
         }
@@ -230,12 +235,11 @@ struct SidebarView: View {
                 Haptics.tap()
                 showSettings = true
             } label: {
-                // Фото профиля в стеклянном круге, как у Claude.
-                AvatarView(image: model.user?.avatar, name: model.user?.shownName ?? "?", size: 36)
-                    .padding(4)
+                // Фото профиля 32 pt в стеклянном круге 48 pt, как у Claude.
+                AvatarView(image: model.user?.avatar, name: model.user?.shownName ?? "?", size: 32)
+                    .frame(width: 48, height: 48)
                     .glassChrome(Circle())
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    .contentShape(Circle())
             }
             .glassPressStyle()
             .accessibilityLabel("Настройки")
@@ -247,22 +251,22 @@ struct SidebarView: View {
                 model.activeChatID = nil
                 open(.chat)
             } label: {
-                HStack(spacing: 7) {
+                HStack(spacing: 9) {
                     Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .regular))
+                        .font(.system(size: 17, weight: .regular))
                     Text("Новая сессия")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 17, weight: .medium))
                 }
                 .foregroundStyle(Theme.buttonPrimaryText)
-                .padding(.horizontal, 16)
-                .frame(height: 42)
+                .padding(.horizontal, 20)
+                .frame(height: 46)
                 .glassChrome(Capsule(), tint: Theme.buttonPrimary)
             }
             .glassPressStyle()
             .accessibilityLabel("Новая сессия")
         }
-        .padding(.leading, 24)
-        .padding(.trailing, 25)
+        .padding(.leading, 28)
+        .padding(.trailing, 28)
         .padding(.top, 6)
     }
 }
@@ -270,6 +274,6 @@ struct SidebarView: View {
 struct RowPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(configuration.isPressed ? Theme.fill : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(configuration.isPressed ? Theme.fill : Color.clear, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
     }
 }

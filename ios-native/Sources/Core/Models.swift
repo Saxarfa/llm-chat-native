@@ -30,6 +30,9 @@ struct ChatSummary: Decodable, Identifiable, Equatable {
     var pinned: Bool
     var updatedAt: Double
     var modelID: String
+    /// Сессия «Инкогнито» (временный чат сервера `temp_…`): живёт только в памяти сервера,
+    /// в списки шторки, «Недавних» и поиска не попадает.
+    var temporary = false
 
     enum CodingKeys: String, CodingKey {
         case id, title, pinned, updatedAt
@@ -61,6 +64,7 @@ struct ChatSummary: Decodable, Identifiable, Equatable {
         let snake = (try? box.decodeIfPresent(Double.self, forKey: .updatedAtSnake)) ?? nil
         updatedAt = camel ?? snake ?? 0
         modelID = ((try? box.decodeIfPresent(String.self, forKey: .modelID)) ?? nil) ?? ""
+        temporary = id.hasPrefix("temp_")
     }
 }
 
@@ -81,6 +85,10 @@ struct ChatMessage {
     /// Варианты ответа (после «Ответить заново»): сколько их и какой показан.
     var variantCount = 0
     var variantIndex = 0
+    /// Источники веб-поиска и баз знаний (`sources` сообщения, как «Источники ответа» на сайте).
+    var sources: [FeedSource] = []
+    /// Варианты продолжения разговора (`suggestions`, сервер пишет их последнему ответу).
+    var suggestions: [String] = []
 
     init(id: String, role: String, content: String, model: String? = nil, reasoning: String? = nil,
          attachments: [FeedAttachment] = [], arts: [FeedArt] = []) {
@@ -116,6 +124,11 @@ struct ChatMessage {
         variantCount = variants
         let chosen = (json["current_variant_index"] as? NSNumber)?.intValue ?? (variants - 1)
         variantIndex = max(0, min(chosen, variants - 1))
+        sources = FeedSource.list(json["sources"])
+        suggestions = ((json["suggestions"] as? [Any]) ?? []).compactMap { item in
+            guard let text = (item as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+            return text
+        }
     }
 
     static func attachmentKey(message: String, index: Int) -> String {
@@ -137,6 +150,8 @@ struct FeedMessage: Identifiable, Equatable {
     let arts: [FeedArt]
     var variantCount = 0
     var variantIndex = 0
+    var sources: [FeedSource] = []
+    var suggestions: [String] = []
 
     static func build(from messages: [ChatMessage]) -> [FeedMessage] {
         var result: [FeedMessage] = []
@@ -155,9 +170,81 @@ struct FeedMessage: Identifiable, Equatable {
                 attachments: message.attachments,
                 arts: message.arts,
                 variantCount: message.variantCount,
-                variantIndex: message.variantIndex
+                variantIndex: message.variantIndex,
+                sources: isUser ? [] : message.sources,
+                suggestions: isUser ? [] : message.suggestions
             ))
         }
         return result
+    }
+}
+
+/// Источник ответа — перенос `webSources.ts` сайта: настоящий сайт (у ссылок Google Search он только
+/// в названии), заголовок, адрес для открытия. Источник из базы знаний открыть по ссылке нельзя.
+struct FeedSource: Identifiable, Equatable {
+    let id: Int
+    let title: String
+    let host: String
+    let url: URL?
+    let note: String?
+    let knowledge: Bool
+
+    private static let googleRedirect = "vertexaisearch.cloud.google.com"
+
+    static func list(_ value: Any?) -> [FeedSource] {
+        ((value as? [[String: Any]]) ?? []).enumerated().compactMap { index, raw in
+            let knowledge = (raw["kind"] as? String) == "knowledge"
+            let link = web(raw["resolved_url"]).flatMap { isRedirect($0) ? nil : $0 } ?? web(raw["url"])
+            let siteName = ((raw["site_name"] as? String) ?? "").trimmingCharacters(in: .whitespaces)
+            let title = ((raw["title"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            var host = ""
+            if knowledge {
+                host = siteName
+            } else if let link, !isRedirect(link), let name = link.host {
+                host = bare(name)
+            } else {
+                // Ссылка Google Search ведёт на переадресацию: сайт известен только по названию.
+                host = [title, siteName].map(bare).first(where: domainLike) ?? ""
+            }
+            guard knowledge || link != nil || !title.isEmpty else { return nil }
+            var note: String?
+            if knowledge {
+                let heading = ((raw["heading"] as? String) ?? "").trimmingCharacters(in: .whitespaces)
+                let page = (raw["page"] as? NSNumber).map { "стр. \($0.intValue)" }
+                let parts = [heading.isEmpty ? nil : heading, page].compactMap { $0 }
+                note = parts.isEmpty ? nil : parts.joined(separator: " · ")
+            }
+            return FeedSource(id: index, title: title.isEmpty ? (host.isEmpty ? "Источник" : host) : title,
+                              host: host, url: knowledge ? nil : link, note: note, knowledge: knowledge)
+        }
+    }
+
+    /// Значок сайта — `/favicon.ico` на самом сайте (как у сайта LLM Chat); у переадресаций — по имени.
+    var favicon: URL? {
+        guard !knowledge, !host.isEmpty else { return nil }
+        if let url, let scheme = url.scheme, let name = url.host, !Self.isRedirect(url) {
+            return URL(string: "\(scheme)://\(name)/favicon.ico")
+        }
+        return URL(string: "https://\(host)/favicon.ico")
+    }
+
+    private static func web(_ value: Any?) -> URL? {
+        guard let text = value as? String, let url = URL(string: text.trimmingCharacters(in: .whitespaces)),
+              let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http", url.host != nil else { return nil }
+        return url
+    }
+
+    private static func isRedirect(_ url: URL) -> Bool {
+        let name = (url.host ?? "").lowercased()
+        return name == googleRedirect || name.hasSuffix("." + googleRedirect)
+    }
+
+    private static func bare(_ value: String) -> String {
+        let text = value.trimmingCharacters(in: .whitespaces).lowercased()
+        return text.hasPrefix("www.") ? String(text.dropFirst(4)) : text
+    }
+
+    private static func domainLike(_ value: String) -> Bool {
+        value.range(of: "^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}$", options: .regularExpression) != nil
     }
 }

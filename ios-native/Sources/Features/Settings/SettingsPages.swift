@@ -33,14 +33,14 @@ struct ProfilePage: View {
                 SectionCaption(text: "Имя")
                 SettingsCard {
                     TextField("", text: $name, prompt: Text(model.user?.username ?? "Имя").foregroundStyle(Theme.subtle))
-                        .font(.system(size: 16))
+                        .font(.system(size: RowMetrics.text))
                         .foregroundStyle(Theme.ink)
                         .textContentType(.nickname)
                         .submitLabel(.done)
                         .focused($typing)
                         .onSubmit(saveName)
-                        .padding(.horizontal, 16)
-                        .frame(minHeight: 46)
+                        .padding(.horizontal, RowMetrics.plainLeading)
+                        .frame(minHeight: RowMetrics.height)
                         .accessibilityIdentifier("profile.name")
                 }
                 SettingsNote(text: "Так модель и приложение обращаются к вам.")
@@ -50,7 +50,7 @@ struct ProfilePage: View {
                     ValueRow(title: "Логин", value: model.user?.username ?? "")
                 }
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, RowMetrics.cardInset)
             .padding(.bottom, 32)
         }
         .scrollDismissesKeyboard(.interactively)
@@ -87,7 +87,7 @@ struct PillButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 15, weight: .medium))
             .foregroundStyle(Theme.ink)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, RowMetrics.plainLeading)
             .frame(minHeight: 38)
             .background(Theme.card, in: Capsule())
             .opacity(configuration.isPressed ? 0.7 : 1)
@@ -122,7 +122,7 @@ struct ComputerPage: View {
                     ProgressView().tint(Theme.muted).frame(maxWidth: .infinity, minHeight: 120)
                 }
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, RowMetrics.cardInset)
             .padding(.bottom, 32)
         }
         .refreshable { await load() }
@@ -147,15 +147,15 @@ struct ComputerPage: View {
                         .frame(width: 8, height: 8)
                         .frame(width: 24)
                     Text(service.name)
-                        .font(.system(size: 16))
+                        .font(.system(size: RowMetrics.text))
                         .foregroundStyle(Theme.ink)
                     Spacer()
                     Text(service.online ? "Доступен" : "Нет связи")
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.subtle)
                 }
-                .padding(.horizontal, 16)
-                .frame(minHeight: 46)
+                .padding(.horizontal, RowMetrics.plainLeading)
+                .frame(minHeight: RowMetrics.height)
             }
         }
 
@@ -183,10 +183,10 @@ struct ComputerPage: View {
                     Image(systemName: "checkmark")
                     Text("Нет активных задач")
                 }
-                .font(.system(size: 16))
+                .font(.system(size: RowMetrics.text))
                 .foregroundStyle(Theme.muted)
-                .padding(.horizontal, 16)
-                .frame(minHeight: 46)
+                .padding(.horizontal, RowMetrics.plainLeading)
+                .frame(minHeight: RowMetrics.height)
             }
             ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                 if index > 0 { CardDivider() }
@@ -199,7 +199,7 @@ struct ComputerPage: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(title)
-                    .font(.system(size: 16))
+                    .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                 Spacer(minLength: 8)
@@ -217,7 +217,7 @@ struct ComputerPage: View {
             }
             .frame(height: 4)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, RowMetrics.plainLeading)
         .padding(.vertical, 12)
     }
 
@@ -225,7 +225,7 @@ struct ComputerPage: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text("\(task.kindTitle) · \(task.title)")
-                    .font(.system(size: 16))
+                    .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(2)
                 Text(task.phase + (task.progress.map { " · \($0)%" } ?? ""))
@@ -306,19 +306,19 @@ struct ModelsPage: View {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(Theme.subtle)
                     TextField("", text: $query, prompt: Text("Название модели").foregroundStyle(Theme.subtle))
-                        .font(.system(size: 16))
+                        .font(.system(size: RowMetrics.text))
                         .foregroundStyle(Theme.ink)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 }
                 .padding(.horizontal, 14)
-                .frame(minHeight: 46)
+                .frame(minHeight: RowMetrics.height)
                 .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 SettingsCard {
                     if ids.isEmpty {
                         Text("Модели не найдены")
-                            .font(.system(size: 16))
+                            .font(.system(size: RowMetrics.text))
                             .foregroundStyle(Theme.muted)
                             .padding(16)
                     }
@@ -331,7 +331,7 @@ struct ModelsPage: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     HStack(spacing: 6) {
                                         Text(name(id))
-                                            .font(.system(size: 16))
+                                            .font(.system(size: RowMetrics.text))
                                             .foregroundStyle(Theme.ink)
                                             .lineLimit(1)
                                         if id == ChatConfig.text(model.settings.shared["model"]) {
@@ -353,7 +353,7 @@ struct ModelsPage: View {
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(Theme.subtle)
                             }
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, RowMetrics.plainLeading)
                             .frame(minHeight: 56)
                             .contentShape(Rectangle())
                         }
@@ -363,7 +363,7 @@ struct ModelsPage: View {
                 }
                 SettingsNote(text: "Название, фото и описание видны в выборе модели и в сессиях — и здесь, и на сайте.")
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, RowMetrics.cardInset)
             .padding(.bottom, 32)
         }
         .scrollDismissesKeyboard(.interactively)
@@ -438,7 +438,7 @@ struct ModelProfilePage: View {
                 ModelParameters(modelID: modelID, showsInstruction: false)
                     .id(modelID)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, RowMetrics.cardInset)
             .padding(.bottom, 32)
         }
         .scrollDismissesKeyboard(.interactively)
@@ -472,18 +472,18 @@ struct ModelProfilePage: View {
     private func field(_ title: String, text: Binding<String>, prompt: String, which: Field) -> some View {
         HStack(spacing: 12) {
             Text(title)
-                .font(.system(size: 16))
+                .font(.system(size: RowMetrics.text))
                 .foregroundStyle(Theme.ink)
                 .frame(width: 96, alignment: .leading)
             TextField("", text: text, prompt: Text(prompt).foregroundStyle(Theme.subtle))
-                .font(.system(size: 16))
+                .font(.system(size: RowMetrics.text))
                 .foregroundStyle(Theme.ink)
                 .focused($focus, equals: which)
                 .submitLabel(.done)
                 .onSubmit { save(which) }
         }
-        .padding(.horizontal, 16)
-        .frame(minHeight: 46)
+        .padding(.horizontal, RowMetrics.plainLeading)
+        .frame(minHeight: RowMetrics.height)
     }
 
     private func save(_ which: Field) {
@@ -539,7 +539,7 @@ struct SearchPage: View {
                             HStack(spacing: 12) {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(choice.label)
-                                        .font(.system(size: 16))
+                                        .font(.system(size: RowMetrics.text))
                                         .foregroundStyle(Theme.ink)
                                     Text(Self.hints[choice.value] ?? "")
                                         .font(.system(size: 13))
@@ -552,7 +552,7 @@ struct SearchPage: View {
                                         .foregroundStyle(Theme.accent)
                                 }
                             }
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, RowMetrics.plainLeading)
                             .frame(minHeight: 60)
                             .contentShape(Rectangle())
                         }
@@ -570,7 +570,7 @@ struct SearchPage: View {
                     }), in: 1...10) {
                         HStack {
                             Text("Количество результатов")
-                                .font(.system(size: 16))
+                                .font(.system(size: RowMetrics.text))
                                 .foregroundStyle(Theme.ink)
                             Spacer()
                             Text("\(count)")
@@ -578,11 +578,11 @@ struct SearchPage: View {
                                 .foregroundStyle(Theme.muted)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 46)
+                    .padding(.horizontal, RowMetrics.plainLeading)
+                    .frame(minHeight: RowMetrics.height)
                 }
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, RowMetrics.cardInset)
             .padding(.bottom, 32)
         }
     }

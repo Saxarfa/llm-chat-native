@@ -25,6 +25,8 @@ enum PreviewScene: String, CaseIterable {
     /// 0.11, вид как у Claude: экран «Недавние», лента и настройки в светлой теме,
     /// разделы настроек «Компьютер» и «Профиль модели».
     case recents, light, settingsLight, computer, modelProfile
+    /// 0.16: новая сессия в режиме «Инкогнито»; ответ с источниками и вариантами продолжения.
+    case incognito, sources
 
     /// Тема снимка: светлая — у сцен `light…`, у остальных тёмная.
     var appearance: Appearance {
@@ -245,7 +247,34 @@ enum PreviewScene: String, CaseIterable {
         ModelOption(id: "muse-glimmer-30b", name: "Muse Glimmer 30B", group: .local, loaded: false),
         ModelOption(id: "aistudio/gemini-4-hydrogen", name: "Gemini 4 Hydrogen", group: .studio, loaded: false),
         ModelOption(id: "aistudio/gemma-4-31b-it", name: "Gemma 4 31B", group: .studio, loaded: false),
+        // Облачные сервисы — во «Других моделях», по разделу на сервис.
+        ModelOption(id: "nvidia/qwen/qwen3.5-122b-a10b", name: HostedService.name("nvidia/qwen/qwen3.5-122b-a10b"),
+                    group: .hosted, loaded: false),
+        ModelOption(id: "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+                    name: HostedService.name("openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"), group: .hosted, loaded: false),
+        ModelOption(id: "groq/openai/gpt-oss-120b", name: HostedService.name("groq/openai/gpt-oss-120b"),
+                    group: .hosted, loaded: false),
     ]
+
+    /// Ответ с веб-поиском: источники (обычные сайты, переадресация Google Search, база знаний)
+    /// и варианты продолжения под последним ответом.
+    static var sourcesFeed: [FeedMessage] {
+        FeedMessage.build(from: [
+            ChatMessage(json: ["id": "su1", "role": "user", "content": "Что нового в SQLite 3.50?"]),
+            ChatMessage(json: [
+                "id": "sa1", "role": "assistant", "model": "aistudio/gemini-4-hydrogen",
+                "content": "Главное в **SQLite 3.50**:\n\n- функции `json_pretty` и `jsonb_*` работают быстрее;\n- `VACUUM INTO` сжимает базу без блокировки читателей;\n- исправлены редкие ошибки планировщика запросов.\n\nДля режима WAL обновление не требует миграции.",
+                "sources": [
+                    ["title": "SQLite Release 3.50.0", "url": "https://www.sqlite.org/releaselog/3_50_0.html"],
+                    ["title": "news.ycombinator.com", "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AbC"],
+                    ["title": "What's new in SQLite", "url": "https://github.com/sqlite/sqlite/blob/master/README.md"],
+                    ["kind": "knowledge", "title": "Регламент резервного копирования.pdf", "site_name": "Документы по работе",
+                     "heading": "Копии базы", "page": 3, "url": "knowledge://d1"],
+                ] as [[String: Any]],
+                "suggestions": ["Как включить WAL в Python?", "Чем VACUUM INTO лучше обычной копии?", "Нужно ли обновлять старые базы?"],
+            ]),
+        ])
+    }
 
     static var live: AppModel.LiveState {
         let text = "Включается одной командой — режим сохраняется в файле базы:\n\n```python\nimport sqlite3\n\nconn = sqlite3.connect(\"app.db\")\nconn.execute(\"PRAGMA journal_mode=WAL\")\n```\n\nПосле этого рядом с базой появятся"

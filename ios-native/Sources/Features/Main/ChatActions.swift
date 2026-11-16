@@ -45,8 +45,9 @@ extension View {
     }
 }
 
-/// Пункты меню сессии, как у Claude: «Закрепить», затем «Переименовать», внизу красная «Удалить».
-/// «Поделиться» и «Добавить в проект» не показываются: у нашего сайта этих действий нет.
+/// Пункты меню сессии, как у Claude: «Закрепить», затем «Поделиться» и «Переименовать», внизу красная
+/// «Удалить». «Поделиться» отдаёт переписку текстом (ссылок на сессии у сайта нет);
+/// «Добавить в проект» не показывается: проектов у сайта нет.
 struct ChatMenuItems: View {
     @Environment(AppModel.self) private var model
     let chat: ChatSummary
@@ -61,6 +62,11 @@ struct ChatMenuItems: View {
             Label(chat.pinned ? "Открепить" : "Закрепить", systemImage: chat.pinned ? "pin.slash" : "pin")
         }
         Divider()
+        Button {
+            Task { await ChatShare.share(chat, model: model) }
+        } label: {
+            Label("Поделиться", systemImage: "square.and.arrow.up")
+        }
         Button(action: onRename) {
             Label("Переименовать", systemImage: "pencil")
         }
@@ -68,6 +74,57 @@ struct ChatMenuItems: View {
         Button(role: .destructive, action: onDelete) {
             Label("Удалить", systemImage: "trash")
         }
+    }
+}
+
+/// «Поделиться» сессией: вся переписка Markdown-текстом через системное меню «Поделиться».
+enum ChatShare {
+    @MainActor
+    static func share(_ chat: ChatSummary, model: AppModel) async {
+        guard let text = await model.transcript(of: chat) else { return }
+        Haptics.tap()
+        present(text)
+    }
+
+    /// Системное окно «Поделиться» поверх самого верхнего экрана (меню и шторки тоже экраны).
+    @MainActor
+    static func present(_ text: String) {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let window = scenes.flatMap(\.windows).first(where: \.isKeyWindow) ?? scenes.first?.windows.first,
+              var top = window.rootViewController else { return }
+        while let next = top.presentedViewController, !next.isBeingDismissed { top = next }
+        let sheet = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+        sheet.popoverPresentationController?.sourceView = top.view
+        top.present(sheet, animated: true)
+    }
+}
+
+extension AppModel {
+    /// Переписка сессии текстом: из открытой ленты, кэша или с сервера.
+    func transcript(of chat: ChatSummary) async -> String? {
+        var messages: [FeedMessage] = threadChatID == chat.id && !thread.isEmpty ? thread : (threadCache[chat.id] ?? [])
+        if messages.isEmpty, preview == nil, let api,
+           let status = try? await api.json("/api/chat/status/\(APIClient.pathSafe(chat.id))"),
+           let raw = (status["chat"] as? [String: Any])?["messages"] as? [[String: Any]] {
+            messages = await Task.detached(priority: .userInitiated) {
+                FeedMessage.build(from: raw.map { ChatMessage(json: $0) })
+            }.value
+        }
+        guard !messages.isEmpty else {
+            chatsNotice = "Не удалось получить переписку этой сессии."
+            return nil
+        }
+        var parts = ["# \(chat.title)"]
+        for message in messages {
+            let who = message.isUser
+                ? (user?.shownName ?? "Вы")
+                : (message.model.isEmpty ? "Модель" : ChatConfig.modelName(message.model, profiles: settings.modelProfiles))
+            var body = message.text
+            let files = message.attachments.map { "Вложение: \($0.name)" }
+            if !files.isEmpty { body += (body.isEmpty ? "" : "\n\n") + files.joined(separator: "\n") }
+            parts.append("**\(who):**\n\n\(body)")
+        }
+        return parts.joined(separator: "\n\n")
     }
 }
 
@@ -146,32 +203,50 @@ enum AvatarCache {
 }
 
 /// Строка чата со значком: в шторке — одна строка, на экране «Недавние» — со временем.
+/// Размеры — по снимкам Claude 16.11.2026: название 17 pt, время 15 pt, значок ~19 pt в рамке 26.
 struct ChatRowLabel: View {
+    static let iconSize: CGFloat = 18
+    static let iconFrame: CGFloat = 26
+    /// Рамка значка → текст: в шторке текст начинается в 60,5 pt от края экрана.
+    static let drawerGap: CGFloat = 11.5
+
     let chat: ChatSummary
     var showTime = false
+    /// Ответ пришёл, пока сессию не открывали: синяя точка справа, как у Claude.
+    var unread = false
+    var gap: CGFloat = ChatRowLabel.drawerGap
 
     var body: some View {
-        HStack(alignment: showTime ? .top : .center, spacing: 10) {
+        HStack(alignment: showTime ? .top : .center, spacing: gap) {
             Image(systemName: chat.pinned ? "pin" : "message")
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(Theme.ink.opacity(0.8))
-                .frame(width: 22)
-                .padding(.top, showTime ? 1 : 0)
-            VStack(alignment: .leading, spacing: 4) {
+                .font(.system(size: Self.iconSize, weight: .regular))
+                .foregroundStyle(Theme.ink.opacity(0.88))
+                .frame(width: Self.iconFrame)
+                .padding(.top, showTime ? 2 : 0)
+            VStack(alignment: .leading, spacing: 5) {
                 Text(chat.title)
-                    .font(.system(size: 16))
+                    .font(.system(size: 17))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                 if showTime {
                     let time = RelativeTime.text(chat.updatedAt)
                     if !time.isEmpty {
                         Text(time)
-                            .font(.system(size: 12.5))
+                            .font(.system(size: 15))
                             .foregroundStyle(Theme.subtle)
                     }
                 }
             }
             Spacer(minLength: 0)
+            if unread {
+                Circle()
+                    .fill(Theme.unread)
+                    .frame(width: 8, height: 8)
+                    .padding(.top, showTime ? 8 : 0)
+                    .transition(.scale.combined(with: .opacity))
+                    .accessibilityLabel("Новый ответ")
+            }
         }
+        .animation(Theme.spring, value: unread)
     }
 }
