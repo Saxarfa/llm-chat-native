@@ -41,9 +41,9 @@ final class ComposerUITests: XCTestCase {
         XCTAssertTrue(plus.waitForExistence(timeout: 10))
         plus.tap()
         XCTAssertTrue(element(app, "tools.photo").waitForExistence(timeout: 5), "кнопка «Фото» в заголовке")
-        XCTAssertTrue(element(app, "tools.camera").exists, "плитка «Камера»")
+        XCTAssertTrue(element(app, "tools.camera").exists, "строка «Камера» в первой карточке")
         XCTAssertTrue(element(app, "tools.file").exists, "строка «Добавить файлы»")
-        XCTAssertTrue(app.staticTexts["Добавление в чат"].exists)
+        XCTAssertTrue(app.staticTexts["Добавление в сессию"].exists)
         XCTAssertTrue(app.switches.matching(NSPredicate(format: "label CONTAINS %@", "Память")).firstMatch.exists)
         sleep(1)
         snap("ui-c1-tools")
@@ -124,7 +124,7 @@ final class ComposerUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Настройки модели"].waitForExistence(timeout: 5))
         XCTAssertFalse(text(app, contains: "только для этого чата").exists, "надписей про временные настройки нет")
         XCTAssertFalse(app.staticTexts["Веб-поиск"].exists, "поиск переехал в меню «+»")
-        let plus = app.buttons["Увеличить: Температура"].firstMatch
+        let plus = app.buttons["Увеличить: Temperature"].firstMatch
         XCTAssertTrue(plus.waitForExistence(timeout: 5))
         plus.tap()
         XCTAssertTrue(text(app, contains: "Своё значение").waitForExistence(timeout: 3))

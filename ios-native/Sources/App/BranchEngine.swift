@@ -1,6 +1,6 @@
 import Foundation
 
-/// Ветки диалога и варианты ответа — как `selectBranch`/`forkBranch`/`chooseVariant` в `store.ts`.
+/// Ветки сессии и варианты ответа — как `selectBranch`/`forkBranch`/`chooseVariant` в `store.ts`.
 /// Сервер принимает изменение, только если клиент знает текущую ветку (`expected_branch_id`),
 /// и отвечает чатом целиком; его и показываем.
 extension AppModel {
@@ -92,7 +92,7 @@ extension AppModel {
                 await logout()
                 return false
             }
-            sendError = (error as? APIError)?.message ?? "Не удалось изменить историю чата."
+            sendError = (error as? APIError)?.message ?? "Не удалось изменить историю сессии."
             Haptics.error()
             // Ветку поменяли на другом устройстве — показать актуальную.
             if (error as? APIError)?.status == 409, activeChatID == id {

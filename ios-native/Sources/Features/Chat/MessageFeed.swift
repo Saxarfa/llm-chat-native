@@ -64,7 +64,7 @@ struct MessageFeed: View {
             }
         case .loaded:
             if items.isEmpty && live == nil {
-                FeedNotice(text: "В этом чате пока нет сообщений.", actionTitle: nil, action: {})
+                FeedNotice(text: "В этой сессии пока нет сообщений.", actionTitle: nil, action: {})
             } else {
                 let visible = items.suffix(shown)
                 let earlier = items.count - visible.count
@@ -294,26 +294,18 @@ private struct BottomEdgeKey: PreferenceKey {
     }
 }
 
-/// Ответ, который пишется прямо сейчас. Статус — вариант «Искра» (выбран пользователем
-/// 13.11.2026): коралловая искра вращается и «дышит», подпись этапа сменяется снизу вверх,
-/// через 2 с рядом идёт счётчик секунд; когда пошёл текст, статус сворачивается в «Думал N с».
+/// Ответ, который пишется прямо сейчас: строка рассуждений («Атом» + «Размышляет») или строка этапа
+/// (`SparkStatus`: «Атом» + короткая подпись, сменяется снизу вверх). Секунд нигде нет
+/// (убраны по просьбе пользователя 16.11.2026).
 private struct LiveAnswerView: View {
     let live: AppModel.LiveState
-    @State private var started = Date()
-    /// Сколько секунд модель готовилась до первого слова ответа.
-    @State private var thought: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if !live.reasoning.isEmpty {
-                ReasoningView(text: live.reasoning, title: live.isThinking ? "Размышляет…"
-                              : thought.map { "Думал \($0) с" } ?? "Размышления")
-            } else if let thought, thought >= 2, !live.text.isEmpty {
-                Text("Думал \(thought) с")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.muted)
-                    .padding(.top, -6)
-                    .transition(.opacity)
+                // Одна строка, как «Thinking» у Claude: пока модель думает — «Атом» и «Размышляет»;
+                // потом та же строка становится «Размышления». Нажатие раскрывает текст рассуждений.
+                ReasoningView(text: live.reasoning, title: working ? "Размышляет" : "Размышления", spark: working)
             }
             if !live.blocks.isEmpty {
                 MarkdownView(blocks: live.blocks)
@@ -321,89 +313,115 @@ private struct LiveAnswerView: View {
             ForEach(live.arts) { art in
                 ArtView(art: art)
             }
-            if live.text.isEmpty || live.stopping {
-                SparkStatus(text: live.stopping ? "Останавливаю" : live.phase, started: started)
+            // Отдельная «Искра» не нужна, пока искра уже стоит в строке рассуждений (раньше статус был двойным).
+            if (live.text.isEmpty || live.stopping) && !(working && !live.stopping) {
+                SparkStatus(text: live.stopping ? "Останавливаю" : live.phase)
                     .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .animation(.easeOut(duration: 0.3), value: live.text.isEmpty)
-        .onChange(of: live.text.isEmpty) { _, empty in
-            if !empty, thought == nil { thought = max(0, Int(Date().timeIntervalSince(started).rounded())) }
-        }
+        .animation(Theme.spring, value: working)
     }
+
+    /// Модель сейчас рассуждает, и текст рассуждений уже идёт (его строка несёт «Атом»).
+    private var working: Bool { live.isThinking && !live.reasoning.isEmpty && !live.stopping }
 }
 
-/// Строка статуса «Искра»: искра, подпись этапа и (после 2 с) секунды ожидания.
+/// Строка статуса под ответом: «Атом» и короткая подпись этапа («Думаю», «Ищу в интернете», «Пишу ответ»).
+/// Подписи — не сырые строки сервера, а `LiveStatus.label`; итоговые фразы («Поиск завершён») прежнюю подпись
+/// не меняют. Каждая подпись держится не меньше `minDwell`, чтобы быстрые смены не мелькали, а сменялись
+/// плавно снизу вверх (16.11.2026).
 private struct SparkStatus: View {
     let text: String
-    let started: Date
+    @State private var shown: String
+    @State private var shownAt = Date.distantPast
+    @State private var wanted: String?
+    @State private var task: Task<Void, Never>?
 
-    /// «Ищу в интернете…» → «Ищу в интернете»: многоточие заменяет живая искра.
-    private var label: String {
-        var value = text.trimmingCharacters(in: .whitespaces)
-        while value.hasSuffix("…") || value.hasSuffix(".") { value.removeLast() }
-        return value.isEmpty ? "Думаю" : value
+    private static let minDwell: TimeInterval = 0.9
+
+    init(text: String) {
+        self.text = text
+        _shown = State(initialValue: LiveStatus.label(text) ?? LiveStatus.fallback)
     }
 
     var body: some View {
         HStack(spacing: 9) {
-            Spark()
-            Text(label)
-                .font(.system(size: 14))
+            AtomIndicator(size: 20)
+            Text(shown)
+                .font(.system(size: 15))
                 .foregroundStyle(Theme.muted)
                 .lineLimit(2)
-                .id(label)
+                .id(shown)
                 .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
                                         removal: .move(edge: .top).combined(with: .opacity)))
-            TimelineView(.periodic(from: started, by: 1)) { context in
-                let seconds = Int(context.date.timeIntervalSince(started))
-                if seconds >= 2 {
-                    Text("· \(seconds) с")
-                        .font(.system(size: 14).monospacedDigit())
-                        .foregroundStyle(Theme.subtle)
-                        .contentTransition(.numericText(value: Double(seconds)))
-                        .transition(.opacity)
-                }
-            }
         }
         .clipped()
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: label)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: shown)
         .frame(minHeight: 28)
         .accessibilityElement(children: .combine)
+        .onChange(of: text) { _, new in update(new) }
+        .onDisappear { task?.cancel() }
+    }
+
+    /// Новая подпись ждёт, пока прежняя не продержится `minDwell`; из нескольких быстрых остаётся последняя.
+    private func update(_ phase: String) {
+        guard let next = LiveStatus.label(phase) else { return }
+        if next == shown {
+            task?.cancel()
+            wanted = nil
+            return
+        }
+        wanted = next
+        let wait = max(0, Self.minDwell - Date().timeIntervalSince(shownAt))
+        task?.cancel()
+        task = Task { @MainActor in
+            if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
+            guard !Task.isCancelled, let value = wanted else { return }
+            shown = value
+            shownAt = Date()
+            wanted = nil
+        }
     }
 }
 
-/// Коралловая четырёхлучевая искра: медленно вращается и «дышит».
-private struct Spark: View {
+/// Индикатор рассуждения «Атом» (вариант A, выбран пользователем 16.11.2026 по макету): три точки
+/// летят по наклонённым орбитам (0°, 60°, 120°) с разной скоростью и шлейфом из пяти точек,
+/// в центре пульсирует ядро. Размеры считаются в сетке 28×28 и масштабируются под `size`.
+struct AtomIndicator: View {
+    var size: CGFloat = 24
+
+    private static let tilts: [Double] = [0, 60, 120].map { $0 * .pi / 180 }
+    private static let periods: [Double] = [1.5, 2.1, 2.8]
+
     var body: some View {
         TimelineView(.animation) { context in
             let time = context.date.timeIntervalSinceReferenceDate
-            SparkShape()
-                .fill(Theme.send)
-                .frame(width: 13, height: 13)
-                .rotationEffect(.degrees(time.truncatingRemainder(dividingBy: 2.4) / 2.4 * 360))
-                .scaleEffect(0.85 + 0.2 * (0.5 + 0.5 * sin(time * 2 * .pi / 1.2)))
+            Canvas { graphics, canvasSize in
+                let unit = canvasSize.width / 28
+                let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
+                for orbit in 0..<3 {
+                    let tilt = Self.tilts[orbit]
+                    for step in 0..<5 {
+                        let angle = (time - Double(step) * 0.05) * 2 * .pi / Self.periods[orbit]
+                        let x = 11 * cos(angle)
+                        let y = 4.2 * sin(angle)
+                        let dx = x * cos(tilt) - y * sin(tilt)
+                        let dy = x * sin(tilt) + y * cos(tilt)
+                        let radius = (2.1 - Double(step) * 0.32) * unit
+                        let rect = CGRect(x: center.x + dx * unit - radius, y: center.y + dy * unit - radius,
+                                          width: radius * 2, height: radius * 2)
+                        graphics.fill(Path(ellipseIn: rect), with: .color(Theme.muted.opacity(1 - Double(step) * 0.2)))
+                    }
+                }
+                let core = (1.8 + 0.5 * sin(time * 5)) * unit
+                graphics.fill(Path(ellipseIn: CGRect(x: center.x - core, y: center.y - core, width: core * 2, height: core * 2)),
+                              with: .color(Theme.muted))
+            }
         }
-        .frame(width: 16, height: 16)
+        .frame(width: size, height: size)
         .accessibilityHidden(true)
-    }
-}
-
-private struct SparkShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let c = CGPoint(x: rect.midX, y: rect.midY)
-        let r = min(rect.width, rect.height) / 2
-        let inner = r * 0.28
-        var path = Path()
-        for index in 0..<8 {
-            let angle = Double(index) * .pi / 4 - .pi / 2
-            let radius = index.isMultiple(of: 2) ? r : inner
-            let point = CGPoint(x: c.x + CGFloat(cos(angle)) * radius, y: c.y + CGFloat(sin(angle)) * radius)
-            if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
-        }
-        path.closeSubpath()
-        return path
     }
 }
 
@@ -702,6 +720,8 @@ private struct AnswerMoreMenu: View {
 private struct ReasoningView: View {
     let text: String
     var title = "Размышления"
+    /// Идёт рассуждение: слева живой «Атом».
+    var spark = false
     @State private var open = false
 
     var body: some View {
@@ -711,8 +731,15 @@ private struct ReasoningView: View {
                 withAnimation(Theme.spring) { open.toggle() }
             } label: {
                 HStack(spacing: 6) {
+                    if spark {
+                        AtomIndicator()
+                            .padding(.trailing, 2)
+                            .transition(.opacity.combined(with: .scale(scale: 0.6)))
+                    }
                     Text(title)
                         .font(.system(size: 15))
+                        .id(title)
+                        .transition(.opacity)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
                         .rotationEffect(.degrees(open ? 90 : 0))
@@ -725,18 +752,95 @@ private struct ReasoningView: View {
             .accessibilityHint(open ? "Свернуть" : "Развернуть")
 
             if open {
-                Text(text)
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.muted)
-                    .lineSpacing(4)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.leading, 14)
-                    .overlay(alignment: .leading) {
-                        Capsule().fill(Theme.fillActive).frame(width: 3)
-                    }
+                ReasoningTimeline(text: text, live: spark)
                     .transition(.opacity)
             }
         }
         .padding(.top, -10)
+    }
+}
+
+/// Раскрытые рассуждения — шаги с заголовками на линии времени (вариант B из макета): у шага точка,
+/// между точками тонкая линия, у идущего шага точка «дышит». Без абзацев и заголовков — обычный текст
+/// с полосой слева, как раньше.
+private struct ReasoningTimeline: View {
+    let text: String
+    let live: Bool
+
+    var body: some View {
+        let steps = ReasoningSteps.parse(text)
+        if steps.count == 1, steps[0].heading == nil {
+            Text(InlineMarkdown.render(steps[0].body, size: 15))
+                .font(.system(size: 15))
+                .foregroundStyle(Theme.muted)
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 14)
+                .overlay(alignment: .leading) {
+                    Capsule().fill(Theme.fillActive).frame(width: 3)
+                }
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(steps) { step in
+                    let last = step.id == steps.count - 1
+                    VStack(alignment: .leading, spacing: 3) {
+                        if let heading = step.heading {
+                            Text(heading)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Theme.ink)
+                        }
+                        if !step.body.isEmpty {
+                            Text(InlineMarkdown.render(step.body, size: 15))
+                                .font(.system(size: 15))
+                                .foregroundStyle(Theme.muted)
+                                .lineSpacing(4)
+                        }
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 24)
+                    // Отступ между шагами — внутри строки: линия ниже тянется до следующей точки.
+                    .padding(.bottom, last ? 0 : 14)
+                    // Точка и линия — поверх строки: так линия всегда ровно в высоту шага
+                    // (в колонке рядом с текстом в ленте прокрутки она оставалась короткой).
+                    .overlay(alignment: .topLeading) {
+                        ZStack(alignment: .top) {
+                            if !last {
+                                Rectangle().fill(Theme.line)
+                                    .frame(width: 1)
+                                    .padding(.top, 12)
+                                    .frame(maxHeight: .infinity, alignment: .top)
+                            }
+                            Dot(pulsing: live && last)
+                                .padding(.top, 2)
+                        }
+                        .frame(width: 14)
+                    }
+                }
+            }
+            .animation(Theme.spring, value: steps.count)
+        }
+    }
+
+    /// Точка шага; у идущего шага плавно пульсирует.
+    private struct Dot: View {
+        let pulsing: Bool
+
+        var body: some View {
+            Group {
+                if pulsing {
+                    TimelineView(.animation) { context in
+                        let time = context.date.timeIntervalSinceReferenceDate
+                        Circle()
+                            .fill(Theme.muted)
+                            .frame(width: 7, height: 7)
+                            .scaleEffect(1 + 0.4 * (0.5 + 0.5 * sin(time * 5)))
+                    }
+                } else {
+                    Circle().fill(Theme.subtle).frame(width: 7, height: 7)
+                }
+            }
+            .frame(width: 14, height: 9)
+        }
     }
 }

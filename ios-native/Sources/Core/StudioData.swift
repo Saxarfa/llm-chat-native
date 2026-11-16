@@ -340,3 +340,41 @@ enum StudioPromptInput {
         return new[new.index(after: index)...] == old[oldIndex...]
     }
 }
+
+/// Последние промпты студии — чипы над полем, пока идёт набор (16.11.2026). Хранятся только на телефоне.
+enum StudioPromptHistory {
+    static let key = "studio.recentPrompts"
+    static let limit = 8
+
+    /// Новый промпт — первым; повтор поднимается наверх, пустые не запоминаются.
+    static func add(_ prompt: String, to list: [String]) -> [String] {
+        let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return list }
+        return Array(([text] + list.filter { $0 != text }).prefix(limit))
+    }
+
+    static func load() -> [String] { UserDefaults.standard.stringArray(forKey: key) ?? [] }
+    static func save(_ list: [String]) { UserDefaults.standard.set(list, forKey: key) }
+}
+
+/// Пресеты «Быстро / Баланс / Качество» в настройках генерации (16.11.2026). Меняют только число шагов:
+/// CFG, семплер и scheduler у каждого движка свои (профиль на сервере), их пресеты не трогают.
+struct StudioPreset: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let steps: Int
+
+    static func list(for model: String) -> [StudioPreset] {
+        let sdxl = StudioModels.engine(model) == "sdxl"
+        return [
+            StudioPreset(id: "fast", title: "Быстро", steps: 20),
+            StudioPreset(id: "balance", title: "Баланс", steps: sdxl ? 28 : 30),
+            StudioPreset(id: "quality", title: "Качество", steps: 40),
+        ]
+    }
+
+    /// Пресет, совпадающий с черновиком; `nil` — «Свои».
+    static func match(_ draft: StudioDraft) -> StudioPreset? {
+        list(for: draft.model).first { $0.steps == draft.steps }
+    }
+}

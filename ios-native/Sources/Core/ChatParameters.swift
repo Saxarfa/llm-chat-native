@@ -21,6 +21,8 @@ struct ParameterSpec: Identifiable {
     let max: Double
     let step: Double
     let hint: String
+    /// Значение, которое показывать, пока параметр нигде не задан (у моделей телефона — умолчание движка).
+    var fallback: Double?
 
     var id: String { key }
     var isInteger: Bool { step >= 1 }
@@ -30,24 +32,66 @@ struct ParameterSpec: Identifiable {
 /// (`parameterSupported`, `reasoningKind`, `reasoningLevels`, `nano*`) и списков из
 /// `Settings.tsx`/`NanoChatParameters.tsx`. Менять только вместе с сайтом.
 enum ChatParameters {
+    /// Названия параметров генерации не переводятся (решение пользователя 16.11.2026): так их знает llama.cpp.
     static let specs: [ParameterSpec] = [
-        ParameterSpec(key: "temperature", label: "Температура", min: 0, max: 2, step: 0.05,
+        ParameterSpec(key: "temperature", label: "Temperature", min: 0, max: 2, step: 0.05,
                       hint: "Меньше — более предсказуемый выбор токенов. Больше — больше разнообразия."),
         ParameterSpec(key: "top_p", label: "Top-P", min: 0, max: 1, step: 0.05,
                       hint: "Оставляет токены с суммарной вероятностью до этого порога. 1 отключает фильтр."),
         ParameterSpec(key: "min_p", label: "Min-P", min: 0, max: 1, step: 0.01,
                       hint: "Порог относительно наиболее вероятного токена. 0 отключает фильтр."),
-        ParameterSpec(key: "max_tokens", label: "Длина ответа", min: 1, max: 131072, step: 1,
+        ParameterSpec(key: "max_tokens", label: "Max tokens", min: 1, max: 131072, step: 1,
                       hint: "Максимум новых токенов, включая рассуждения."),
         ParameterSpec(key: "top_k", label: "Top-K", min: 0, max: 1000, step: 1,
                       hint: "Оставляет K наиболее вероятных токенов. 0 отключает фильтр."),
-        ParameterSpec(key: "repeat_penalty", label: "Штраф за повторы", min: 0, max: 3, step: 0.05,
+        ParameterSpec(key: "repeat_penalty", label: "Repeat penalty", min: 0, max: 3, step: 0.05,
                       hint: "1 отключает штраф. Повышение может уменьшить повторы, но и исказить текст."),
         ParameterSpec(key: "presence_penalty", label: "Presence penalty", min: -2, max: 2, step: 0.05,
                       hint: "Штраф за появление токена в контексте."),
         ParameterSpec(key: "frequency_penalty", label: "Frequency penalty", min: -2, max: 2, step: 0.05,
                       hint: "Штраф пропорционально частоте токена."),
     ]
+
+    /// Остальные параметры выборки llama.cpp. Есть только у моделей на телефоне: ими управляет
+    /// `LlamaRunner.makeSampler`, а сервер ПК их не знает. Умолчания — как у движка (`fallback`).
+    static let phoneSpecs: [ParameterSpec] = [
+        ParameterSpec(key: "repeat_last_n", label: "Repeat last N", min: 0, max: 4096, step: 1,
+                      hint: "Сколько последних токенов учитывают Repeat, Presence и Frequency penalty. 0 отключает все три штрафа.",
+                      fallback: 64),
+        ParameterSpec(key: "typical_p", label: "Typical-P", min: 0, max: 1, step: 0.01,
+                      hint: "Оставляет токены, неожиданность которых близка к средней. 1 отключает фильтр.",
+                      fallback: 1),
+        ParameterSpec(key: "top_n_sigma", label: "Top-N sigma", min: 0, max: 5, step: 0.1,
+                      hint: "Отсекает токены дальше N стандартных отклонений от лучшего. 0 отключает фильтр.",
+                      fallback: 0),
+        ParameterSpec(key: "xtc_probability", label: "XTC probability", min: 0, max: 1, step: 0.01,
+                      hint: "Шанс, что на шаге уберут самые вероятные токены (XTC), чтобы ответ был менее шаблонным. 0 отключает.",
+                      fallback: 0),
+        ParameterSpec(key: "xtc_threshold", label: "XTC threshold", min: 0, max: 0.5, step: 0.01,
+                      hint: "Токены вероятнее этого порога могут быть убраны. Работает, только если XTC probability больше 0.",
+                      fallback: 0.1),
+        ParameterSpec(key: "dry_multiplier", label: "DRY multiplier", min: 0, max: 5, step: 0.05,
+                      hint: "Сила штрафа за повторение целых фраз (DRY). 0 отключает.",
+                      fallback: 0),
+        ParameterSpec(key: "dry_base", label: "DRY base", min: 1, max: 4, step: 0.05,
+                      hint: "Во сколько раз растёт штраф с каждым лишним токеном повторяющейся фразы.",
+                      fallback: 1.75),
+        ParameterSpec(key: "dry_allowed_length", label: "DRY allowed length", min: 1, max: 20, step: 1,
+                      hint: "Повтор короче этого числа токенов не штрафуется.",
+                      fallback: 2),
+        ParameterSpec(key: "dry_penalty_last_n", label: "DRY penalty last N", min: 0, max: 8192, step: 1,
+                      hint: "Сколько последних токенов проверяет DRY на повторы. 0 отключает DRY.",
+                      fallback: 512),
+        ParameterSpec(key: "seed", label: "Seed", min: -1, max: 2147483647, step: 1,
+                      hint: "Одинаковое число даёт одинаковый ответ при тех же параметрах. -1 — каждый раз новое.",
+                      fallback: -1),
+    ]
+
+    /// Все параметры генерации, которые есть у модели в приложении.
+    static func allSpecs(for model: String, onPhone: Bool) -> [ParameterSpec] {
+        let shared = specs.filter { supported(model, $0.key) }
+        return onPhone ? shared + phoneSpecs : shared
+    }
 
     /// Главные параметры показываются сразу, остальные — в «Расширенных».
     static let mainKeys: Set<String> = ["temperature", "max_tokens"]
@@ -127,11 +171,11 @@ enum ChatParameters {
     // MARK: - Nano Banana
 
     static let nanoSpecs: [String: ParameterSpec] = [
-        "nano_temperature": ParameterSpec(key: "nano_temperature", label: "Температура", min: 0, max: 2, step: 0.05,
+        "nano_temperature": ParameterSpec(key: "nano_temperature", label: "Temperature", min: 0, max: 2, step: 0.05,
                                           hint: "Меньше — изображения ближе к описанию и друг к другу. Больше — больше разнообразия."),
         "nano_top_p": ParameterSpec(key: "nano_top_p", label: "Top-P", min: 0, max: 1, step: 0.05,
                                     hint: "Оставляет варианты с суммарной вероятностью до этого порога. 1 отключает фильтр."),
-        "nano_max_output_tokens": ParameterSpec(key: "nano_max_output_tokens", label: "Длина ответа", min: 1, max: 65536, step: 1,
+        "nano_max_output_tokens": ParameterSpec(key: "nano_max_output_tokens", label: "Max output tokens", min: 1, max: 65536, step: 1,
                                                 hint: "Вместе с рассуждениями и изображением. Слишком малое значение может оборвать картинку."),
     ]
 

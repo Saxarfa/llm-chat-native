@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Шторка «Выбор модели», как в приложении Claude: главная карточка с моделями (аватарка,
-/// название, описание, синяя галочка у выбранной), под ней строка «Рассуждения» с уровнем
+/// Шторка «Выбор модели», как в приложении Claude: главная карточка с моделями (название,
+/// описание, синяя галочка у выбранной, без аватарок), под ней строка «Рассуждения» с уровнем
 /// (переход на список уровней) и «Другие модели» — модели телефона и модели картинок.
 struct ModelPickerSheet: View {
     @Environment(AppModel.self) private var model
@@ -73,7 +73,7 @@ struct ModelPickerSheet: View {
                     } else {
                         SettingsCard {
                             ForEach(Array(mainModels.enumerated()), id: \.element.id) { index, item in
-                                if index > 0 { CardDivider(inset: 62) }
+                                if index > 0 { CardDivider(inset: 16) }
                                 row(item)
                             }
                         }
@@ -129,7 +129,7 @@ struct ModelPickerSheet: View {
                     SettingsCard {
                         let phone = otherModels.filter { $0.group == .phone }
                         ForEach(Array(phone.enumerated()), id: \.element.id) { index, item in
-                            if index > 0 { CardDivider(inset: 62) }
+                            if index > 0 { CardDivider(inset: 16) }
                             row(item)
                         }
                         if !phone.isEmpty { CardDivider(inset: 16) }
@@ -141,7 +141,7 @@ struct ModelPickerSheet: View {
                             .padding(.top, 10)
                         SettingsCard {
                             ForEach(Array(images.enumerated()), id: \.element.id) { index, item in
-                                if index > 0 { CardDivider(inset: 62) }
+                                if index > 0 { CardDivider(inset: 16) }
                                 row(item)
                             }
                         }
@@ -253,14 +253,12 @@ struct ModelPickerSheet: View {
 
     private func row(_ item: ModelOption) -> some View {
         let selected = item.id == model.activeModelID
-        let avatar = ChatConfig.text(ChatConfig.dict(model.settings.modelProfiles[item.id])["avatar"])
         return Button {
             Task { await model.selectModel(item.id) }
             dismiss()
         } label: {
             HStack(spacing: 12) {
-                // Аватарка из профиля модели (как в выборе модели на сайте), иначе — буква.
-                AvatarView(image: avatar, name: item.name, size: 34)
+                // Как у Claude: название и описание без аватарки (фото модели видно на её странице в настройках).
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.name)
                         .font(.system(size: 17))
@@ -330,7 +328,7 @@ private struct ReasoningPage: View {
                             }
                         }
                     }
-                    Text("Чем выше уровень, тем дольше модель думает перед ответом и тем точнее ответ. Действует во всех чатах с \(model.activeModelName).")
+                    Text("Чем выше уровень, тем дольше модель думает перед ответом и тем точнее ответ. Действует во всех сессиях с \(model.activeModelName).")
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.subtle)
                         .fixedSize(horizontal: false, vertical: true)

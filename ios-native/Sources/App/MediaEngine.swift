@@ -151,14 +151,14 @@ extension AppModel {
         }
         if offline {
             chats[index] = previous
-            chatsNotice = "Нет связи с ПК. Изменить этот чат можно, когда ПК будет доступен."
+            chatsNotice = "Нет связи с ПК. Изменить эту сессию можно, когда ПК будет доступен."
             return
         }
         do {
             _ = try await api.json("/api/chats/\(APIClient.pathSafe(chat.id))/metadata", method: "PATCH", body: body)
         } catch {
             if let position = chats.firstIndex(where: { $0.id == chat.id }) { chats[position] = previous }
-            chatsNotice = (error as? APIError)?.message ?? "Не удалось изменить чат."
+            chatsNotice = (error as? APIError)?.message ?? "Не удалось изменить сессию."
             Haptics.error()
         }
     }
@@ -176,7 +176,7 @@ extension AppModel {
             return
         }
         if offline {
-            chatsNotice = "Нет связи с ПК. Удалить этот чат можно, когда ПК будет доступен."
+            chatsNotice = "Нет связи с ПК. Удалить эту сессию можно, когда ПК будет доступен."
             Haptics.error()
             return
         }
@@ -190,7 +190,7 @@ extension AppModel {
             if activeChatID == chat.id { activeChatID = nil }
             Haptics.success()
         } catch {
-            chatsNotice = (error as? APIError)?.message ?? "Не удалось удалить чат."
+            chatsNotice = (error as? APIError)?.message ?? "Не удалось удалить сессию."
             Haptics.error()
         }
     }

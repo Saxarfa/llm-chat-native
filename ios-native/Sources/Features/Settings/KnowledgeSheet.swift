@@ -282,7 +282,7 @@ private struct LibraryView: View {
             }
             Button("Отмена", role: .cancel) {}
         } message: {
-            Text("Чаты перестанут искать в ней. Вернуть базу можно на сайте.")
+            Text("Сессии перестанут искать в ней. Вернуть базу можно на сайте.")
         }
         .confirmationDialog("Удалить документ?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
                             titleVisibility: .visible) {

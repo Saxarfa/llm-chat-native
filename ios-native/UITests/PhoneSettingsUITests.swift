@@ -74,7 +74,7 @@ final class PhoneSettingsUITests: XCTestCase {
         done.tap()
         XCTAssertEqual(number(field) ?? -1, 1.25, accuracy: 0.001, "вбитое число принято")
 
-        let plus = app.buttons["Увеличить: Температура"].firstMatch
+        let plus = app.buttons["Увеличить: Temperature"].firstMatch
         XCTAssertTrue(plus.exists)
         plus.tap()
         XCTAssertEqual(number(field) ?? -1, 1.3, accuracy: 0.001, "«+» шагает на 0,05")

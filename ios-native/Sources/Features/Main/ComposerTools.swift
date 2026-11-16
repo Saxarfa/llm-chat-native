@@ -1,9 +1,9 @@
 import Photos
 import SwiftUI
 
-/// Меню «+» у поля ввода, как «Добавление в сессию» в приложении Claude: камера и лента
-/// последних фото, ниже — файлы и то, что меняет ответ. Поиск и базы знаний — для этого чата,
-/// рассуждения и память — для всех чатов с моделью.
+/// Меню «+» у поля ввода, как «Добавление в сессию» в приложении Claude: лента последних фото,
+/// карточка «Камера» и «Добавить файлы», затем поиск, базы знаний и переключатели ответа.
+/// Поиск и базы знаний — для этой сессии, рассуждения и память — для всех сессий с моделью.
 struct ComposerToolsSheet: View {
     enum Source {
         case camera, photo, file
@@ -25,12 +25,18 @@ struct ComposerToolsSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    PhotoStrip(enabled: !onPhone || seesImages, onCamera: { pick(.camera) }, onLibrary: { pick(.photo) })
+                    PhotoStrip(enabled: !onPhone || seesImages, onLibrary: { pick(.photo) })
                     if onPhone {
                         SettingsNote(text: seesImages ? "Модель на телефоне видит картинки, но не файлы."
                                      : "Модель на телефоне понимает только текст. Чтобы она видела картинки, добавьте ей файл зрения в «Моделях на телефоне».")
                     }
+                    // Первая группа, как у Claude: «Камера» и «Добавить файлы» одной карточкой.
                     SettingsCard {
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) || model.preview != nil {
+                            ToolRow(title: "Камера", symbol: "camera", enabled: !onPhone || seesImages) { pick(.camera) }
+                                .accessibilityIdentifier("tools.camera")
+                            CardDivider(inset: 53)
+                        }
                         ToolRow(title: "Добавить файлы", symbol: "doc.badge.plus", enabled: !onPhone) { pick(.file) }
                             .accessibilityIdentifier("tools.file")
                     }
@@ -45,16 +51,13 @@ struct ComposerToolsSheet: View {
                         SettingsCard {
                             if let reasoning = ChatParameters.reasoning(id) {
                                 ReasoningRow(modelID: id, reasoning: reasoning)
-                                CardDivider()
+                                CardDivider(inset: 53)
                             }
-                            ToggleRow(title: "Память",
-                                      hint: model.memoryEnabled(id) ? "Модель помнит сохранённые факты о вас"
-                                                                    : "Не читает и не меняет сохранённые факты",
+                            ToggleRow(title: "Память", symbol: "brain",
                                       isOn: model.memoryEnabled(id)) { value in
                                 Task { await model.setModelValue("memoryEnabled", value, model: id) }
                             }
                         }
-                        SettingsNote(text: "Поиск и базы знаний — для этого чата. Рассуждения и память — для всех чатов с этой моделью.")
                     }
                 }
                 .padding(.horizontal, 18)
@@ -79,7 +82,7 @@ struct ComposerToolsSheet: View {
 
     private var header: some View {
         ZStack {
-            Text("Добавление в чат")
+            Text("Добавление в сессию")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.ink)
             HStack {
@@ -200,7 +203,6 @@ struct ToolRow: View {
 private struct PhotoStrip: View {
     @Environment(AppModel.self) private var model
     let enabled: Bool
-    let onCamera: () -> Void
     let onLibrary: () -> Void
     @State private var assets: [PHAsset] = []
     @State private var thumbs: [String: UIImage] = [:]
@@ -214,10 +216,6 @@ private struct PhotoStrip: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                if UIImagePickerController.isSourceTypeAvailable(.camera) || model.preview != nil {
-                    tile("Камера", symbol: "camera", action: onCamera)
-                        .accessibilityIdentifier("tools.camera")
-                }
                 if !allowed || (assets.isEmpty && thumbs.isEmpty) {
                     tile("Фото", symbol: "photo.on.rectangle", action: onLibrary)
                 }
@@ -355,7 +353,7 @@ private struct ReasoningRow: View {
         let config = model.modelConfig(modelID)
         switch reasoning {
         case .toggle:
-            ToggleRow(title: "Рассуждения", hint: "Больше времени на обдумывание ответа",
+            ToggleRow(title: "Рассуждения", symbol: "lightbulb",
                       isOn: (config["thinking"] as? Bool) ?? true) { value in
                 Task { await model.setModelValue("thinking", value, model: modelID) }
             }
@@ -378,7 +376,7 @@ private struct PhoneReasoning: View {
         let kind = model.phone.infos[file]?.thinking
         SettingsCard {
             if kind?.canToggle == true {
-                ToggleRow(title: "Рассуждения", hint: "Модель сначала думает, потом отвечает. Дольше, но точнее",
+                ToggleRow(title: "Рассуждения", symbol: "lightbulb",
                           isOn: (model.modelConfig(modelID)["thinking"] as? Bool) ?? false) { value in
                     Task { await model.setModelValue("thinking", value, model: modelID) }
                 }

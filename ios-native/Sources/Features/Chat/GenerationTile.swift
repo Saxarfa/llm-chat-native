@@ -119,6 +119,43 @@ struct GenerationTile: View {
     }
 }
 
+/// Ход генерации поверх прежнего арта в студии: маленькая стеклянная капсула внизу сцены —
+/// «Атом», статус и (у ComfyUI) процент. Сам арт остаётся виден целиком, пока создаётся новый
+/// (замечание пользователя 16.11.2026: раньше его закрывало матовое стекло плитки генерации).
+struct GenerationBadge: View {
+    /// 0…1; `nil` — процент неизвестен (облачные модели).
+    let progress: Double?
+    let status: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            AtomIndicator(size: 18)
+            Text(status)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Theme.ink)
+                .id(status)
+                .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
+                                        removal: .move(edge: .top).combined(with: .opacity)))
+            if let progress {
+                Text(progress, format: .percent.precision(.fractionLength(0)))
+                    .font(.system(size: 14, weight: .medium).monospacedDigit())
+                    .foregroundStyle(Theme.muted)
+                    .contentTransition(.numericText(value: progress))
+            }
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 14)
+        .frame(height: 36)
+        .clipped()
+        .glassChrome(Capsule(), interactive: false)
+        .animation(.easeOut(duration: 0.6), value: progress)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: status)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(progress.map { "\(status) \(Int(($0 * 100).rounded()))%" } ?? status)
+        .accessibilityIdentifier("generation.badge")
+    }
+}
+
 private struct RatioFrame: ViewModifier {
     let ratio: CGFloat?
 

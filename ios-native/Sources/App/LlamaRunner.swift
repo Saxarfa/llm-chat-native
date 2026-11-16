@@ -579,20 +579,37 @@ final class LlamaRunner: @unchecked Sendable {
 
     private func makeSampler(_ sampling: PhoneSampling) -> UnsafeMutablePointer<llama_sampler> {
         let chain = llama_sampler_chain_init(llama_sampler_chain_default_params())!
-        if sampling.repeatPenalty != 1 || sampling.presencePenalty != 0 || sampling.frequencyPenalty != 0 {
+        // Порядок звеньев — как в llama.cpp: штрафы, DRY, top-n-sigma, top-k, typical, top-p, min-p, XTC, температура.
+        if sampling.repeatLastN > 0,
+           sampling.repeatPenalty != 1 || sampling.presencePenalty != 0 || sampling.frequencyPenalty != 0 {
             llama_sampler_chain_add(chain, llama_sampler_init_penalties(
-                llama_vocab_n_tokens(vocab), 64, max(0.01, sampling.repeatPenalty),
+                llama_vocab_n_tokens(vocab), sampling.repeatLastN, max(0.01, sampling.repeatPenalty),
                 sampling.frequencyPenalty, sampling.presencePenalty))
+        }
+        if sampling.dryMultiplier > 0, sampling.dryPenaltyLastN > 0 {
+            // Разрыв последовательностей, как в llama.cpp по умолчанию: перевод строки, двоеточие, кавычка, звёздочка.
+            let breakers = ["\n", ":", "\"", "*"].map { strdup($0) }
+            defer { breakers.forEach { free($0) } }
+            var pointers: [UnsafePointer<CChar>?] = breakers.map { $0.map { UnsafePointer($0) } }
+            llama_sampler_chain_add(chain, llama_sampler_init_dry(
+                vocab, sampling.dryMultiplier, sampling.dryBase, sampling.dryAllowedLength,
+                sampling.dryPenaltyLastN, &pointers, pointers.count))
         }
         if sampling.temperature <= 0 {
             llama_sampler_chain_add(chain, llama_sampler_init_greedy())
             return chain
         }
+        let seed = sampling.seed < 0 ? UInt32.random(in: 0...UInt32.max - 1) : UInt32(truncatingIfNeeded: sampling.seed)
+        if sampling.topNSigma > 0 { llama_sampler_chain_add(chain, llama_sampler_init_top_n_sigma(sampling.topNSigma)) }
         if sampling.topK > 0 { llama_sampler_chain_add(chain, llama_sampler_init_top_k(sampling.topK)) }
+        if sampling.typicalP > 0, sampling.typicalP < 1 { llama_sampler_chain_add(chain, llama_sampler_init_typical(sampling.typicalP, 1)) }
         if sampling.topP > 0, sampling.topP < 1 { llama_sampler_chain_add(chain, llama_sampler_init_top_p(sampling.topP, 1)) }
         if sampling.minP > 0 { llama_sampler_chain_add(chain, llama_sampler_init_min_p(sampling.minP, 1)) }
+        if sampling.xtcProbability > 0 {
+            llama_sampler_chain_add(chain, llama_sampler_init_xtc(sampling.xtcProbability, sampling.xtcThreshold, 1, seed))
+        }
         llama_sampler_chain_add(chain, llama_sampler_init_temp(sampling.temperature))
-        llama_sampler_chain_add(chain, llama_sampler_init_dist(UInt32.random(in: 0...UInt32.max - 1)))
+        llama_sampler_chain_add(chain, llama_sampler_init_dist(seed))
         return chain
     }
 

@@ -185,6 +185,8 @@ private struct CustomSize: View {
 
 private struct StudioSettingsPanel: View {
     @Environment(AppModel.self) private var model
+    /// Пользователь сам открыл «Свои».
+    @State private var custom = false
 
     private static let steps = ParameterSpec(key: "steps", label: "Шаги", min: 1, max: 80, step: 1,
                                              hint: "Сколько раз модель уточняет картинку. Больше — детальнее, но дольше.")
@@ -210,27 +212,33 @@ private struct StudioSettingsPanel: View {
                             CustomSize().padding(16)
                         }
                     }
-                    SettingsCard {
-                        ParameterRow(spec: Self.steps, value: Double(studio.draft.steps)) { value in
-                            studio.edit { $0.steps = Int(value.rounded()) }
+                    SectionCaption(text: "Качество")
+                    PresetPicker(custom: $custom)
+                    if showsCustom {
+                        SettingsCard {
+                            ParameterRow(spec: Self.steps, value: Double(studio.draft.steps)) { value in
+                                studio.edit { $0.steps = Int(value.rounded()) }
+                            }
+                            CardDivider()
+                            ParameterRow(spec: Self.cfg, value: studio.draft.cfg) { value in
+                                studio.edit { $0.cfg = (value * 10).rounded() / 10 }
+                            }
+                            CardDivider()
+                            ParameterRow(spec: Self.denoise, value: studio.draft.denoise) { value in
+                                studio.edit { $0.denoise = (value * 100).rounded() / 100 }
+                            }
                         }
-                        CardDivider()
-                        ParameterRow(spec: Self.cfg, value: studio.draft.cfg) { value in
-                            studio.edit { $0.cfg = (value * 10).rounded() / 10 }
+                        .transition(.opacity)
+                        SettingsCard {
+                            ChoiceRow(title: "Семплер", choices: options(config?.samplers, current: studio.draft.sampler),
+                                      selected: studio.draft.sampler) { value in studio.edit { $0.sampler = value } }
+                            CardDivider()
+                            ChoiceRow(title: "Scheduler", choices: options(config?.schedulers, current: studio.draft.scheduler),
+                                      selected: studio.draft.scheduler) { value in studio.edit { $0.scheduler = value } }
                         }
-                        CardDivider()
-                        ParameterRow(spec: Self.denoise, value: studio.draft.denoise) { value in
-                            studio.edit { $0.denoise = (value * 100).rounded() / 100 }
-                        }
+                        .disabled(!studio.available)
+                        .transition(.opacity)
                     }
-                    SettingsCard {
-                        ChoiceRow(title: "Семплер", choices: options(config?.samplers, current: studio.draft.sampler),
-                                  selected: studio.draft.sampler) { value in studio.edit { $0.sampler = value } }
-                        CardDivider()
-                        ChoiceRow(title: "Scheduler", choices: options(config?.schedulers, current: studio.draft.scheduler),
-                                  selected: studio.draft.scheduler) { value in studio.edit { $0.scheduler = value } }
-                    }
-                    .disabled(!studio.available)
                     SectionCaption(text: "Seed")
                     SeedCard()
                     SectionCaption(text: "Негативный промпт")
@@ -242,15 +250,70 @@ private struct StudioSettingsPanel: View {
                     }
                 }
                 .padding(.horizontal, 16)
+                .animation(Theme.spring, value: showsCustom)
             }
             .padding(.bottom, 32)
         }
         .scrollDismissesKeyboard(.interactively)
     }
 
+    /// Ползунки видны, когда выбраны «Свои» или черновик не совпадает ни с одним пресетом.
+    private var showsCustom: Bool { custom || StudioPreset.match(model.studio.draft) == nil }
+
     private func options(_ list: [String]?, current: String) -> [Choice] {
         let names = (list?.isEmpty == false ? list! : []) + (list?.contains(current) == true ? [] : [current])
         return names.map { Choice($0, $0) }
+    }
+}
+
+/// «Быстро / Баланс / Качество / Свои» вместо трёх ползунков сразу (16.11.2026). Пресет меняет только
+/// число шагов; «Свои» раскрывает ползунки, семплер и scheduler.
+private struct PresetPicker: View {
+    @Environment(AppModel.self) private var model
+    @Binding var custom: Bool
+
+    var body: some View {
+        let studio = model.studio
+        let presets = StudioPreset.list(for: studio.draft.model)
+        let current = custom ? nil : StudioPreset.match(studio.draft)
+        HStack(spacing: 6) {
+            ForEach(presets) { preset in
+                segment(preset.title, detail: "\(preset.steps) шагов", active: current?.id == preset.id) {
+                    custom = false
+                    studio.edit { $0.steps = preset.steps }
+                }
+            }
+            segment("Свои", detail: current == nil ? "\(studio.draft.steps) шагов" : "ползунки", active: current == nil) {
+                custom = true
+            }
+        }
+        .padding(4)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .animation(Theme.morph, value: current?.id)
+        .accessibilityIdentifier("studio.presets")
+    }
+
+    private func segment(_ title: String, detail: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.selection()
+            action()
+        } label: {
+            VStack(spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(active ? Theme.buttonPrimaryText : Theme.ink)
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(active ? Theme.buttonPrimaryText.opacity(0.75) : Theme.subtle)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(active ? Theme.buttonPrimary : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressScaleStyle())
+        .accessibilityAddTraits(active ? .isSelected : [])
     }
 }
 
@@ -681,7 +744,7 @@ private struct StudioDetailsPanel: View {
                             studio.reuse(job)
                             done()
                         }
-                        .disabled(studio.busy || studio.pendingJob != nil || studio.loop)
+                        .disabled(studio.busy || studio.loop)
                         Button(role: .destructive) {
                             Task {
                                 await studio.delete(job)
@@ -694,7 +757,7 @@ private struct StudioDetailsPanel: View {
                                 .frame(maxWidth: .infinity, minHeight: 50)
                         }
                         .disabled(studio.deleting)
-                        SettingsNote(text: "Увеличение и правка арта появятся позже.")
+                        SettingsNote(text: "Долгое нажатие на арт в студии — все действия сразу: сохранить, поделиться, скопировать промпт, взять seed.")
                     }
                     .padding(.horizontal, 16)
                 }

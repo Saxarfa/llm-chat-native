@@ -13,7 +13,7 @@ struct ChatActions: ViewModifier {
             .onChange(of: renaming?.id) { _, _ in
                 if let chat = renaming { newTitle = chat.title }
             }
-            .alert("Название чата", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            .alert("Название сессии", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
                 TextField("Название", text: $newTitle)
                 Button("Сохранить") {
                     if let chat = renaming {
@@ -24,7 +24,7 @@ struct ChatActions: ViewModifier {
                 }
                 Button("Отмена", role: .cancel) { renaming = nil }
             }
-            .confirmationDialog("Удалить чат?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+            .confirmationDialog("Удалить сессию?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
                                 titleVisibility: .visible) {
                 Button("Удалить", role: .destructive) {
                     if let chat = deleting {
@@ -34,7 +34,7 @@ struct ChatActions: ViewModifier {
                 }
                 Button("Отмена", role: .cancel) { deleting = nil }
             } message: {
-                Text("«\(deleting?.title ?? "")» переместится в корзину. Вернуть чат можно на сайте.")
+                Text("«\(deleting?.title ?? "")» переместится в корзину. Вернуть сессию можно на сайте.")
             }
     }
 }
@@ -45,7 +45,8 @@ extension View {
     }
 }
 
-/// Пункты меню чата: переименовать, закрепить, удалить.
+/// Пункты меню сессии, как у Claude: «Закрепить», затем «Переименовать», внизу красная «Удалить».
+/// «Поделиться» и «Добавить в проект» не показываются: у нашего сайта этих действий нет.
 struct ChatMenuItems: View {
     @Environment(AppModel.self) private var model
     let chat: ChatSummary
@@ -53,14 +54,17 @@ struct ChatMenuItems: View {
     let onDelete: () -> Void
 
     var body: some View {
-        Button(action: onRename) {
-            Label("Переименовать", systemImage: "pencil")
-        }
         Button {
+            Haptics.tap()
             Task { await model.setPinned(chat, !chat.pinned) }
         } label: {
             Label(chat.pinned ? "Открепить" : "Закрепить", systemImage: chat.pinned ? "pin.slash" : "pin")
         }
+        Divider()
+        Button(action: onRename) {
+            Label("Переименовать", systemImage: "pencil")
+        }
+        Divider()
         Button(role: .destructive, action: onDelete) {
             Label("Удалить", systemImage: "trash")
         }

@@ -43,4 +43,59 @@ final class StudioDataTests: XCTestCase {
         XCTAssertFalse(StudioPromptInput.isReturnPress(old: "a", new: "a\nb\nc"))
         XCTAssertFalse(StudioPromptInput.isReturnPress(old: "abc", new: "ab"))
     }
+
+    /// Последние промпты: новый первым, повтор поднимается, пустые не запоминаются, не больше восьми.
+    func testPromptHistory() {
+        var list = StudioPromptHistory.add("закат", to: [])
+        list = StudioPromptHistory.add("дракон", to: list)
+        list = StudioPromptHistory.add("  закат  ", to: list)
+        XCTAssertEqual(list, ["закат", "дракон"])
+        XCTAssertEqual(StudioPromptHistory.add("   ", to: list), list)
+        let many = (1...12).reduce([String]()) { StudioPromptHistory.add("p\($1)", to: $0) }
+        XCTAssertEqual(many.count, StudioPromptHistory.limit)
+        XCTAssertEqual(many.first, "p12")
+    }
+
+    /// Пресеты меняют только шаги; совпадение с черновиком — выбранный пресет, иначе «Свои».
+    func testPresets() {
+        var draft = StudioDraft()
+        XCTAssertEqual(StudioPreset.match(draft)?.id, "balance", "умолчание 30 шагов — «Баланс»")
+        draft.steps = 40
+        XCTAssertEqual(StudioPreset.match(draft)?.id, "quality")
+        draft.steps = 33
+        XCTAssertNil(StudioPreset.match(draft))
+        draft.model = "waiIllustriousSDXL_v170.safetensors"
+        XCTAssertEqual(StudioPreset.list(for: draft.model).first { $0.id == "balance" }?.steps, 28)
+    }
+
+    /// Очередь, листание сцены и замок seed — в режиме снимков, без сервера.
+    @MainActor
+    func testQueueSwipeAndSeedLock() {
+        let studio = StudioModel()
+        studio.loadPreview()
+        XCTAssertEqual(studio.selected?.id, "p0")
+        XCTAssertFalse(studio.canStep(-1), "новее самого нового нет")
+        studio.step(1)
+        XCTAssertEqual(studio.selected?.id, "p1")
+        studio.step(-1)
+        XCTAssertEqual(studio.selected?.id, "p0")
+
+        XCTAssertFalse(studio.seedLocked)
+        studio.toggleSeedLock()
+        XCTAssertTrue(studio.seedLocked)
+        XCTAssertEqual(studio.draft.seed, String(418_204_771), "закрепляется seed арта на сцене")
+        studio.toggleSeedLock()
+        XCTAssertEqual(studio.draft.seed, "-1")
+
+        var running = StudioJob(id: "r")
+        running.status = "generating"
+        running.created = 10
+        var waiting = StudioJob(id: "w")
+        waiting.status = "queued"
+        waiting.created = 20
+        studio.jobs.insert(contentsOf: [waiting, running], at: 0)
+        XCTAssertEqual(studio.activeJobs.map(\.id), ["r", "w"])
+        XCTAssertEqual(studio.pendingJob?.id, "r", "идёт тот, что не ждёт в очереди")
+        XCTAssertFalse(studio.queueFull)
+    }
 }

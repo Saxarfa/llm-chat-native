@@ -90,8 +90,6 @@ final class AppModel {
     var knowledgeLibraries: [KnowledgeLibrary] = []
     /// Что открыто справа от шторки: чат или студия картинок.
     var screen: MainScreen = .chat
-    /// Экран «Недавние» открыт кнопкой поиска в шторке: сразу ставим курсор в поиск.
-    var focusRecentsSearch = false
     /// Тема (Настройки → Внешний вид). В режиме снимков не сохраняется.
     var appearance: Appearance = .dark {
         didSet {
@@ -305,7 +303,7 @@ final class AppModel {
         } catch let error as APIError where error.status == 401 {
             await logout()
         } catch {
-            chatsError = (error as? APIError)?.message ?? "Не удалось загрузить диалоги."
+            chatsError = (error as? APIError)?.message ?? "Не удалось загрузить сессии."
         }
     }
 

@@ -172,7 +172,7 @@ extension AppModel {
     /// Название нового чата — по тому же правилу, что у сервера: первая строка, 35 символов.
     nonisolated static func phoneTitle(_ text: String) -> String {
         let line = text.split(separator: "\n").first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? ""
-        guard !line.isEmpty else { return "Новый диалог" }
+        guard !line.isEmpty else { return "Новая сессия" }
         return line.count > 35 ? String(line.prefix(35)) + "..." : line
     }
 

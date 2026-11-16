@@ -67,18 +67,30 @@ enum HorizontalScrollGuard {
 /// Отмечает горизонтальную ленту как зону, где свайп вправо не открывает боковое меню.
 struct DrawerFreeZone: ViewModifier {
     @State private var id = UUID()
+    /// Полоса слева, где свайп вправо всё же открывает меню (у сцены студии, которая листается свайпом).
+    var leadingGap: CGFloat
+
+    init(leadingGap: CGFloat = 0) {
+        self.leadingGap = leadingGap
+    }
 
     func body(content: Content) -> some View {
         content
             .background(
                 GeometryReader { geo in
-                    let frame = geo.frame(in: .global)
+                    let frame = zone(geo.frame(in: .global))
                     Color.clear
                         .onAppear { HorizontalScrollGuard.zones[id] = frame }
                         .onChange(of: frame) { _, value in HorizontalScrollGuard.zones[id] = value }
                 }
             )
             .onDisappear { HorizontalScrollGuard.zones[id] = nil }
+    }
+
+    private func zone(_ frame: CGRect) -> CGRect {
+        guard leadingGap > 0 else { return frame }
+        let gap = max(0, leadingGap - frame.minX)
+        return CGRect(x: frame.minX + gap, y: frame.minY, width: max(0, frame.width - gap), height: frame.height)
     }
 }
 
@@ -234,31 +246,70 @@ private struct CodeBlockView: View {
     }
 }
 
+/// Таблица ответа. Ширины столбцов считаются заранее по тексту ячеек, а не отдаются Grid:
+/// Grid внутри горизонтальной прокрутки мерял высоту строки по одной строчке текста, и перенесённый
+/// текст налезал на соседние строки (снимок 16.11.2026, Qwen3.5 9B). Узкая таблица лежит в ширину
+/// ответа, широкая листается вбок.
 private struct TableBlockView: View {
     let header: [String]
     let rows: [[String]]
 
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            Grid(alignment: .topLeading, horizontalSpacing: 0, verticalSpacing: 0) {
-                GridRow {
-                    ForEach(Array(header.enumerated()), id: \.offset) { _, cell in
-                        TableCell(text: cell, isHeader: true)
-                    }
-                }
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    Rectangle().fill(Theme.line).frame(height: 1).gridCellUnsizedAxes(.horizontal)
-                    GridRow {
-                        ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
-                            TableCell(text: cell, isHeader: false)
-                        }
-                    }
+    private static let padding: CGFloat = 14
+    private static let minColumn: CGFloat = 76
+    private static let maxColumn: CGFloat = 240
+
+    private var widths: [CGFloat] {
+        header.indices.map { column in
+            var widest: CGFloat = 0
+            let all = [header[column]] + rows.map { $0.indices.contains(column) ? $0[column] : "" }
+            for (index, cell) in all.enumerated() {
+                let font = UIFont.systemFont(ofSize: 15, weight: index == 0 ? .semibold : .regular)
+                let plain = String(InlineMarkdown.render(TableCell.clean(cell)).characters)
+                for line in plain.split(separator: "\n", omittingEmptySubsequences: false) {
+                    widest = max(widest, (String(line) as NSString).size(withAttributes: [.font: font]).width)
                 }
             }
-            .background(Theme.surface.opacity(0.55), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line))
+            let wanted = ceil(widest * 1.04) + Self.padding * 2 + 2
+            return min(max(wanted, Self.minColumn), Self.maxColumn)
         }
-        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+    }
+
+    var body: some View {
+        let columns = widths
+        let total = columns.reduce(0, +)
+        let grid = VStack(alignment: .leading, spacing: 0) {
+            TableLine(cells: header, widths: columns, isHeader: true)
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                Rectangle().fill(Theme.line).frame(width: total, height: 1)
+                TableLine(cells: row, widths: columns, isHeader: false)
+            }
+        }
+        .frame(width: total, alignment: .leading)
+        .background(Theme.surface.opacity(0.55), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+        ViewThatFits(in: .horizontal) {
+            grid
+            ScrollView(.horizontal, showsIndicators: false) { grid }
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct TableLine: View {
+    let cells: [String]
+    let widths: [CGFloat]
+    let isHeader: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(Array(widths.enumerated()), id: \.offset) { index, width in
+                TableCell(text: cells.indices.contains(index) ? cells[index] : "", isHeader: isHeader)
+                    .frame(width: width, alignment: .topLeading)
+            }
+        }
     }
 }
 
@@ -266,12 +317,19 @@ private struct TableCell: View {
     let text: String
     let isHeader: Bool
 
+    /// Переносы `<br>` из ответов моделей становятся настоящими.
+    static func clean(_ text: String) -> String {
+        text.replacingOccurrences(of: "<br>", with: "\n", options: .caseInsensitive)
+            .replacingOccurrences(of: "<br/>", with: "\n", options: .caseInsensitive)
+            .replacingOccurrences(of: "<br />", with: "\n", options: .caseInsensitive)
+    }
+
     var body: some View {
-        Text(InlineMarkdown.render(text, size: 15))
+        Text(InlineMarkdown.render(Self.clean(text), size: 15))
             .font(.system(size: 15, weight: isHeader ? .semibold : .regular))
             .foregroundStyle(isHeader ? Theme.ink : Theme.ink.opacity(0.92))
             .lineSpacing(3)
-            .frame(maxWidth: 220, alignment: .leading)
+            .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 14)
             .padding(.vertical, 11)

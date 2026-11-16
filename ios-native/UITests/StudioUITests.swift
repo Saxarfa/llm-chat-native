@@ -85,9 +85,9 @@ final class StudioUITests: XCTestCase {
         XCTAssertTrue(element(app, "studio.create").waitForExistence(timeout: 5))
         sleep(1)
         snap("ui-02-studio")
-        app.buttons["Вернуться в чат"].firstMatch.tap()
+        app.buttons["Вернуться в сессию"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Настройки модели"].firstMatch.waitForExistence(timeout: 5)
-            || app.buttons["Новый чат"].firstMatch.waitForExistence(timeout: 5))
+            || app.buttons["Новая сессия"].firstMatch.waitForExistence(timeout: 5))
     }
 
     /// Промпт → «Создать» → ход генерации → готовый арт на сцене.
@@ -137,11 +137,22 @@ final class StudioUITests: XCTestCase {
         XCTAssertTrue(format.exists && abs(format.frame.minX - left) < 2,
                       "свайп по ленте артов сдвинул экран (открылось меню): \(format.frame.minX) vs \(left)")
 
-        // Контроль: свайп по сцене меню открывает, иначе проверка выше ничего не доказывает.
-        element(app, "studio.canvas").swipeRight()
+        // Свайп влево по сцене листает арты, как в «Фото» (16.11.2026): выбран второй в ленте, меню закрыто.
+        let thumbs = app.buttons.matching(identifier: "studio.thumb.strip")
+        XCTAssertTrue(thumbs.element(boundBy: 0).isSelected, "сначала на сцене самый новый арт")
+        element(app, "studio.canvas").swipeLeft()
         sleep(1)
         snap("ui-05c-swipe-stage")
-        XCTAssertTrue(!format.exists || format.frame.minX > left + 100, "свайп по сцене не открыл меню")
+        XCTAssertTrue(thumbs.element(boundBy: 1).isSelected, "свайп по сцене не перелистнул арт")
+        XCTAssertEqual(format.frame.minX, left, accuracy: 2, "свайп по сцене открыл меню")
+
+        // Контроль: свайп от самого левого края меню по-прежнему открывает,
+        // иначе проверка ленты выше ничего не доказывает.
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.4))
+            .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.4)))
+        sleep(1)
+        XCTAssertTrue(!format.exists || format.frame.minX > left + 100, "свайп от края не открыл меню")
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
         sleep(1)
         XCTAssertTrue(format.waitForExistence(timeout: 3))

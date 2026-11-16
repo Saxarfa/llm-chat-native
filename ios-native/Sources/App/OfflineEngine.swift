@@ -72,7 +72,7 @@ extension AppModel {
         let old = store.chats[id]
         let now = Date().timeIntervalSince1970 * 1000
         store.put(LocalChat(id: id,
-                            title: entry.title ?? old?.title ?? chats.first(where: { $0.id == id })?.title ?? "Новый диалог",
+                            title: entry.title ?? old?.title ?? chats.first(where: { $0.id == id })?.title ?? "Новая сессия",
                             model: model, messages: entry.messages,
                             overrides: chatMeta[id]?.overrides ?? old?.overrides ?? [:],
                             created: old?.created ?? now, serverUpdatedAt: entry.updatedAt,
@@ -131,7 +131,7 @@ extension AppModel {
         }
         do {
             let answer = try await api.json("/api/chats/\(APIClient.pathSafe(local.id))", method: "PUT", body: body, timeout: 30)
-            guard let chat = answer["chat"] as? [String: Any] else { return .failed("ПК не вернул сохранённый чат.") }
+            guard let chat = answer["chat"] as? [String: Any] else { return .failed("ПК не вернул сохранённую сессию.") }
             var saved = local
             saved.dirty = false
             saved.serverUpdatedAt = Self.updatedAt(chat)
@@ -153,7 +153,7 @@ extension AppModel {
         } catch let error as APIError where error.status == 0 {
             return .unreachable
         } catch {
-            return .failed((error as? APIError)?.message ?? "Не удалось сохранить чат на ПК.")
+            return .failed((error as? APIError)?.message ?? "Не удалось сохранить сессию на ПК.")
         }
     }
 

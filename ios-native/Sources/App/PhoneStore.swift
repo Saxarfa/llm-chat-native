@@ -44,7 +44,7 @@ struct LocalChat {
     init?(json: [String: Any]) {
         guard let id = json["id"] as? String, !id.isEmpty else { return nil }
         self.id = id
-        title = (json["title"] as? String) ?? "Новый диалог"
+        title = (json["title"] as? String) ?? "Новая сессия"
         model = (json["model"] as? String) ?? ""
         messages = (json["messages"] as? [[String: Any]]) ?? []
         overrides = (json["overrides"] as? [String: Any]) ?? [:]

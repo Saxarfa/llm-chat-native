@@ -72,6 +72,9 @@ struct ArtView: View {
     @State private var image: UIImage?
     @State private var failed = false
     @State private var attempt = 0
+    /// Картинка уже резкая. Только что докачанная появляется из блюра и «наводится на резкость» —
+    /// единственный честный момент проявки: пока арт генерируется, самой картинки ещё нет (16.11.2026).
+    @State private var revealed = true
 
     var body: some View {
         if art.isVideo {
@@ -92,6 +95,8 @@ struct ArtView: View {
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFill()
+                                .blur(radius: revealed ? 0 : 24)
+                                .scaleEffect(revealed ? 1 : 1.08)
                                 .transition(.opacity)
                         } else if failed {
                             placeholder("Не удалось загрузить. Нажмите, чтобы повторить.", symbol: "arrow.clockwise")
@@ -111,8 +116,17 @@ struct ArtView: View {
             .task(id: "\(art.id)-\(attempt)") {
                 guard image == nil else { return }
                 failed = false
-                image = await model.artImage(art.id, preview: true)
-                failed = image == nil
+                let started = Date()
+                let loaded = await model.artImage(art.id, preview: true)
+                // Из кэша (прокрутка назад) — сразу резкая; докачанная — проявляется из блюра.
+                let fresh = Date().timeIntervalSince(started) > 0.15
+                revealed = !fresh
+                image = loaded
+                failed = loaded == nil
+                guard fresh, loaded != nil else { return }
+                // Кадр с размытой картинкой должен успеть отрисоваться, иначе анимации не будет.
+                try? await Task.sleep(nanoseconds: 40_000_000)
+                withAnimation(.easeOut(duration: 0.8)) { revealed = true }
             }
         } else if art.busy {
             GenerationTile(ratio: art.ratio, progress: art.progress, status: art.statusText)

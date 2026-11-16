@@ -86,9 +86,8 @@ private struct TextParameters: View {
         let config = model.modelConfig(modelID)
         let saved = model.savedModelValues(modelID)
         let onPhone = PhoneModelID.isPhone(modelID)
-        let specs = ChatParameters.specs
-            .filter { ChatParameters.supported(modelID, $0.key) }
-            .filter { !onPhone || ($0.key != "presence_penalty" && $0.key != "frequency_penalty") }
+        // У моделей телефона показываются все параметры выборки llama.cpp, включая Presence и Frequency penalty.
+        let specs = ChatParameters.allSpecs(for: modelID, onPhone: onPhone)
             .map { ChatParameters.spec($0, for: modelID) }
         let main = specs.filter { ChatParameters.mainKeys.contains($0.key) }
         let rest = specs.filter { !ChatParameters.mainKeys.contains($0.key) }
@@ -190,13 +189,13 @@ private struct TextParameters: View {
                 }
                 Button("Отмена", role: .cancel) {}
             } message: {
-                Text("Температура, длина ответа и остальные параметры снова будут как у модели по умолчанию. Рассуждения и инструкция не изменятся.")
+                Text("Temperature, Max tokens и остальные параметры снова будут как у модели по умолчанию. Рассуждения и инструкция не изменятся.")
             }
         }
     }
 
     private func row(_ spec: ParameterSpec, config: [String: Any], saved: [String: Any]) -> some View {
-        ParameterRow(spec: spec, value: ChatParameters.number(config[spec.key]) ?? spec.min,
+        ParameterRow(spec: spec, value: ChatParameters.number(config[spec.key]) ?? spec.fallback ?? spec.min,
                      changed: saved[spec.key] != nil,
                      changedLabel: "Своё значение", sourceLabel: "По умолчанию",
                      onCommit: { value in set(spec.key, ChatParameters.stored(value, spec: spec)) },

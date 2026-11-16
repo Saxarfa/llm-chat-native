@@ -79,6 +79,7 @@ struct MainView: View {
                 DispatchQueue.main.async {
                     if axis != nil {
                         axis = nil
+                        DrawerSwipe.swiping = false
                         setOpen(isOpen)
                     }
                 }
@@ -119,7 +120,10 @@ struct MainView: View {
                     let horizontal = !scrollingBlock
                         && abs(value.translation.width) > abs(value.translation.height) * 1.3
                     axis = horizontal ? .horizontal : .vertical
-                    if horizontal { Keyboard.hide() }
+                    if horizontal {
+                        DrawerSwipe.swiping = true
+                        Keyboard.hide()
+                    }
                 }
                 guard axis == .horizontal else { return }
                 DrawerSwipe.lastMove = Date()
@@ -130,6 +134,9 @@ struct MainView: View {
                 axis = nil
                 guard wasHorizontal else { return }
                 settle()
+                // Кнопка под пальцем может сработать на отрыве чуть позже этого кадра: окно в 0,4 с
+                // (`lastMove`) её уже закрывает, а флаг снимаем только после него.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { DrawerSwipe.swiping = false }
                 let projected = (isOpen ? width : 0) + value.predictedEndTranslation.width
                 setOpen(projected > width / 2)
             }
@@ -141,11 +148,16 @@ struct MainView: View {
 /// на весь экран, спрашивают `blocksTaps` и в это время ничего не делают.
 enum DrawerSwipe {
     static var lastMove = Date.distantPast
+    /// Палец сейчас ведёт шторку (горизонтальный жест идёт). Поднимается в начале жеста и опускается в
+    /// его конце: если палец стоял неподвижно дольше 0,4 с и только потом оторвался, одного `lastMove`
+    /// не хватало, и строка под пальцем срабатывала (замечание 16.11.2026: закрываю шторку, а открывается
+    /// чат, на котором лежал палец).
+    static var swiping = false
     /// Открыт просмотр картинки поверх экрана: свайп вбок не открывает меню.
     static var viewerOpen = false
 
     static var blocksTaps: Bool {
-        Date().timeIntervalSince(lastMove) < 0.4
+        swiping || Date().timeIntervalSince(lastMove) < 0.4
     }
 }
 

@@ -27,7 +27,7 @@ struct PhoneModelsSheet: View {
                     downloadsSection
                     searchSection
                     toolsSection
-                    SettingsNote(text: "Ответ считает сам телефон — llama.cpp на Metal. Переписка сохраняется на ПК, как у других чатов. Быстрее всего работают модели до 4 млрд параметров в квантовании Q4_K_M.")
+                    SettingsNote(text: "Ответ считает сам телефон — llama.cpp на Metal. Переписка сохраняется на ПК, как у других сессий. Быстрее всего работают модели до 4 млрд параметров в квантовании Q4_K_M.")
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 32)
@@ -67,7 +67,7 @@ struct PhoneModelsSheet: View {
             }
             Button("Отмена", role: .cancel) {}
         } message: { item in
-            Text("«\(item.name)» освободит место. Чаты с ней на ПК останутся.")
+            Text("«\(item.name)» освободит место. Сессии с ней на ПК останутся.")
         }
         .sheet(item: $configuring) { item in
             ModelProfileSheet(modelID: item.chatID)
@@ -140,7 +140,7 @@ struct PhoneModelsSheet: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(PressScaleStyle())
-            .accessibilityLabel("Выбрать для чата: \(item.name)")
+            .accessibilityLabel("Выбрать для сессии: \(item.name)")
             .accessibilityIdentifier("phone.installed")
             if selected {
                 Image(systemName: "checkmark")
@@ -161,7 +161,7 @@ struct PhoneModelsSheet: View {
             .accessibilityLabel("Настройки: \(item.name)")
             .accessibilityIdentifier("phone.settings")
             Menu {
-                Button("Выбрать для чата", systemImage: "bubble.left") { onChoose(item.chatID) }
+                Button("Выбрать для сессии", systemImage: "bubble.left") { onChoose(item.chatID) }
                 Button("Настройки модели", systemImage: "slider.horizontal.3") { configuring = item }
                 if phone.visionFile(for: item.file) == nil, item.repo != nil {
                     Button("Добавить зрение", systemImage: "eye") { Task { await phone.addVision(for: item) } }

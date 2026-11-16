@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Ветки диалога — как `BranchSwitcher.tsx`: выбрать ветку или удалить ненужную.
+/// Ветки сессии — как `BranchSwitcher.tsx`: выбрать ветку или удалить ненужную.
 struct BranchesSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -10,7 +10,7 @@ struct BranchesSheet: View {
         let branches = model.activeBranches
         let active = model.activeBranchID
         VStack(spacing: 0) {
-            SheetHeader(title: "Ветки диалога", subtitle: branchCount(branches.count), busy: model.branchBusy)
+            SheetHeader(title: "Ветки сессии", subtitle: branchCount(branches.count), busy: model.branchBusy)
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     if !model.canChangeHistory, !model.branchBusy {

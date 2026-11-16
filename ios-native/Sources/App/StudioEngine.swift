@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Photos
 import SwiftUI
 import UIKit
 
@@ -33,6 +34,13 @@ final class StudioModel {
     var loraSets: [LoraSet] = []
     var lorasLoading = false
     var lorasError: String?
+    /// Последние промпты (только на этом телефоне) — чипы над полем при наборе.
+    var recentPrompts: [String] = StudioPromptHistory.load()
+    /// Короткое подтверждение под «Создать» («Сохранено в «Фото»», «Seed закреплён»); гаснет само.
+    var flash: String?
+    @ObservationIgnored private var flashTask: Task<Void, Never>?
+    /// Сколько артов можно поставить в очередь за раз (сервер принимает задания и во время генерации).
+    static let queueLimit = 4
 
     @ObservationIgnored weak var app: AppModel?
     /// Правки, ещё не принятые сервером (в формате сервера).
@@ -54,8 +62,17 @@ final class StudioModel {
     // MARK: - Что показывать
 
     var completed: [StudioJob] { jobs.filter(\.isDone) }
-    var pendingJob: StudioJob? { jobs.first(where: \.isActive) }
+    /// Очередь: идущие и ждущие задания, первым — то, что запущено раньше.
+    var activeJobs: [StudioJob] { jobs.filter(\.isActive).sorted { $0.created < $1.created } }
+    /// Задание, которое рисуется сейчас (или первое в очереди, пока ни одно не началось).
+    var pendingJob: StudioJob? {
+        let active = activeJobs
+        return active.first { $0.status != "queued" } ?? active.first
+    }
+    var queueFull: Bool { activeJobs.count >= Self.queueLimit }
     var available: Bool { config?.online == true }
+    /// Seed закреплён: следующие арты получают одно и то же число (замок у «Создать»).
+    var seedLocked: Bool { draft.seed != "-1" }
 
     var selected: StudioJob? {
         let done = completed
@@ -280,10 +297,12 @@ final class StudioModel {
 
     // MARK: - Генерация
 
+    /// Новый арт. Если уже что-то рисуется, задание встаёт в очередь (до `queueLimit`).
     func generate() async {
-        guard valid, !busy, pendingJob == nil, !loop else { return }
+        guard valid, !busy, !queueFull, !loop else { return }
         Keyboard.hide()
         Haptics.tap()
+        remember(draft.prompt)
         if isPreview {
             previewGenerate()
             return
@@ -307,8 +326,9 @@ final class StudioModel {
         }
     }
 
-    func stop() async {
-        guard let job = pendingJob else { return }
+    /// Остановить задание: идущее (по умолчанию) или любое из очереди.
+    func stop(_ target: StudioJob? = nil) async {
+        guard let job = target ?? pendingJob else { return }
         Haptics.tap()
         if isPreview {
             jobs.removeAll { $0.id == job.id }
@@ -336,7 +356,10 @@ final class StudioModel {
         defer { if revision == loopRevision { loopPending = false } }
         if isPreview { return }
         guard let api else { return }
-        if enabled { await flush() }
+        if enabled {
+            remember(draft.prompt)
+            await flush()
+        }
         guard revision == loopRevision else { return }
         var body: [String: Any] = ["enabled": enabled, "paused": enabled && !valid, "revision": revision]
         if valid { body["parameters"] = draft.parameters }
@@ -359,6 +382,84 @@ final class StudioModel {
     func select(_ job: StudioJob) {
         Haptics.tap()
         selectedID = job.id == completed.first?.id ? nil : job.id
+    }
+
+    /// Листание сцены свайпом: `+1` — более старый арт (правее в ленте), `-1` — более новый.
+    func canStep(_ delta: Int) -> Bool {
+        let done = completed
+        guard let current = selected, let index = done.firstIndex(where: { $0.id == current.id }) else { return false }
+        return done.indices.contains(index + delta)
+    }
+
+    func step(_ delta: Int) {
+        let done = completed
+        guard let current = selected, let index = done.firstIndex(where: { $0.id == current.id }),
+              done.indices.contains(index + delta) else { return }
+        select(done[index + delta])
+    }
+
+    /// Замок seed у «Создать»: закрепить seed арта на сцене (или новый случайный) либо вернуть случайный.
+    func toggleSeedLock() {
+        Haptics.tap()
+        if seedLocked {
+            edit { $0.seed = "-1" }
+            show("Seed снова случайный")
+        } else {
+            let seed = selected?.seed ?? Int.random(in: 0...4_294_967_295)
+            edit { $0.seed = String(seed) }
+            show("Seed закреплён · \(seed)")
+        }
+    }
+
+    /// Запомнить промпт в «последних» (чипы над полем).
+    private func remember(_ prompt: String) {
+        let next = StudioPromptHistory.add(prompt, to: recentPrompts)
+        guard next != recentPrompts else { return }
+        recentPrompts = next
+        if !isPreview { StudioPromptHistory.save(next) }
+    }
+
+    /// Короткое подтверждение под «Создать».
+    func show(_ text: String) {
+        flash = text
+        flashTask?.cancel()
+        flashTask = Task {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            guard !Task.isCancelled else { return }
+            if self.flash == text { self.flash = nil }
+        }
+    }
+
+    /// «Сохранить в Фото» из меню арта: оригинал с сервера, иначе — уменьшенная копия.
+    func saveToPhotos(_ job: StudioJob) async {
+        guard let app else { return }
+        let picture: UIImage?
+        if let original = await app.artImage(job.id, preview: false) {
+            picture = original
+        } else {
+            picture = await app.artImage(job.id, preview: true)
+        }
+        guard let image = picture else {
+            Haptics.error()
+            show("Не удалось загрузить арт.")
+            return
+        }
+        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        guard status == .authorized || status == .limited else {
+            Haptics.error()
+            show("Разрешите доступ к «Фото» в настройках iPhone.")
+            return
+        }
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
+            }
+            Haptics.success()
+            show("Сохранено в «Фото»")
+        } catch {
+            Haptics.error()
+            show("Не удалось сохранить арт.")
+        }
     }
 
     func toggleFavorite(_ job: StudioJob) async {
@@ -467,9 +568,16 @@ final class StudioModel {
         }
     }
 
-    /// «Повторить настройки»: всё, кроме seed, — как у выбранного арта.
-    func reuse(_ job: StudioJob) {
-        guard !busy, pendingJob == nil, !loop else { return }
+    /// «Повторить настройки»: всё, кроме seed, — как у выбранного арта. `keepSeed` — и seed тоже
+    /// (пункт меню арта «Взять настройки и seed»): так получается тот же арт с правками промпта.
+    func reuse(_ job: StudioJob, keepSeed: Bool = false) {
+        guard !busy, !loop else { return }
+        defer {
+            if keepSeed, let seed = job.seed {
+                edit { $0.seed = String(seed) }
+                show("Настройки и seed взяты · \(seed)")
+            }
+        }
         Haptics.tap()
         if job.isCloud {
             edit { $0.prompt = job.prompt }
@@ -585,6 +693,7 @@ final class StudioModel {
         draft = StudioDraft()
         draft.prompt = "девушка-рыцарь в серебряных доспехах на краю утёса, закат, ветер, детальный фон"
         draft.loras = [StudioLora(name: "silvana-style-AB10-01.safetensors")]
+        recentPrompts = [draft.prompt, "дракон в облаках над горами, рассвет", "уютная кофейня в дождь, тёплый свет"]
         ready = true
         catalog = [
             LoraEntry(name: "silvana-style-AB10-01.safetensors", description: "Мягкий акварельный стиль", triggers: "silvana style", favorite: true),

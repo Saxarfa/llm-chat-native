@@ -104,6 +104,44 @@ final class PhoneModelDataTests: XCTestCase {
         XCTAssertEqual(sampling.stop, ["</s>"])
     }
 
+    /// Полный набор параметров выборки llama.cpp у моделей телефона (замечание 16.11.2026).
+    func testFullSamplingSettings() {
+        let defaults = PhoneSampling(config: [:])
+        XCTAssertEqual(defaults.repeatLastN, 64)
+        XCTAssertEqual(defaults.typicalP, 1)
+        XCTAssertEqual(defaults.dryBase, 1.75, accuracy: 0.0001)
+        XCTAssertEqual(defaults.seed, -1)
+
+        let tuned = PhoneSampling(config: [
+            "repeat_last_n": 128, "typical_p": 0.9, "top_n_sigma": 1.5, "xtc_probability": 0.5,
+            "xtc_threshold": 0.15, "dry_multiplier": 0.8, "dry_base": 2, "dry_allowed_length": 3,
+            "dry_penalty_last_n": 256, "seed": 42, "frequency_penalty": 0.3,
+        ])
+        XCTAssertEqual(tuned.repeatLastN, 128)
+        XCTAssertEqual(tuned.topNSigma, 1.5, accuracy: 0.0001)
+        XCTAssertEqual(tuned.xtcProbability, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(tuned.dryAllowedLength, 3)
+        XCTAssertEqual(tuned.dryPenaltyLastN, 256)
+        XCTAssertEqual(tuned.seed, 42)
+        XCTAssertEqual(tuned.frequencyPenalty, 0.3, accuracy: 0.0001)
+    }
+
+    /// Названия параметров не переводятся; Presence и Frequency penalty видны у модели телефона.
+    func testPhoneSettingNamesStayEnglish() {
+        let keys = ChatParameters.allSpecs(for: "phone/model.gguf", onPhone: true).map(\.key)
+        for key in ["presence_penalty", "frequency_penalty", "repeat_last_n", "typical_p", "xtc_probability",
+                    "dry_multiplier", "seed"] {
+            XCTAssertTrue(keys.contains(key), key)
+        }
+        let latin = ChatParameters.allSpecs(for: "phone/model.gguf", onPhone: true).allSatisfy { spec in
+            spec.label.unicodeScalars.allSatisfy { $0.value < 0x0400 || $0.value > 0x04FF }
+        }
+        XCTAssertTrue(latin)
+        // У моделей на ПК остаются только параметры, которые знает сервер.
+        let pc = ChatParameters.allSpecs(for: "gemma-26b-qat", onPhone: false).map(\.key)
+        XCTAssertFalse(pc.contains("typical_p"))
+    }
+
     func testSearchResultParsing() {
         let repo = HFRepo(json: ["id": "unsloth/Qwen3-4B-GGUF", "downloads": 812_400, "likes": 214])
         XCTAssertEqual(repo?.author, "unsloth")
@@ -115,6 +153,6 @@ final class PhoneModelDataTests: XCTestCase {
     func testPhoneChatTitle() {
         XCTAssertEqual(AppModel.phoneTitle("Короткий вопрос\nвторая строка"), "Короткий вопрос")
         XCTAssertEqual(AppModel.phoneTitle(String(repeating: "а", count: 40)), String(repeating: "а", count: 35) + "...")
-        XCTAssertEqual(AppModel.phoneTitle("   "), "Новый диалог")
+        XCTAssertEqual(AppModel.phoneTitle("   "), "Новая сессия")
     }
 }

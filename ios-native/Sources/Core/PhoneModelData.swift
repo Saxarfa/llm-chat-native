@@ -276,6 +276,18 @@ struct PhoneSampling: Equatable {
     var repeatPenalty: Float = 1.1
     var presencePenalty: Float = 0
     var frequencyPenalty: Float = 0
+    /// Сколько последних токенов видят штрафы за повторы; 0 — штрафов нет.
+    var repeatLastN: Int32 = 64
+    var typicalP: Float = 1
+    var topNSigma: Float = 0
+    var xtcProbability: Float = 0
+    var xtcThreshold: Float = 0.1
+    var dryMultiplier: Float = 0
+    var dryBase: Float = 1.75
+    var dryAllowedLength: Int32 = 2
+    var dryPenaltyLastN: Int32 = 512
+    /// `-1` — каждый раз новое зерно.
+    var seed: Int64 = -1
     /// `-1` — до конца контекста.
     var maxTokens: Int = -1
     var stop: [String] = []
@@ -295,6 +307,16 @@ struct PhoneSampling: Equatable {
         if let value = number("repeat_penalty") { repeatPenalty = Float(value) }
         if let value = number("presence_penalty") { presencePenalty = Float(value) }
         if let value = number("frequency_penalty") { frequencyPenalty = Float(value) }
+        if let value = number("repeat_last_n") { repeatLastN = Int32(max(0, min(value, 100_000))) }
+        if let value = number("typical_p") { typicalP = Float(value) }
+        if let value = number("top_n_sigma") { topNSigma = Float(max(0, value)) }
+        if let value = number("xtc_probability") { xtcProbability = Float(value) }
+        if let value = number("xtc_threshold") { xtcThreshold = Float(value) }
+        if let value = number("dry_multiplier") { dryMultiplier = Float(max(0, value)) }
+        if let value = number("dry_base") { dryBase = Float(max(1, value)) }
+        if let value = number("dry_allowed_length") { dryAllowedLength = Int32(max(1, min(value, 1000))) }
+        if let value = number("dry_penalty_last_n") { dryPenaltyLastN = Int32(max(0, min(value, 100_000))) }
+        if let value = number("seed") { seed = Int64(value) }
         if let value = number("max_tokens") { maxTokens = Int(value) }
         stop = ((config["stop"] as? [Any]) ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty }
         thinking = (config["thinking"] as? Bool) ?? false

@@ -146,7 +146,7 @@ extension AppModel {
             if !showLocal(id), lives[id] == nil {
                 thread = []
                 threadChatID = id
-                threadState = .failed("Нет связи с ПК. Этот чат откроется, когда ПК будет доступен.")
+                threadState = .failed("Нет связи с ПК. Эта сессия откроется, когда ПК будет доступен.")
             }
             return
         }
@@ -186,7 +186,7 @@ extension AppModel {
             if activeChatID == id, lives[id] == nil, showLocal(id) { return }
             // Чат, который только создаётся отправкой, сервер ещё может не знать.
             guard activeChatID == id, thread.isEmpty, lives[id] == nil else { return }
-            threadState = .failed((error as? APIError)?.message ?? "Не удалось загрузить чат.")
+            threadState = .failed((error as? APIError)?.message ?? "Не удалось загрузить сессию.")
         }
     }
 
@@ -275,7 +275,7 @@ extension AppModel {
         lives[id] = live
         sendError = nil
         if isNew {
-            chats.insert(ChatSummary(id: id, title: text.isEmpty ? "Новый чат" : String(text.prefix(42)),
+            chats.insert(ChatSummary(id: id, title: text.isEmpty ? "Новая сессия" : String(text.prefix(42)),
                                      updatedAt: now, modelID: model), at: 0)
             thread = [question]
             threadChatID = id

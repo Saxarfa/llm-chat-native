@@ -104,7 +104,7 @@ struct ChatScreen: View {
         }
     }
 
-    /// Шапка как у Claude: слева меню, справа «Новый чат» и «⋯» в общей капсуле; названия чата нет.
+    /// Шапка как у Claude: слева меню, справа «Новая сессия» и «⋯» в общей капсуле; названия чата нет.
     /// Кнопки стоят сразу под «островом» и плавают над лентой.
     private var header: some View {
         HStack(spacing: 8) {
@@ -112,7 +112,7 @@ struct ChatScreen: View {
             Spacer()
             if let chat = model.activeChat {
                 HStack(spacing: 0) {
-                    headerIcon("square.and.pencil", label: "Новый чат") {
+                    headerIcon("square.and.pencil", label: "Новая сессия") {
                         model.activeChatID = nil
                     }
                     Menu {
@@ -125,7 +125,7 @@ struct ChatScreen: View {
                             Keyboard.hide()
                             showBranches = true
                         } label: {
-                            Label("Ветки диалога", systemImage: "arrow.triangle.branch")
+                            Label("Ветки сессии", systemImage: "arrow.triangle.branch")
                         }
                         Divider()
                         ChatMenuItems(chat: chat, onRename: { renaming = chat }, onDelete: { deleting = chat })

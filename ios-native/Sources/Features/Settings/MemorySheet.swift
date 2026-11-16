@@ -72,7 +72,7 @@ struct MemorySheet: View {
     @ViewBuilder
     private func content(_ snapshot: MemorySnapshot) -> some View {
         SettingsCard {
-            ToggleRow(title: "Память включена", hint: "Модель видит сохранённые факты в каждом чате",
+            ToggleRow(title: "Память включена", hint: "Модель видит сохранённые факты в каждой сессии",
                       isOn: snapshot.enabled) { value in
                 Task { await saveSettings(enabled: value, autoSave: snapshot.autoSave) }
             }
@@ -141,7 +141,7 @@ struct MemorySheet: View {
                     .font(.system(size: 16))
                     .foregroundStyle(Theme.ink)
                     .fixedSize(horizontal: false, vertical: true)
-                let tags = [fact.scope.isEmpty ? nil : "Только в чатах пресета",
+                let tags = [fact.scope.isEmpty ? nil : "Только в сессиях пресета",
                             fact.origin == "model" ? "Запомнила модель" : nil].compactMap { $0 }
                 if !tags.isEmpty {
                     Text(tags.joined(separator: " · "))

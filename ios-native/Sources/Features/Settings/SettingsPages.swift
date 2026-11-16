@@ -361,7 +361,7 @@ struct ModelsPage: View {
                         .accessibilityIdentifier("models.row")
                     }
                 }
-                SettingsNote(text: "Название, фото и описание видны в выборе модели и в чатах — и здесь, и на сайте.")
+                SettingsNote(text: "Название, фото и описание видны в выборе модели и в сессиях — и здесь, и на сайте.")
             }
             .padding(.horizontal, 18)
             .padding(.bottom, 32)
@@ -421,7 +421,7 @@ struct ModelProfilePage: View {
                     CardDivider()
                     field("Описание", text: $tagline, prompt: "Для чего эта модель", which: .tagline)
                 }
-                SettingsNote(text: "Название и фото видны в выборе модели и в чатах.")
+                SettingsNote(text: "Название и фото видны в выборе модели и в сессиях.")
 
                 // У моделей картинок своя инструкция — она среди их параметров ниже.
                 if !ChatParameters.isNano(modelID) {
@@ -528,7 +528,7 @@ struct SearchPage: View {
         let count = Int(ChatParameters.number(shared["searchMaxResults"]) ?? 5)
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                SectionCaption(text: "Режим для новых чатов")
+                SectionCaption(text: "Режим для новых сессий")
                 SettingsCard {
                     ForEach(Array(ChatParameters.searchModes.enumerated()), id: \.element.id) { index, choice in
                         if index > 0 { CardDivider() }
@@ -560,7 +560,7 @@ struct SearchPage: View {
                         .accessibilityAddTraits(choice.value == mode ? .isSelected : [])
                     }
                 }
-                SettingsNote(text: "В открытом чате поиск переключается в меню «+» у поля ввода.")
+                SettingsNote(text: "В открытой сессии поиск переключается в меню «+» у поля ввода.")
 
                 SectionCaption(text: "Результаты")
                 SettingsCard {

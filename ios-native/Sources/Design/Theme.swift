@@ -248,7 +248,7 @@ struct CircleIconButton: View {
 extension View {
     /// Подложка кнопок шапки, как у Claude на iOS 26: системное «жидкое стекло», которое
     /// откликается на нажатие (растягивается и подсвечивается). На iOS 17–18 — прежний круг с каймой.
-    /// `tint` — главная кнопка («Новый чат»): стекло, окрашенное в цвет кнопки.
+    /// `tint` — главная кнопка («Новая сессия»): стекло, окрашенное в цвет кнопки.
     @ViewBuilder
     func glassChrome<S: InsettableShape>(_ shape: S, tint: Color? = nil, interactive: Bool = true) -> some View {
         if #available(iOS 26.0, *) {

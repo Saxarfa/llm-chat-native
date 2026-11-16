@@ -151,6 +151,8 @@ struct ValueRow: View {
 struct ToggleRow: View {
     let title: String
     var hint: String?
+    /// Значок слева, как у строк меню «+» в Claude; без него — прежняя строка.
+    var symbol: String?
     let isOn: Bool
     let onChange: (Bool) -> Void
 
@@ -159,20 +161,29 @@ struct ToggleRow: View {
             Haptics.tap()
             onChange(value)
         })) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 16))
-                    .foregroundStyle(Theme.ink)
-                if let hint {
-                    Text(hint)
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(Theme.subtle)
-                        .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 14) {
+                if let symbol {
+                    Image(systemName: symbol)
+                        .font(.system(size: 15, weight: .light))
+                        .foregroundStyle(Theme.ink.opacity(0.9))
+                        .frame(width: 22)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 16))
+                        .foregroundStyle(Theme.ink)
+                    if let hint {
+                        Text(hint)
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(Theme.subtle)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
         .tint(Theme.accent)
-        .padding(.horizontal, 16)
+        .padding(.leading, symbol == nil ? 16 : 17)
+        .padding(.trailing, 16)
         .padding(.vertical, 8)
         .frame(minHeight: 46)
     }
@@ -277,7 +288,7 @@ struct ParameterRow: View {
     /// `nil` — строку источника не показывать.
     var changed: Bool?
     /// Подписи источника значения.
-    var changedLabel = "Изменено в этом чате"
+    var changedLabel = "Изменено в этой сессии"
     var sourceLabel = "Из профиля модели"
     let onCommit: (Double) -> Void
     var onReset: (() -> Void)?
@@ -291,7 +302,7 @@ struct ParameterRow: View {
     private var unlimited: Bool { isLength && value == -1 }
     private var upper: Double { Swift.max(spec.max, value) }
     /// У длинных шкал (Top-K) «−»/«+» шагают крупнее.
-    private var buttonStep: Double { spec.max - spec.min > 200 ? Swift.max(spec.step, 5) : spec.step }
+    private var buttonStep: Double { spec.max - spec.min > 200 && spec.key != "seed" ? Swift.max(spec.step, 5) : spec.step }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -322,7 +333,7 @@ struct ParameterRow: View {
                     // При вводе поле пустое, прежнее значение — бледной подсказкой: новое число
                     // набирается сразу, без стирания (курсор мог встать в начало — «1.250.7»).
                     TextField(Self.format(value, spec: spec), text: $text)
-                        .keyboardType(spec.isInteger ? .numberPad : (spec.min < 0 ? .numbersAndPunctuation : .decimalPad))
+                        .keyboardType(spec.min < 0 ? .numbersAndPunctuation : (spec.isInteger ? .numberPad : .decimalPad))
                         .multilineTextAlignment(.trailing)
                         .font(.system(size: 15).monospacedDigit())
                         .foregroundStyle(Theme.ink)

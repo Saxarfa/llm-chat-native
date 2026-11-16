@@ -26,7 +26,7 @@ struct StudioScreen: View {
                     StudioStage(onOpen: openArt, onDetails: { panel = .details })
                         .contentShape(Rectangle())
                         .onTapGesture { typing = false }
-                    if !studio.completed.isEmpty {
+                    if !studio.completed.isEmpty || !studio.activeJobs.isEmpty {
                         StudioFilmstrip()
                             .padding(.top, 10)
                     }
@@ -84,7 +84,7 @@ struct StudioScreen: View {
                         .allowsHitTesting(false)
                 }
             }
-            CircleIconButton(symbol: "bubble.left", label: "Вернуться в чат") {
+            CircleIconButton(symbol: "bubble.left", label: "Вернуться в сессию") {
                 Haptics.tap()
                 model.screen = .chat
             }
@@ -126,6 +126,8 @@ private struct StudioStage: View {
     let onDetails: () -> Void
     @State private var image: UIImage?
     @State private var shownID: String?
+    /// Сдвиг арта за пальцем, пока сцену листают свайпом.
+    @State private var dragX: CGFloat = 0
 
     private var studio: StudioModel { model.studio }
 
@@ -140,19 +142,27 @@ private struct StudioStage: View {
                         .scaledToFit()
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .padding(6)
+                        .offset(x: dragX)
+                        .opacity(1 - min(abs(dragX) / 500, 0.35))
                         .id(shownID)
                         .transition(.opacity)
                 } else if studio.pendingJob == nil {
                     empty
                         .transition(.opacity)
                 }
-                // Идёт генерация — живой фон с ходом работы (процент — только у ComfyUI);
-                // прежний арт, если он есть, виден под ним размытым.
+                // Идёт генерация. Прежний арт остаётся виден целиком, ход работы — капсула внизу сцены
+                // (раньше его закрывало матовое стекло); пустая сцена — живая плитка с ходом работы.
                 if let job = studio.pendingJob {
-                    GenerationTile(progress: job.isCloud ? nil : job.progress.map { Double($0) / 100 },
-                                   status: job.statusText, cornerRadius: 22,
-                                   translucent: image != nil && studio.selected != nil)
-                        .transition(.opacity)
+                    let progress = job.isCloud ? nil : job.progress.map { Double($0) / 100 }
+                    if image != nil && studio.selected != nil {
+                        GenerationBadge(progress: progress, status: job.statusText)
+                            .padding(.bottom, 16)
+                            .frame(maxHeight: .infinity, alignment: .bottom)
+                            .transition(.opacity.combined(with: .offset(y: 12)))
+                    } else {
+                        GenerationTile(progress: progress, status: job.statusText, cornerRadius: 22)
+                            .transition(.opacity)
+                    }
                 }
             }
             .animation(.easeOut(duration: 0.25), value: shownID)
@@ -162,6 +172,12 @@ private struct StudioStage: View {
             .onTapGesture {
                 if studio.selected != nil, !DrawerSwipe.blocksTaps { onOpen() }
             }
+            // Листание артов свайпом прямо по сцене, как в «Фото»; у самого левого края свайп
+            // по-прежнему открывает меню.
+            .gesture(swipe)
+            .modifier(DrawerFreeZone(leadingGap: 36))
+            // Все действия с артом — по долгому нажатию.
+            .contextMenu { artMenu }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("studio.canvas")
             .accessibilityLabel(studio.selected == nil ? "Пустая сцена" : "Открыть арт на весь экран")
@@ -172,6 +188,80 @@ private struct StudioStage: View {
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .task(id: studio.selected?.id) { await load() }
+    }
+
+    private var swipe: some Gesture {
+        DragGesture(minimumDistance: 16)
+            .onChanged { value in
+                guard image != nil, studio.selected != nil,
+                      abs(value.translation.width) > abs(value.translation.height) else { return }
+                let delta = value.translation.width < 0 ? 1 : -1
+                // За краем ленты арт тянется туго — дальше листать некуда.
+                dragX = value.translation.width * (studio.canStep(delta) ? 1 : 0.25)
+            }
+            .onEnded { value in
+                let width = value.translation.width
+                let predicted = value.predictedEndTranslation.width
+                let delta = width < -60 || predicted < -160 ? 1 : (width > 60 || predicted > 160 ? -1 : 0)
+                guard dragX != 0 else { return }
+                if delta != 0, studio.canStep(delta) {
+                    studio.step(delta)
+                    // Новый арт въезжает с той стороны, куда ушёл палец.
+                    var instant = Transaction()
+                    instant.disablesAnimations = true
+                    withTransaction(instant) { dragX = CGFloat(delta) * 80 }
+                    DispatchQueue.main.async {
+                        withAnimation(Theme.spring) { dragX = 0 }
+                    }
+                } else {
+                    withAnimation(Theme.spring) { dragX = 0 }
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var artMenu: some View {
+        if let job = studio.selected {
+            Button {
+                Task { await studio.saveToPhotos(job) }
+            } label: {
+                Label("Сохранить в «Фото»", systemImage: "square.and.arrow.down")
+            }
+            if let image {
+                ShareLink(item: Image(uiImage: image), preview: SharePreview("Арт", image: Image(uiImage: image))) {
+                    Label("Поделиться", systemImage: "square.and.arrow.up")
+                }
+            }
+            Button {
+                UIPasteboard.general.string = job.prompt
+                Haptics.success()
+                studio.show("Промпт скопирован")
+            } label: {
+                Label("Скопировать промпт", systemImage: "doc.on.doc")
+            }
+            if !job.isCloud, job.seed != nil {
+                Button {
+                    studio.reuse(job, keepSeed: true)
+                } label: {
+                    Label("Взять настройки и seed", systemImage: "lock")
+                }
+            }
+            let favorite = (studio.jobs.first { $0.id == job.id } ?? job).favorite
+            Button {
+                Task { await studio.toggleFavorite(job) }
+            } label: {
+                Label(favorite ? "Убрать из избранного" : "В избранное", systemImage: favorite ? "star.slash" : "star")
+            }
+            Button(action: onDetails) {
+                Label("Об этом арте", systemImage: "info.circle")
+            }
+            Divider()
+            Button(role: .destructive) {
+                Task { await studio.delete(job) }
+            } label: {
+                Label("Удалить", systemImage: "trash")
+            }
+        }
     }
 
     private var empty: some View {
@@ -223,6 +313,14 @@ private struct StudioStage: View {
                 .accessibilityIdentifier("studio.status")
                 .transition(.opacity)
             }
+            if studio.pendingJob != nil, !studio.loop {
+                // «Создать» теперь ставит новые арты в очередь, поэтому идущий останавливается здесь.
+                SmallIconButton(symbol: "stop.fill", label: "Остановить генерацию") {
+                    Task { await studio.stop() }
+                }
+                .accessibilityIdentifier("studio.stop")
+                .transition(.opacity)
+            }
             Spacer(minLength: 0)
             if let job = studio.selected {
                 SmallIconButton(symbol: (studio.jobs.first { $0.id == job.id } ?? job).favorite ? "star.fill" : "star",
@@ -256,35 +354,109 @@ private struct StudioStage: View {
     }
 }
 
-/// Лента готовых артов: нажатие показывает арт на сцене.
+/// Лента: сначала очередь (идущий арт и ждущие, у каждого — крестик отмены), затем готовые арты.
+/// Нажатие на готовый показывает его на сцене; лента сама докручивается до выбранного,
+/// когда сцену листают свайпом.
 private struct StudioFilmstrip: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         let studio = model.studio
-        ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 8) {
-                ForEach(studio.completed.prefix(30)) { job in
-                    Button {
-                        studio.select(job)
-                    } label: {
-                        StudioThumb(id: job.id)
-                            .frame(width: 58, height: 58)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .strokeBorder(job.id == studio.selected?.id ? Theme.ink : Color.clear, lineWidth: 2)
-                            )
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 8) {
+                    ForEach(studio.activeJobs) { job in
+                        QueueTile(job: job, running: job.id == studio.pendingJob?.id)
+                            .id(job.id)
+                            .transition(.scale(scale: 0.6).combined(with: .opacity))
                     }
-                    .buttonStyle(PressScaleStyle())
-                    .accessibilityLabel("Арт \(job.prompt.prefix(40))")
+                    ForEach(studio.completed.prefix(30)) { job in
+                        Button {
+                            studio.select(job)
+                        } label: {
+                            StudioThumb(id: job.id)
+                                .frame(width: 58, height: 58)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .strokeBorder(job.id == studio.selected?.id ? Theme.ink : Color.clear, lineWidth: 2)
+                                )
+                        }
+                        .buttonStyle(PressScaleStyle())
+                        .id(job.id)
+                        .accessibilityLabel("Арт \(job.prompt.prefix(40))")
+                        .accessibilityAddTraits(job.id == studio.selected?.id ? .isSelected : [])
+                        .accessibilityIdentifier("studio.thumb.strip")
+                    }
                 }
+                .padding(.horizontal, 16)
+                .animation(Theme.spring, value: studio.activeJobs.map(\.id))
             }
-            .padding(.horizontal, 16)
+            .onChange(of: studio.selected?.id) { _, id in
+                guard let id else { return }
+                withAnimation(Theme.spring) { proxy.scrollTo(id, anchor: .center) }
+            }
         }
         .frame(height: 60)
         .modifier(DrawerFreeZone())
         .accessibilityIdentifier("studio.filmstrip")
+    }
+}
+
+/// Плитка очереди в ленте: идущий арт — «Атом» и процент, ждущий — «Ждёт»; крестик отменяет задание.
+private struct QueueTile: View {
+    @Environment(AppModel.self) private var model
+    let job: StudioJob
+    let running: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Theme.surface)
+            if running {
+                GenerationAura().opacity(0.7)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            VStack(spacing: 3) {
+                if running {
+                    AtomIndicator(size: 18)
+                    if let progress = job.progress, !job.isCloud {
+                        Text("\(progress)%")
+                            .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(Theme.ink)
+                            .contentTransition(.numericText(value: Double(progress)))
+                    }
+                } else {
+                    Image(systemName: "hourglass")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundStyle(Theme.muted)
+                    Text("Ждёт")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+        }
+        .frame(width: 58, height: 58)
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.line))
+        .overlay(alignment: .topTrailing) {
+            Button {
+                Task { await model.studio.stop(job) }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 20, height: 20)
+                    .background(Theme.fillActive, in: Circle())
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PressScaleStyle())
+            // Кружок крестика целиком внутри плитки: лента обрезает всё, что выступает за её высоту.
+            .offset(x: 6, y: -6)
+            .accessibilityLabel(running ? "Остановить генерацию" : "Убрать из очереди")
+        }
+        .animation(.easeOut(duration: 0.4), value: job.progress)
+        .accessibilityIdentifier("studio.queue")
     }
 }
 
@@ -393,11 +565,15 @@ private struct StudioComposer: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             chipRow
+            if typing.wrappedValue {
+                recentRow
+            }
             // Пока идёт набор, поле занимает всё место до «Создать» (а не висит над пустотой).
             prompt
                 .frame(maxHeight: typing.wrappedValue ? .infinity : nil, alignment: .top)
             HStack(spacing: 10) {
                 loopButton
+                seedButton
                 createButton
             }
             if let text = message {
@@ -462,6 +638,44 @@ private struct StudioComposer: View {
         chips
     }
 
+    /// Последние промпты чипами — только пока идёт набор; нажатие подставляет промпт целиком.
+    @ViewBuilder
+    private var recentRow: some View {
+        let recent = studio.recentPrompts.filter { $0 != studio.draft.prompt.trimmingCharacters(in: .whitespacesAndNewlines) }
+        if !recent.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Theme.subtle)
+                    ForEach(recent, id: \.self) { text in
+                        Button {
+                            Haptics.tap()
+                            studio.edit { $0.prompt = text }
+                        } label: {
+                            Text(text)
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.ink)
+                                .lineLimit(1)
+                                .frame(maxWidth: 220)
+                                .padding(.horizontal, 12)
+                                .frame(height: 32)
+                                .background(Theme.fill, in: Capsule())
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(PressScaleStyle())
+                        .accessibilityLabel("Подставить промпт: \(text.prefix(60))")
+                    }
+                }
+            }
+            .scrollClipDisabled()
+            .modifier(DrawerFreeZone())
+            .accessibilityIdentifier("studio.recent")
+            .transition(.opacity)
+        }
+    }
+
     private var formatName: String {
         if studio.draft.size == "custom" { return "\(studio.draft.width) × \(studio.draft.height)" }
         return StudioFormat.all.first { $0.value == studio.draft.size }?.name ?? "Свой размер"
@@ -498,7 +712,8 @@ private struct StudioComposer: View {
             .font(.system(size: 17))
             .foregroundStyle(Theme.ink)
             .focused(typing)
-            .padding(.horizontal, 16)
+            .padding(.leading, 16)
+            .padding(.trailing, showsClear ? 44 : 16)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, maxHeight: typing.wrappedValue ? .infinity : nil, alignment: .topLeading)
             .background(Theme.surface, in: shape)
@@ -506,8 +721,49 @@ private struct StudioComposer: View {
             // Касание в любом месте рамки (и под текстом) ставит курсор.
             .contentShape(shape)
             .onTapGesture { typing.wrappedValue = true }
+            .overlay(alignment: .topTrailing) {
+                // Длинный промпт с телефона не стереть — одна кнопка очищает поле.
+                if showsClear {
+                    Button {
+                        Haptics.tap()
+                        studio.edit { $0.prompt = "" }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Theme.subtle)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .padding(2)
+                    .accessibilityLabel("Очистить промпт")
+                    .accessibilityIdentifier("studio.prompt.clear")
+                    .transition(.opacity)
+                }
+            }
             .accessibilityLabel("Промпт")
             .accessibilityIdentifier("studio.prompt")
+    }
+
+    private var showsClear: Bool { typing.wrappedValue && !studio.draft.prompt.isEmpty }
+
+    /// Замок seed: закреплённый seed повторяет композицию, пока меняется промпт.
+    private var seedButton: some View {
+        Button {
+            studio.toggleSeedLock()
+        } label: {
+            Image(systemName: studio.seedLocked ? "lock.fill" : "lock.open")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(studio.seedLocked ? Theme.buttonPrimaryText : Theme.ink)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 52, height: 52)
+                .background(studio.seedLocked ? Theme.buttonPrimary : Theme.fill,
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(PressScaleStyle())
+        .disabled(!studio.ready)
+        .animation(.easeOut(duration: 0.2), value: studio.seedLocked)
+        .accessibilityLabel(studio.seedLocked ? "Открепить seed" : "Закрепить seed")
+        .accessibilityIdentifier("studio.seed")
     }
 
     private var loopButton: some View {
@@ -532,9 +788,8 @@ private struct StudioComposer: View {
         Button {
             if studio.loop {
                 Task { await studio.toggleLoop() }
-            } else if studio.pendingJob != nil {
-                Task { await studio.stop() }
             } else {
+                // Пока рисуется прежний, новый арт встаёт в очередь (остановка — у плитки и у строки хода).
                 typing.wrappedValue = false
                 Task { await studio.generate() }
             }
@@ -543,7 +798,7 @@ private struct StudioComposer: View {
                 if studio.busy {
                     ProgressView().tint(Theme.buttonPrimaryText)
                 } else {
-                    Image(systemName: studio.loop || studio.pendingJob != nil ? "stop.fill" : "sparkles")
+                    Image(systemName: studio.loop ? "stop.fill" : "sparkles")
                 }
                 Text(createTitle)
             }
@@ -555,21 +810,24 @@ private struct StudioComposer: View {
 
     private var createTitle: String {
         if studio.loop { return "Остановить цикл" }
-        if let job = studio.pendingJob { return job.status == "preparing" ? "Подготовка…" : "Остановить" }
-        return studio.busy ? "Запускаю…" : "Создать"
+        if studio.busy { return "Запускаю…" }
+        if studio.queueFull { return "Очередь полна" }
+        return studio.pendingJob == nil ? "Создать" : "В очередь"
     }
 
     private var createDisabled: Bool {
         if studio.busy || !studio.ready { return true }
         if studio.loop { return false }
-        if let job = studio.pendingJob { return job.status == "preparing" && !job.isCloud }
-        return !studio.valid || !studio.available
+        return !studio.valid || !studio.available || studio.queueFull
     }
 
     private var message: String? {
         if let error = studio.lastError { return error }
+        if let flash = studio.flash { return flash }
         if studio.loop { return studio.valid ? "Изменения применятся к следующему арту" : "Следующий арт ждёт корректных настроек" }
-        return studio.notice
+        if let notice = studio.notice { return notice }
+        if studio.seedLocked { return "Seed закреплён · \(studio.draft.seed)" }
+        return nil
     }
 
     private var isError: Bool { studio.lastError != nil }

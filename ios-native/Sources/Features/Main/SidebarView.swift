@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Боковое меню, как в приложении Claude: логотип и поиск, разделы, недавние чаты
-/// («Показать все» — отдельный экран), внизу поверх списка — фото профиля (настройки) и «Новый чат».
+/// («Показать все» — отдельный экран), внизу поверх списка — фото профиля (настройки) и «Новая сессия».
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
     let onClose: () -> Void
@@ -9,6 +9,7 @@ struct SidebarView: View {
     @State private var deleting: ChatSummary?
     @State private var showSettings = false
     @State private var showPhone = false
+    @State private var showSearch = false
 
     /// Сколько недавних чатов видно в шторке; остальные — на экране «Недавние».
     private static let recentLimit = 12
@@ -44,9 +45,9 @@ struct SidebarView: View {
             HStack {
                 Wordmark(size: 23)
                 Spacer()
-                CircleIconButton(symbol: "magnifyingglass", label: "Поиск чатов") {
-                    model.focusRecentsSearch = true
-                    open(.recents)
+                CircleIconButton(symbol: "magnifyingglass", label: "Поиск сессий") {
+                    guard !DrawerSwipe.blocksTaps else { return }
+                    showSearch = true
                 }
             }
             .padding(.leading, 15)
@@ -68,6 +69,13 @@ struct SidebarView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsSheet()
+        }
+        .sheet(isPresented: $showSearch) {
+            // Поиск, как у Claude: лист поверх шторки; выбранная сессия открывается, шторка закрывается.
+            SessionSearchSheet { chat in
+                model.activeChatID = chat.id
+                open(.chat)
+            }
         }
         .sheet(isPresented: $showPhone) {
             PhoneModelsSheet { id in
@@ -112,7 +120,7 @@ struct SidebarView: View {
                     .foregroundStyle(Theme.ink)
                     .frame(minHeight: 44)
                 } else {
-                    Text("Диалогов пока нет")
+                    Text("Сессий пока нет")
                         .font(.system(size: 14))
                         .foregroundStyle(Theme.muted)
                 }
@@ -134,6 +142,7 @@ struct SidebarView: View {
                 row(chat)
             }
             Button {
+                guard !DrawerSwipe.blocksTaps else { return }
                 Haptics.tap()
                 open(.recents)
             } label: {
@@ -156,6 +165,7 @@ struct SidebarView: View {
     private func navRow(_ title: String, symbol: String, active: Bool, busy: Bool,
                         action: @escaping () -> Void) -> some View {
         Button {
+            guard !DrawerSwipe.blocksTaps else { return }
             Haptics.tap()
             action()
         } label: {
@@ -194,6 +204,8 @@ struct SidebarView: View {
     private func row(_ chat: ChatSummary) -> some View {
         let active = chat.id == model.activeChatID && model.screen == .chat
         return Button {
+            // Палец, ведший шторку, мог лечь на эту строку: после свайпа она не открывается.
+            guard !DrawerSwipe.blocksTaps else { return }
             model.activeChatID = chat.id
             open(.chat)
         } label: {
@@ -214,6 +226,7 @@ struct SidebarView: View {
     private var footer: some View {
         HStack(spacing: 12) {
             Button {
+                guard !DrawerSwipe.blocksTaps else { return }
                 Haptics.tap()
                 showSettings = true
             } label: {
@@ -230,13 +243,14 @@ struct SidebarView: View {
             Spacer()
 
             Button {
+                guard !DrawerSwipe.blocksTaps else { return }
                 model.activeChatID = nil
                 open(.chat)
             } label: {
                 HStack(spacing: 7) {
                     Image(systemName: "plus")
                         .font(.system(size: 13, weight: .regular))
-                    Text("Новый чат")
+                    Text("Новая сессия")
                         .font(.system(size: 14, weight: .medium))
                 }
                 .foregroundStyle(Theme.buttonPrimaryText)
@@ -245,7 +259,7 @@ struct SidebarView: View {
                 .glassChrome(Capsule(), tint: Theme.buttonPrimary)
             }
             .glassPressStyle()
-            .accessibilityLabel("Новый чат")
+            .accessibilityLabel("Новая сессия")
         }
         .padding(.leading, 24)
         .padding(.trailing, 25)

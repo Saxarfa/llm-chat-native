@@ -54,7 +54,8 @@ struct ChatSummary: Decodable, Identifiable, Equatable {
         }
         let rawTitle = (try? box.decodeIfPresent(String.self, forKey: .title)) ?? nil
         let cleaned = (rawTitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        title = cleaned.isEmpty ? "Новый чат" : cleaned
+        // Сервер называет пустой чат «Новый чат» (и сайт показывает так же); в приложении это «Новая сессия».
+        title = cleaned.isEmpty || cleaned == "Новый чат" ? "Новая сессия" : cleaned
         pinned = ((try? box.decodeIfPresent(Bool.self, forKey: .pinned)) ?? nil) ?? false
         let camel = (try? box.decodeIfPresent(Double.self, forKey: .updatedAt)) ?? nil
         let snake = (try? box.decodeIfPresent(Double.self, forKey: .updatedAtSnake)) ?? nil

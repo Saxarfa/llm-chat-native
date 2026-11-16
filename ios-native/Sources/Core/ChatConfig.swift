@@ -49,7 +49,7 @@ enum PhoneProfiles {
 struct ChatMeta {
     var overrides: [String: Any]
     var branch: String
-    /// Ветки диалога; у чата без веток — пусто или одна «Основная».
+    /// Ветки сессии; у чата без веток — пусто или одна «Основная».
     var branches: [ChatBranch] = []
 }
 

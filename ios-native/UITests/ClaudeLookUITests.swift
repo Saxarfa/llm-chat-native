@@ -101,25 +101,39 @@ final class ClaudeLookUITests: XCTestCase {
         snap("ui-l5-model-parameters")
     }
 
-    /// Поиск в шторке открывает «Недавние»: список со временем, поиск по названию.
-    func testRecentsSearch() {
+    /// Поиск в шторке открывает лист поиска, как у Claude: «Недавние» и поле сверху, набор сужает список.
+    func testSessionSearch() {
         let app = launch("sidebar")
-        let search = app.buttons["Поиск чатов"].firstMatch
+        let search = app.buttons["Поиск сессий"].firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 10))
         search.tap()
+        let field = element(app, "search.field")
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(app.buttons.matching(identifier: "search.row").count, 5)
+        sleep(1)
+        snap("ui-l5-search")
+        app.skipKeyboardTip()
+        field.typeText("плов")
+        let rows = app.buttons.matching(identifier: "search.row")
+        let filtered = expectation(for: NSPredicate(format: "count == 1"), evaluatedWith: rows)
+        wait(for: [filtered], timeout: 5)
+        snap("ui-l5b-search-keyboard")
+    }
+
+    /// «Показать все» открывает «Недавние» со временем у каждой сессии; строка поиска внизу открывает тот же лист.
+    func testRecentsPage() {
+        let app = launch("sidebar")
+        let all = app.buttons["sidebar.all"].firstMatch
+        XCTAssertTrue(all.waitForExistence(timeout: 10))
+        all.tap()
         let field = element(app, "recents.search")
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         XCTAssertGreaterThan(app.buttons.matching(identifier: "recents.row").count, 5)
+        XCTAssertTrue(element(app, "recents.filter").exists, "справа в шапке — «⋯» с фильтром")
         sleep(1)
         snap("ui-l5-recents")
         field.tap()
-        app.skipKeyboardTip()
-        field.typeText("плов")
-        let rows = app.buttons.matching(identifier: "recents.row")
-        let filtered = expectation(for: NSPredicate(format: "count == 1"), evaluatedWith: rows)
-        wait(for: [filtered], timeout: 5)
-        assertAboveKeyboard(field, in: app)
-        snap("ui-l5b-recents-keyboard")
+        XCTAssertTrue(element(app, "search.field").waitForExistence(timeout: 5), "строка поиска открывает лист поиска")
     }
 
     /// Капсула: без клавиатуры — строка без модели, с клавиатурой — карточка с моделью,
@@ -176,7 +190,7 @@ final class ClaudeLookUITests: XCTestCase {
         XCTAssertTrue(element(app, "composer.mic").exists, "микрофон для диктовки")
         app.buttons["Ещё"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Переименовать"].firstMatch.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Ветки диалога"].firstMatch.exists)
+        XCTAssertTrue(app.buttons["Ветки сессии"].firstMatch.exists)
         sleep(1)
         snap("ui-l6-header-menu")
     }
