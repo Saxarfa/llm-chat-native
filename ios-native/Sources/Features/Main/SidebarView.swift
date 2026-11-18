@@ -184,7 +184,8 @@ struct SidebarView: View {
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 if busy {
-                    ProgressView().controlSize(.mini).tint(Theme.muted)
+                    // Модель отвечает в этой сессии — тот же «Атом», что у статусов ответа.
+                    AtomIndicator(size: 16, orbits: true)
                 }
             }
             .padding(.leading, 5)

@@ -409,12 +409,10 @@ private struct SparkStatus: View {
     }
 
     var body: some View {
-        HStack(spacing: 9) {
-            AtomIndicator(size: 20)
-            Text(shown)
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.muted)
-                .lineLimit(2)
+        HStack(spacing: 7) {
+            // Как строка размышлений: «Атом» с орбитами и волна по подписи.
+            AtomIndicator(size: 20, orbits: true)
+            WaveText(text: shown)
                 .id(shown)
                 .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
                                         removal: .move(edge: .top).combined(with: .opacity)))
@@ -932,19 +930,26 @@ private struct ReasoningView: View {
 /// Слово с волной по буквам: каждая буква по очереди светлеет и чуть приподнимается.
 /// Один `Text` с атрибутами на каждую букву (а не ряд отдельных букв): интервалы между буквами
 /// те же, что у обычного текста, и ширина слова не меняется.
-private struct WaveText: View {
+///
+/// Это вид всех статусов работы в приложении (решение пользователя 18.11.2026: «все статусы — как
+/// строка размышлений»): «Атом» с орбитами + слово с волной. Размер и цвет — у каждого места свои.
+struct WaveText: View {
     let text: String
+    var size: CGFloat = 15
+    var weight: Font.Weight = .regular
+    var color: Color = Theme.muted
 
     var body: some View {
         TimelineView(.animation) { context in
             let time = context.date.timeIntervalSinceReferenceDate
-            Text(Self.wave(text, time: time))
+            Text(wave(time: time))
         }
-        .frame(height: 20)
+        .frame(height: size + 5)
         .fixedSize()
+        .accessibilityLabel(text)
     }
 
-    private static func wave(_ text: String, time: Double) -> AttributedString {
+    private func wave(time: Double) -> AttributedString {
         var result = AttributedString()
         for (index, letter) in text.enumerated() {
             // Гребень волны проходит слово за 1,3 с; между буквами 0,07 с.
@@ -952,9 +957,9 @@ private struct WaveText: View {
                 .truncatingRemainder(dividingBy: 1.3) / 1.3
             let lift = phase < 0.6 ? sin(.pi * phase / 0.6) : 0
             var piece = AttributedString(String(letter))
-            piece.swiftUI.font = .system(size: 15)
-            piece.swiftUI.foregroundColor = Theme.muted.opacity(0.45 + 0.55 * lift)
-            piece.swiftUI.baselineOffset = 1.5 * lift
+            piece.swiftUI.font = .system(size: size, weight: weight)
+            piece.swiftUI.foregroundColor = color.opacity(0.45 + 0.55 * lift)
+            piece.swiftUI.baselineOffset = size / 10 * lift
             result += piece
         }
         return result

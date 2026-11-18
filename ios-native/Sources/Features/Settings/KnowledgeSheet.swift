@@ -298,12 +298,15 @@ private struct LibraryView: View {
                     .lineLimit(2)
                 HStack(spacing: 6) {
                     if document.working {
-                        ProgressView().controlSize(.mini).tint(Theme.subtle)
+                        // Документ разбирается — как все статусы: «Атом» с орбитами и волна.
+                        AtomIndicator(size: 14, orbits: true)
+                        WaveText(text: document.statusText, size: 13, color: Theme.subtle)
+                    } else {
+                        Text(document.statusText)
+                            .font(.system(size: 13))
+                            .foregroundStyle(document.status == "error" ? Theme.danger : Theme.subtle)
+                            .lineLimit(2)
                     }
-                    Text(document.statusText)
-                        .font(.system(size: 13))
-                        .foregroundStyle(document.status == "error" ? Theme.danger : Theme.subtle)
-                        .lineLimit(2)
                 }
             }
             .padding(.vertical, 12)

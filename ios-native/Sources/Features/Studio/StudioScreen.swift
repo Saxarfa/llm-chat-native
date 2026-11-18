@@ -278,7 +278,7 @@ private struct StudioStage: View {
         VStack(spacing: 10) {
             Group {
                 if studio.pendingJob != nil {
-                    ProgressView().controlSize(.large).tint(Theme.muted)
+                    AtomIndicator(size: 40, orbits: true)
                 } else {
                     Image(systemName: "photo.badge.plus")
                         .font(.system(size: 30, weight: .light))
@@ -286,9 +286,13 @@ private struct StudioStage: View {
                 }
             }
             .frame(height: 40)
-            Text(studio.pendingJob?.statusText ?? "Начни с идеи")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Theme.ink)
+            if let job = studio.pendingJob {
+                WaveText(text: job.statusText, size: 17, weight: .semibold, color: Theme.ink)
+            } else {
+                Text("Начни с идеи")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+            }
             Text(emptyHint)
                 .font(.system(size: 15))
                 .foregroundStyle(Theme.muted)
@@ -307,15 +311,16 @@ private struct StudioStage: View {
         HStack(spacing: 8) {
             if let status = studio.status {
                 HStack(spacing: 6) {
+                    // Идёт работа — как все статусы: «Атом» с орбитами и волна (18.11.2026).
                     if studio.pendingJob != nil {
-                        ProgressView().controlSize(.mini).tint(Theme.muted)
+                        AtomIndicator(size: 16, orbits: true)
+                        WaveText(text: status, size: 13, weight: .medium)
                     } else {
                         Circle().fill(Theme.muted).frame(width: 6, height: 6)
+                        Text(status)
+                            .font(.system(size: 13, weight: .medium).monospacedDigit())
+                            .foregroundStyle(Theme.muted)
                     }
-                    Text(status)
-                        .font(.system(size: 13, weight: .medium).monospacedDigit())
-                        .foregroundStyle(Theme.muted)
-                        .contentTransition(.numericText())
                 }
                 .padding(.horizontal, 12)
                 .frame(height: 32)
@@ -429,7 +434,7 @@ private struct QueueTile: View {
             }
             VStack(spacing: 3) {
                 if running {
-                    AtomIndicator(size: 18)
+                    AtomIndicator(size: 18, orbits: true)
                     if let progress = job.progress, !job.isCloud {
                         Text("\(progress)%")
                             .font(.system(size: 11, weight: .semibold).monospacedDigit())

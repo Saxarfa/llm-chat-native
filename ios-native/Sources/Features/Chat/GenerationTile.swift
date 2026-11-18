@@ -67,7 +67,7 @@ struct GenerationTile: View {
                     .contentTransition(.numericText(value: progress))
             } else {
                 // Процента нет (Nano Banana, Omni): «Атом» показывает, что работа идёт, а не зависла.
-                AtomIndicator(size: 30)
+                AtomIndicator(size: 30, orbits: true)
             }
             if let progress {
                 bar(progress)
@@ -128,10 +128,8 @@ struct GenerationBadge: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            AtomIndicator(size: 18)
-            Text(status)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Theme.ink)
+            AtomIndicator(size: 18, orbits: true)
+            WaveText(text: status, size: 14, weight: .medium, color: Theme.ink)
                 .id(status)
                 .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
                                         removal: .move(edge: .top).combined(with: .opacity)))
