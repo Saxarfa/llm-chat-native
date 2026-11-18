@@ -29,6 +29,16 @@ struct MainView: View {
 
                 SidebarView(onClose: { setOpen(false) })
                     .frame(width: width)
+                    // Закрываясь, меню чуть уезжает влево и гаснет (вход в чат «Навстречу», 18.11.2026);
+                    // от хода карточки, поэтому так же ведёт себя и под пальцем. Гаснет под слоем цвета
+                    // фона, а не через `.opacity`: кнопки меню на Liquid Glass прозрачность родителя
+                    // переносят плохо.
+                    .overlay {
+                        Theme.rail.opacity(0.7 * (1 - Double(progress)))
+                            .ignoresSafeArea()
+                            .allowsHitTesting(false)
+                    }
+                    .offset(x: -28 * (1 - progress))
                     .allowsHitTesting(isOpen && !swiping)
                     .scrollDisabled(swiping)
                     .accessibilityHidden(!isOpen)

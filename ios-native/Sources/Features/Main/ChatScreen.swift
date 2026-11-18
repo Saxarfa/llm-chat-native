@@ -10,6 +10,10 @@ struct ChatScreen: View {
     // Состояние редактирования приходит от самого UITextView: FocusState внутри
     // safeAreaBar в проверенной версии iOS не обновлялся при появлении курсора.
     @State private var composerFocused = false
+    /// Приветствие нового чата и капсула появились (см. `playArrival`). Изначально true: если
+    /// что-то пойдёт не так, экран остаётся видимым.
+    @State private var arrived = true
+    @State private var capsuleArrived = true
     @State private var showParameters = false
     @State private var showBranches = false
     @State private var renaming: ChatSummary?
@@ -30,17 +34,17 @@ struct ChatScreen: View {
                     .gesture(DragGesture(minimumDistance: 12).onEnded { value in
                         if value.translation.height > 30 { Keyboard.hide() }
                     })
-                    .transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 0.97)),
-                                            removal: .opacity))
+                    // Части приветствия появляются сами («Слэш», `playArrival`), поэтому здесь только проявление.
+                    .transition(.opacity)
             } else {
                 MessageFeed()
                     .contentShape(Rectangle())
                     .onTapGesture { Keyboard.hide() }
                     // Свой экземпляр ленты на каждый чат: позиция прокрутки не переносится.
                     .id(model.activeChatID)
-                    // Переход между чатами: прежний тает, новый проявляется, чуть поднимаясь.
-                    .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 12)),
-                                            removal: .opacity))
+                    // Переход между чатами: прежний тает, новый проявляется; сообщения нового
+                    // въезжают сбоку сами (`FeedEntrance` в `MessageFeed`), поэтому подъёма здесь нет.
+                    .transition(.opacity)
             }
         }
         .animation(.easeOut(duration: 0.26), value: model.activeChatID)
@@ -59,6 +63,25 @@ struct ChatScreen: View {
         }
         .softEdgeBar(edge: .bottom, tint: Theme.canvas, hasScrollContent: model.activeChatID != nil) {
             ComposerBar(text: $draft, focused: $composerFocused)
+                // В новом чате капсула проявляется после логотипа; в открытом чате стоит всегда.
+                // (только при запуске: при переходе из открытого чата капсула уже на экране и не мигает).
+                .opacity(capsuleArrived ? 1 : 0)
+                .offset(y: capsuleArrived ? 0 : 12)
+                .animation(.spring(response: 0.5, dampingFraction: 0.86).delay(0.4), value: capsuleArrived)
+        }
+        .onAppear {
+            // Один раз за запуск: при возврате из студии или «Недавних» экран создаётся заново,
+            // и появление с миганием капсулы повторялось бы. В режиме снимков не играем вовсе —
+            // тесты снимают экран через секунду, приветствие к этому времени ещё не доиграно.
+            guard model.activeChatID == nil, model.preview == nil, !Arrival.played else { return }
+            Arrival.played = true
+            playArrival(capsule: true)
+        }
+        .onChange(of: model.activeChatID == nil) { _, fresh in
+            guard fresh else { return }
+            // Новая сессия: следующий вход в любой чат снова играет въезд сообщений.
+            FeedEntry.lastChat = nil
+            if model.preview == nil { playArrival(capsule: false) }
         }
         .task(id: model.activeChatID) {
             model.editing = nil
@@ -249,22 +272,87 @@ struct ChatScreen: View {
                 .accessibilityIdentifier("chat.incognitoWelcome")
                 .transition(.opacity.combined(with: .scale(scale: 0.97)))
             } else {
-                VStack(spacing: 12) {
-                    Wordmark(size: 30)
-                    Text(greeting)
-                        .font(Theme.display(21))
-                        .foregroundStyle(Theme.muted)
-                        .multilineTextAlignment(.center)
+                // С клавиатурой («В поле ввода», выбрано пользователем 18.11.2026) логотип гаснет, а приветствие
+                // опускается к карточке ввода, уменьшаясь до её шрифта и тая; в самом поле в это время
+                // сверху въезжает та же фраза подсказкой (`ComposerBar.placeholder`). Это два разных
+                // текста в разных панелях, движение согласовано по времени (`Theme.keyboardMorph`).
+                GeometryReader { geo in
+                    VStack(spacing: 12) {
+                        Wordmark(size: 30, shown: arrived)
+                            .opacity(typing ? 0 : 1)
+                            .offset(y: typing ? -14 : 0)
+                        GreetingLine(text: Self.greeting(model), shown: arrived)
+                            .scaleEffect(typing ? 16.0 / 21.0 : 1, anchor: .leading)
+                            .frame(maxWidth: .infinity, alignment: typing ? .leading : .center)
+                            // Низ свободного места — верх карточки ввода; её первая строка чуть ниже.
+                            .offset(y: typing ? geo.size.height / 2 + 6 : 0)
+                            .opacity(typing ? 0 : 1)
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .animation(Theme.keyboardMorph, value: typing)
                 }
-                .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                .transition(.opacity)
             }
         }
         .animation(.easeOut(duration: 0.22), value: model.incognito)
     }
 
-    private var greeting: String {
+    /// Печатают в новой сессии: приветствие переезжает в поле ввода.
+    private var typing: Bool { composerFocused && !model.incognito }
+
+    /// Появление нового чата «Слэш» (выбрано пользователем 18.11.2026): косая черта, из-за неё «llm» и
+    /// «chat», приветствие по словам, капсула проявляется и чуть поднимается. Прячем без анимации,
+    /// показываем следующим тактом — тогда отложенные анимации играют только на появление.
+    private func playArrival(capsule: Bool) {
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) {
+            arrived = false
+            if capsule { capsuleArrived = false }
+        }
+        DispatchQueue.main.async {
+            arrived = true
+            capsuleArrived = true
+        }
+    }
+
+    static func greeting(_ model: AppModel) -> String {
         guard let name = model.user?.shownName, !name.isEmpty else { return "Чем займёмся?" }
         return "Чем займёмся, \(name)?"
+    }
+}
+
+/// Появление нового чата при запуске уже сыграно (см. `ChatScreen.playArrival`).
+enum Arrival {
+    static var played = false
+}
+
+/// Приветствие нового чата: при появлении проступает по словам. Если слова в строку не помещаются
+/// (длинное имя) — обычный текст в несколько строк, проявляется целиком.
+private struct GreetingLine: View {
+    let text: String
+    let shown: Bool
+
+    var body: some View {
+        let words = text.split(separator: " ").map(String.init)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 5.5) {
+                ForEach(words.indices, id: \.self) { index in
+                    Text(words[index])
+                        .opacity(shown ? 1 : 0)
+                        .animation(.easeOut(duration: 0.4).delay(0.6 + Double(index) * 0.12), value: shown)
+                }
+            }
+            .fixedSize()
+            Text(text)
+                .multilineTextAlignment(.center)
+                .opacity(shown ? 1 : 0)
+                .animation(.easeOut(duration: 0.4).delay(0.6), value: shown)
+        }
+        .font(Theme.display(21))
+        .foregroundStyle(Theme.muted)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
     }
 }
 
@@ -287,6 +375,12 @@ struct ComposerBar: View {
     /// Черновик, отложенный на время правки старого сообщения.
     @State private var parkedDraft = ""
     @State private var dictation = Dictation()
+    /// Окно моделей открыли при клавиатуре: карточка не складывается в строку, пока оно открыто,
+    /// а с его закрытием клавиатура возвращается (просьба пользователя 18.11.2026).
+    @State private var returnFocus = false
+    /// Что стояло на чипе, когда открыли окно моделей; изменилось — чип вздрагивает.
+    @State private var chipBefore = ""
+    @State private var chipPulse = 0
 
     private static let fileTypes: [UTType] = {
         var types: [UTType] = [.pdf, .png, .jpeg, .webP, .heic, .mpeg4Movie]
@@ -309,8 +403,11 @@ struct ComposerBar: View {
     /// Карточка в две строки — когда печатают или уже есть что отправить; иначе строка-капсула.
     private var expanded: Bool {
         focused || hasText || model.editing != nil || !model.draftAttachments.isEmpty
-            || model.attachmentsBusy || dictation.active
+            || model.attachmentsBusy || dictation.active || returnFocus
     }
+
+    /// Подпись чипа целиком — по ней видно, поменяли ли модель или уровень рассуждений.
+    private var chipText: String { model.activeModelName + "·" + (reasoningLabel ?? "") }
 
     var body: some View {
         let live = model.activeLive
@@ -339,8 +436,15 @@ struct ComposerBar: View {
         .animation(.easeOut(duration: 0.18), value: model.sendError)
         .animation(.easeOut(duration: 0.18), value: model.draftAttachments)
         .animation(.easeOut(duration: 0.18), value: model.activeQueue)
-        .sheet(isPresented: $showModels) {
+        .sheet(isPresented: $showModels, onDismiss: {
+            returnFocus = false
+            if chipText != chipBefore { chipPulse += 1 }
+        }) {
             ModelPickerSheet()
+        }
+        // Окно начало закрываться — клавиатура возвращается сразу, вместе с его уходом.
+        .onChange(of: showModels) { _, open in
+            if !open, returnFocus { focused = true }
         }
         .sheet(isPresented: $showTools, onDismiss: openPending) {
             ComposerToolsSheet { source in pendingSource = source }
@@ -413,6 +517,11 @@ struct ComposerBar: View {
                                 .lineLimit(1)
                                 .allowsHitTesting(false)
                                 .accessibilityHidden(true)
+                                // Новая подсказка въезжает сверху: в новой сессии это приветствие,
+                                // которое в тот же момент опускается из центра экрана.
+                                .id(placeholder)
+                                .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: -16)),
+                                                        removal: .opacity))
                         }
                     }
                     // Пока поле не в фокусе, текст подсказки не ловит касания: иначе палец «таскал»
@@ -444,10 +553,20 @@ struct ComposerBar: View {
             if model.editing == nil {
                 attachButton
             }
-            if expanded {
-                modelButton
-                    .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .leading)))
-            }
+            // Чип всегда в ряду, но в строке-капсуле невидим и нажатий не ловит. Раньше он убирался
+            // переходом, и после ухода капсулы вниз нажатие по ней попадало в «исчезнувший» чип —
+            // открывалось окно моделей вместо клавиатуры (жалоба пользователя 18.11.2026).
+            modelButton
+                .opacity(expanded ? 1 : 0)
+                .scaleEffect(expanded ? 1 : 0.92, anchor: .leading)
+                .allowsHitTesting(expanded)
+                .accessibilityHidden(!expanded)
+                // Модель или уровень поменяли в окне — чип вздрагивает («Скользящая отметка»).
+                .phaseAnimator([1.0, 1.12], trigger: chipPulse) { chip, scale in
+                    chip.scaleEffect(scale)
+                } animation: { _ in .spring(response: 0.3, dampingFraction: 0.55) }
+                // Приоритет ширины — снаружи всей цепочки: изнутри `modelButton` его не видно ряду.
+                .layoutPriority(1)
             Spacer(minLength: 4)
             if model.editing == nil {
                 micButton
@@ -591,7 +710,9 @@ struct ComposerBar: View {
     /// (замечание пользователя 13.11.2026); модель и так видна на чипе.
     private var placeholder: String {
         if model.editing != nil { return "Исправьте сообщение" }
-        return model.activeChatID == nil ? "Спросите что-нибудь" : "Напишите сообщение"
+        guard model.activeChatID == nil else { return "Напишите сообщение" }
+        // С клавиатурой в новой сессии подсказкой становится приветствие («В поле ввода», 18.11.2026).
+        return focused && !model.incognito ? ChatScreen.greeting(model) : "Спросите что-нибудь"
     }
 
     /// Уровень рассуждений рядом с названием модели: «Средний», «Рассуждения» или ничего.
@@ -615,6 +736,8 @@ struct ComposerBar: View {
     private var modelButton: some View {
         let level = reasoningLabel
         return Button {
+            returnFocus = focused
+            chipBefore = chipText
             Keyboard.hide()
             Haptics.tap()
             showModels = true

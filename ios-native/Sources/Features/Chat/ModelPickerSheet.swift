@@ -9,6 +9,9 @@ struct ModelPickerSheet: View {
     @State private var path: [Page] = []
     @State private var showPhone = false
     @State private var showSettings = false
+    /// Только что нажатая модель: отметка уже переехала на неё, окно закроется через `SlidingMark.hold`.
+    @State private var picked: String?
+    @Namespace private var mark
 
     enum Page: Hashable { case reasoning, other }
 
@@ -286,11 +289,21 @@ struct ModelPickerSheet: View {
 
     /// Строка модели, как у Claude (замер 16.11.2026): шаг 71 pt, название 17, описание 15, текст в 20 pt
     /// от края карточки, синяя галочка у выбранной.
+    /// Выбор — «Скользящая отметка» (выбрано пользователем 18.11.2026): подсветка с галочкой переезжает
+    /// на нажатую строку с отскоком, и только потом окно закрывается.
     private func row(_ item: ModelOption) -> some View {
-        let selected = item.id == model.activeModelID
+        let selected = item.id == (picked ?? model.activeModelID)
         return Button {
+            guard picked == nil else { return }
+            guard item.id != model.activeModelID else { dismiss(); return }
+            Haptics.selection()
+            withAnimation(SlidingMark.spring) { picked = item.id }
+            // Окно закрывается по времени, а не по ответу сервера: при медленной сети оно не зависает.
             Task { await model.selectModel(item.id) }
-            dismiss()
+            Task {
+                try? await Task.sleep(nanoseconds: SlidingMark.hold)
+                dismiss()
+            }
         } label: {
             HStack(spacing: 12) {
                 // Как у Claude: название и описание без аватарки (фото модели видно на её странице в настройках).
@@ -309,16 +322,41 @@ struct ModelPickerSheet: View {
                     Image(systemName: "checkmark")
                         .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(Theme.accent)
-                        .transition(.scale.combined(with: .opacity))
+                        .matchedGeometryEffect(id: SlidingMark.check, in: mark)
                 }
             }
             .padding(.leading, RowMetrics.plainLeading)
             .padding(.trailing, RowMetrics.trailing)
             .frame(minHeight: 71)
+            .background {
+                // Подсветка видна только во время переезда: в покое у выбранной строки одна галочка, как у Claude.
+                if selected {
+                    SlidingMark.highlight
+                        .opacity(picked == nil ? 0 : 1)
+                        .matchedGeometryEffect(id: SlidingMark.fill, in: mark)
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+/// Общие части «скользящей отметки» в списках выбора (модели и уровни рассуждений).
+enum SlidingMark {
+    static let check = "check"
+    static let fill = "fill"
+    /// Отскок, с которым подсветка и галочка переезжают на новую строку.
+    static let spring = Animation.spring(response: 0.42, dampingFraction: 0.64)
+    /// Сколько окно ждёт после нажатия, чтобы переезд было видно (наносекунды).
+    static let hold: UInt64 = 320_000_000
+
+    static var highlight: some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(Theme.fillActive)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 5)
     }
 }
 
@@ -357,6 +395,9 @@ private struct ReasoningPage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var back
     let modelID: String
+    /// Только что нажатый уровень: отметка уже на нём, назад вернёмся через `SlidingMark.hold`.
+    @State private var picked: String?
+    @Namespace private var mark
 
     var body: some View {
         let config = model.modelConfig(modelID)
@@ -367,7 +408,7 @@ private struct ReasoningPage: View {
                     SettingsCard {
                         switch reasoning {
                         case .levels(let levels)?:
-                            let value = ChatConfig.text(config["reasoning_strength"]) ?? "high"
+                            let value = picked ?? ChatConfig.text(config["reasoning_strength"]) ?? "high"
                             let recommended = ChatParameters.recommendedLevel(modelID)
                             ForEach(Array(levels.enumerated()), id: \.element.id) { index, level in
                                 if index > 0 { CardDivider() }
@@ -402,9 +443,15 @@ private struct ReasoningPage: View {
 
     private func levelRow(_ level: Choice, selected: Bool, recommended: Bool) -> some View {
         Button {
+            guard picked == nil else { return }
+            guard !selected else { back(); return }
             Haptics.selection()
+            withAnimation(SlidingMark.spring) { picked = level.value }
             Task { await model.setModelValue("reasoning_strength", level.value, model: modelID) }
-            back()
+            Task {
+                try? await Task.sleep(nanoseconds: SlidingMark.hold)
+                back()
+            }
         } label: {
             HStack(spacing: 8) {
                 Text(level.label)
@@ -418,10 +465,18 @@ private struct ReasoningPage: View {
                     Image(systemName: "checkmark")
                         .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(Theme.accent)
+                        .matchedGeometryEffect(id: SlidingMark.check, in: mark)
                 }
             }
             .padding(.horizontal, RowMetrics.plainLeading)
             .frame(minHeight: 58)
+            .background {
+                if selected {
+                    SlidingMark.highlight
+                        .opacity(picked == nil ? 0 : 1)
+                        .matchedGeometryEffect(id: SlidingMark.fill, in: mark)
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())

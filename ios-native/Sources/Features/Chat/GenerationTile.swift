@@ -30,10 +30,11 @@ struct GenerationAura: View {
     }
 }
 
-/// Плитка арта, который ещё создаётся (лента чата и сцена студии): живой фон, подпись хода
-/// работы и — только у генерации в ComfyUI, где ход известен, — процент готовности.
+/// Плитка арта, который ещё создаётся (лента чата и сцена студии): живой фон и — только у
+/// генерации в ComfyUI, где ход известен, — процент готовности. Подписи хода работы нет
+/// (убрана по просьбе пользователя 18.11.2026).
 /// Готовая доля «проявляется» снизу вверх тёплой полосой со светящимся краем; число процентов
-/// меняется плавно. У Nano Banana и Omni процента нет — только живой фон и подпись.
+/// меняется плавно. У Nano Banana и Omni процента нет — только живой фон.
 struct GenerationTile: View {
     /// Соотношение сторон будущей картинки; `nil` — заполнить отведённое место.
     var ratio: CGFloat?
@@ -57,18 +58,16 @@ struct GenerationTile: View {
             if let progress {
                 developed(progress)
             }
-            VStack(spacing: 6) {
-                if let progress {
-                    Text(progress, format: .percent.precision(.fractionLength(0)))
-                        .font(.system(size: 30, weight: .semibold, design: .rounded).monospacedDigit())
-                        .foregroundStyle(Theme.ink)
-                        .contentTransition(.numericText(value: progress))
-                }
-                Text(status)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Theme.ink.opacity(0.78))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
+            // Подписи хода работы на плитке нет (просьба пользователя 18.11.2026): только живой фон
+            // и процент, где он известен. `status` остаётся для диктора и тестов.
+            if let progress {
+                Text(progress, format: .percent.precision(.fractionLength(0)))
+                    .font(.system(size: 30, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(Theme.ink)
+                    .contentTransition(.numericText(value: progress))
+            } else {
+                // Процента нет (Nano Banana, Omni): «Атом» показывает, что работа идёт, а не зависла.
+                AtomIndicator(size: 30)
             }
             if let progress {
                 bar(progress)

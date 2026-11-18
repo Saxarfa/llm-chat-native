@@ -118,6 +118,17 @@ struct StudioScreen: View {
     }
 }
 
+/// Горизонтальная лента чипов от края до края экрана внутри поля с отступом 16 pt.
+/// Раньше стояло `scrollClipDisabled`: прокрученные чипы рисовались за краем экрана и при открытой
+/// шторке торчали из карточки студии поверх меню. Теперь лента сама шириной с экран и обрезает по его краю.
+private struct EdgeToEdgeRow: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .contentMargins(.horizontal, 16, for: .scrollContent)
+            .padding(.horizontal, -16)
+    }
+}
+
 /// Арт на сцене: выбранный или последний, с ходом генерации поверх.
 private struct StudioStage: View {
     @Environment(AppModel.self) private var model
@@ -446,12 +457,13 @@ private struct QueueTile: View {
                     .foregroundStyle(Theme.ink)
                     .frame(width: 20, height: 20)
                     .background(Theme.fillActive, in: Circle())
-                    .frame(width: 32, height: 32)
+                    // Зона нажатия 44 pt (было 32 — аудит 18.11.2026); кружок на прежнем месте.
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(PressScaleStyle())
             // Кружок крестика целиком внутри плитки: лента обрезает всё, что выступает за её высоту.
-            .offset(x: 6, y: -6)
+            .offset(x: 12, y: -12)
             .accessibilityLabel(running ? "Остановить генерацию" : "Убрать из очереди")
         }
         .animation(.easeOut(duration: 0.4), value: job.progress)
@@ -629,7 +641,7 @@ private struct StudioComposer: View {
                 .accessibilityIdentifier("studio.settings")
             }
         }
-        .scrollClipDisabled()
+        .modifier(EdgeToEdgeRow())
         .modifier(DrawerFreeZone())
     }
 
@@ -668,7 +680,7 @@ private struct StudioComposer: View {
                     }
                 }
             }
-            .scrollClipDisabled()
+            .modifier(EdgeToEdgeRow())
             .modifier(DrawerFreeZone())
             .accessibilityIdentifier("studio.recent")
             .transition(.opacity)

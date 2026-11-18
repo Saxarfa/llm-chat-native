@@ -220,12 +220,25 @@ enum Keyboard {
 /// Логотип «llm/chat»: «llm» курсивом, приглушённая косая, «chat» прямым.
 struct Wordmark: View {
     var size: CGFloat = 24
+    /// Появление «Слэш» (приветствие нового чата, 18.11.2026): при смене false → true сначала
+    /// вырастает косая черта, затем из-за неё разъезжаются «llm» и «chat». По умолчанию логотип стоит сразу.
+    var shown = true
 
     var body: some View {
+        let sides = Animation.spring(response: 0.5, dampingFraction: 0.85).delay(0.25)
         HStack(alignment: .firstTextBaseline, spacing: 0) {
             Text("llm").italic()
+                .opacity(shown ? 1 : 0)
+                .offset(x: shown ? 0 : size * 0.9)
+                .animation(sides, value: shown)
             Text("/").foregroundStyle(Theme.ink.opacity(0.38)).padding(.horizontal, size * 0.04)
+                .scaleEffect(x: 1, y: shown ? 1 : 0.01)
+                .rotationEffect(.degrees(shown ? 0 : -20))
+                .animation(.spring(response: 0.35, dampingFraction: 0.6), value: shown)
             Text("chat")
+                .opacity(shown ? 1 : 0)
+                .offset(x: shown ? 0 : -size * 0.9)
+                .animation(sides, value: shown)
         }
         .font(Theme.display(size))
         .foregroundStyle(Theme.ink)

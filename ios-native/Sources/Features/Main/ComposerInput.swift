@@ -36,7 +36,9 @@ struct ComposerInput: UIViewRepresentable {
         view.tintColor = UIColor(Theme.ink)
         view.accessibilityLabel = placeholder
         if focused, !view.isFirstResponder {
-            view.becomeFirstResponder()
+            // Пока закрывается окно поверх чата (выбор модели), поле может не принять фокус сразу —
+            // тогда пробуем ещё несколько раз; не вышло — состояние возвращается в «без фокуса».
+            if !view.becomeFirstResponder() { context.coordinator.retryFocus(view, left: 4) }
         } else if !focused, view.isFirstResponder {
             view.resignFirstResponder()
         }
@@ -53,6 +55,25 @@ struct ComposerInput: UIViewRepresentable {
         var parent: ComposerInput
 
         init(_ parent: ComposerInput) { self.parent = parent }
+
+        private var retrying = false
+
+        func retryFocus(_ view: UITextView, left: Int) {
+            guard !retrying || left < 4 else { return }
+            retrying = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self, weak view] in
+                guard let self, let view else { return }
+                guard self.parent.focused, !view.isFirstResponder else { self.retrying = false; return }
+                if view.becomeFirstResponder() {
+                    self.retrying = false
+                } else if left > 1 {
+                    self.retryFocus(view, left: left - 1)
+                } else {
+                    self.retrying = false
+                    self.parent.focused = false
+                }
+            }
+        }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
             if !parent.focused { parent.focused = true }
