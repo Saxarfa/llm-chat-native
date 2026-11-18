@@ -553,20 +553,19 @@ struct ComposerBar: View {
             if model.editing == nil {
                 attachButton
             }
-            // Чип всегда в ряду, но в строке-капсуле невидим и нажатий не ловит. Раньше он убирался
-            // переходом, и после ухода капсулы вниз нажатие по ней попадало в «исчезнувший» чип —
-            // открывалось окно моделей вместо клавиатуры (жалоба пользователя 18.11.2026).
-            modelButton
-                .opacity(expanded ? 1 : 0)
-                .scaleEffect(expanded ? 1 : 0.92, anchor: .leading)
-                .allowsHitTesting(expanded)
-                .accessibilityHidden(!expanded)
-                // Модель или уровень поменяли в окне — чип вздрагивает («Скользящая отметка»).
-                .phaseAnimator([1.0, 1.12], trigger: chipPulse) { chip, scale in
-                    chip.scaleEffect(scale)
-                } animation: { _ in .spring(response: 0.3, dampingFraction: 0.55) }
-                // Приоритет ширины — снаружи всей цепочки: изнутри `modelButton` его не видно ряду.
-                .layoutPriority(1)
+            // Чип — только в карточке. Пока он тает после ухода капсулы вниз, нажатие по нему
+            // не открывает окно моделей, а ставит фокус в поле (проверка `expanded` в действии,
+            // жалоба пользователя 18.11.2026).
+            if expanded {
+                modelButton
+                    // Модель или уровень поменяли в окне — чип вздрагивает («Скользящая отметка»).
+                    .phaseAnimator([1.0, 1.12], trigger: chipPulse) { chip, scale in
+                        chip.scaleEffect(scale)
+                    } animation: { _ in .spring(response: 0.3, dampingFraction: 0.55) }
+                    // Приоритет ширины — снаружи всей цепочки: изнутри `modelButton` его не видно ряду.
+                    .layoutPriority(1)
+                    .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .leading)))
+            }
             Spacer(minLength: 4)
             if model.editing == nil {
                 micButton
@@ -736,6 +735,9 @@ struct ComposerBar: View {
     private var modelButton: some View {
         let level = reasoningLabel
         return Button {
+            // Состояние читается текущее (не снятое при отрисовке): капсула уже свернулась —
+            // значит, это касание по тающему чипу, и оно должно открыть клавиатуру.
+            guard self.expanded else { focused = true; return }
             returnFocus = focused
             chipBefore = chipText
             Keyboard.hide()
