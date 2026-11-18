@@ -13,6 +13,8 @@ struct ComposerToolsSheet: View {
     @Environment(\.dismiss) private var dismiss
     let onPick: (Source) -> Void
     @State private var knowledge = false
+    /// Отмеченные в ленте снимки, по порядку нажатия; в капсулу — по «Добавить».
+    @State private var chosen: [PHAsset] = []
 
     var body: some View {
         let id = model.activeModelID
@@ -25,7 +27,9 @@ struct ComposerToolsSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    PhotoStrip(enabled: !onPhone || seesImages, onLibrary: { pick(.photo) })
+                    PhotoStrip(enabled: !onPhone || seesImages, chosen: $chosen,
+                               room: max(0, AttachmentPrep.limit - model.draftAttachments.count),
+                               onLibrary: { pick(.photo) })
                     if onPhone {
                         SettingsNote(text: seesImages ? "Модель на телефоне видит картинки, но не файлы."
                                      : "Модель на телефоне понимает только текст. Чтобы она видела картинки, добавьте ей файл зрения в «Моделях на телефоне».")
@@ -67,6 +71,8 @@ struct ComposerToolsSheet: View {
             .scrollBounceBehavior(.basedOnSize)
             .background(Theme.sheet)
             .safeAreaInset(edge: .top, spacing: 0) { header }
+            .safeAreaInset(edge: .bottom, spacing: 0) { confirmBar }
+            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: chosen.isEmpty)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(isPresented: $knowledge) {
                 KnowledgeChoice()
@@ -91,6 +97,50 @@ struct ComposerToolsSheet: View {
                 .accessibilityIdentifier("tools.photo")
         }
         .background(Theme.sheet)
+    }
+
+    /// Подтверждение снизу окна, пока в ленте отмечены снимки: «Добавить N фото».
+    @ViewBuilder
+    private var confirmBar: some View {
+        if !chosen.isEmpty {
+            HStack(spacing: 12) {
+                Button {
+                    Haptics.tap()
+                    chosen = []
+                } label: {
+                    Text("Сбросить")
+                        .font(.system(size: 17))
+                        .foregroundStyle(Theme.muted)
+                        .frame(minWidth: 44, minHeight: 50)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressScaleStyle())
+                Button(action: confirmPhotos) {
+                    Text("Добавить \(chosen.count) фото")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.buttonPrimaryText)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Theme.buttonPrimary, in: Capsule())
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(PressScaleStyle())
+                .accessibilityIdentifier("tools.addPhotos")
+            }
+            .padding(.horizontal, RowMetrics.cardInset + 4)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+            .background(Theme.sheet)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
+    /// «Добавить»: отмеченные снимки уходят в капсулу, меню закрывается.
+    private func confirmPhotos() {
+        let assets = chosen
+        Haptics.tap()
+        Task { await model.addLibraryPhotos(assets) }
+        dismiss()
     }
 
     private func pick(_ source: Source) {
@@ -188,17 +238,19 @@ struct ToolRow: View {
     }
 }
 
-/// Плитка «Камера» и лента последних снимков из «Фото»: нажатие сразу прикрепляет снимок
-/// (отмечается галочкой). Без доступа к «Фото» — плитка, открывающая системный выбор.
+/// Лента последних снимков из «Фото»: нажатие отмечает снимок номером по порядку (повторное —
+/// снимает отметку), в капсулу отмеченные уходят по «Добавить N фото» внизу окна
+/// (просьба пользователя 18.11.2026: раньше снимок прикреплялся сразу). Не больше `room` —
+/// сколько ещё вложений помещается в сообщение. Без доступа к «Фото» — плитка системного выбора.
 private struct PhotoStrip: View {
     @Environment(AppModel.self) private var model
     let enabled: Bool
+    @Binding var chosen: [PHAsset]
+    let room: Int
     let onLibrary: () -> Void
     @State private var assets: [PHAsset] = []
     @State private var thumbs: [String: UIImage] = [:]
-    @State private var added: Set<String> = []
     @State private var allowed = true
-    @State private var loading: String?
 
     /// Плитки ленты, как у Claude: ~102×105 pt почти без зазора (3 pt), скруглены только края ленты.
     private static let width: CGFloat = 102
@@ -213,11 +265,12 @@ private struct PhotoStrip: View {
                 }
                 if model.preview != nil {
                     ForEach(Array(thumbs.keys.sorted()), id: \.self) { key in
-                        thumb(key: key, image: thumbs[key]) {}
+                        thumb(image: thumbs[key], number: nil, full: false) {}
                     }
                 } else {
                     ForEach(assets, id: \.localIdentifier) { asset in
-                        thumb(key: asset.localIdentifier, image: thumbs[asset.localIdentifier]) { add(asset) }
+                        let number = chosen.firstIndex { $0.localIdentifier == asset.localIdentifier }.map { $0 + 1 }
+                        thumb(image: thumbs[asset.localIdentifier], number: number, full: chosen.count >= room) { toggle(asset) }
                             .task { load(asset) }
                     }
                 }
@@ -249,7 +302,9 @@ private struct PhotoStrip: View {
         .buttonStyle(PressScaleStyle())
     }
 
-    private func thumb(key: String, image: UIImage?, action: @escaping () -> Void) -> some View {
+    /// Плитка снимка: справа сверху пустой кружок, у отмеченной — номер на синем; отмеченная чуть
+    /// притемнена. `full` — места под вложения больше нет: неотмеченные не нажимаются.
+    private func thumb(image: UIImage?, number: Int?, full: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             ZStack(alignment: .topTrailing) {
                 Group {
@@ -260,24 +315,39 @@ private struct PhotoStrip: View {
                     }
                 }
                 .frame(width: Self.width, height: Self.height)
+                .overlay(Color.black.opacity(number == nil ? 0 : 0.22))
                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                if added.contains(key) || loading == key {
-                    Group {
-                        if loading == key {
-                            ProgressView().controlSize(.small).tint(.white)
-                        } else {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 22))
-                                .foregroundStyle(.white, Theme.accent)
-                        }
+                ZStack {
+                    if let number {
+                        Circle().fill(Theme.accent)
+                        Text("\(number)")
+                            .font(.system(size: 13, weight: .bold).monospacedDigit())
+                            .foregroundStyle(.white)
+                            .transition(.scale.combined(with: .opacity))
+                    } else {
+                        Circle().fill(Color.black.opacity(0.18))
                     }
-                    .padding(8)
+                    Circle().strokeBorder(.white, lineWidth: 1.5)
                 }
+                .frame(width: 24, height: 24)
+                .padding(7)
             }
+            .animation(.spring(response: 0.28, dampingFraction: 0.7), value: number)
         }
         .buttonStyle(PressScaleStyle())
-        .disabled(added.contains(key) || loading != nil)
-        .accessibilityLabel("Прикрепить фото")
+        .disabled(number == nil && full)
+        .opacity(number == nil && full ? 0.5 : 1)
+        .accessibilityLabel(number == nil ? "Отметить фото" : "Фото \(number ?? 0), снять отметку")
+    }
+
+    /// Отметить снимок или снять отметку (номера остальных сдвигаются).
+    private func toggle(_ asset: PHAsset) {
+        Haptics.selection()
+        if let index = chosen.firstIndex(where: { $0.localIdentifier == asset.localIdentifier }) {
+            chosen.remove(at: index)
+        } else if chosen.count < room {
+            chosen.append(asset)
+        }
     }
 
     private func fetch() async {
@@ -312,28 +382,6 @@ private struct PhotoStrip: View {
         }
     }
 
-    private func add(_ asset: PHAsset) {
-        Haptics.tap()
-        let key = asset.localIdentifier
-        loading = key
-        let options = PHImageRequestOptions()
-        options.isNetworkAccessAllowed = true
-        options.deliveryMode = .highQualityFormat
-        PHImageManager.default().requestImageDataAndOrientation(for: asset, options: options) { data, _, _, _ in
-            DispatchQueue.main.async {
-                guard let data else {
-                    loading = nil
-                    model.sendError = "Не удалось загрузить фото из галереи."
-                    return
-                }
-                Task {
-                    await model.addPhotoData(data)
-                    loading = nil
-                    added.insert(key)
-                }
-            }
-        }
-    }
 }
 
 /// Рассуждения модели ПК: выключатель или уровень (для всех чатов с моделью).

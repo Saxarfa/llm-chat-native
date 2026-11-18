@@ -449,6 +449,14 @@ struct ComposerBar: View {
         .sheet(isPresented: $showTools, onDismiss: openPending) {
             ComposerToolsSheet { source in pendingSource = source }
         }
+        // Закончили с «+» — капсула поднимается вместе с клавиатурой (просьба пользователя 18.11.2026):
+        // сразу, как меню начало уходить, а если из него открыли камеру, «Фото» или «Файлы» — после них.
+        .onChange(of: showTools) { _, open in
+            if !open, returnFocus, pendingSource == nil { finishTools() }
+        }
+        .onChange(of: showPhotos) { _, open in if !open { finishTools() } }
+        .onChange(of: showFiles) { _, open in if !open { finishTools() } }
+        .onChange(of: showCamera) { _, open in if !open { finishTools() } }
         .photosPicker(isPresented: $showPhotos, selection: $picked, maxSelectionCount: AttachmentPrep.limit,
                       matching: .images)
         .fileImporter(isPresented: $showFiles, allowedContentTypes: Self.fileTypes,
@@ -638,6 +646,8 @@ struct ComposerBar: View {
 
     private var attachButton: some View {
         Button {
+            // Карточка ввода держится, пока открыто меню, а после него возвращается клавиатура.
+            returnFocus = true
             Keyboard.hide()
             Haptics.tap()
             showTools = true
@@ -654,8 +664,19 @@ struct ComposerBar: View {
         .accessibilityIdentifier("composer.tools")
     }
 
+    /// Меню «+» (и открытый из него выбор фото, камера или файлы) закрылось: клавиатура обратно.
+    private func finishTools() {
+        guard returnFocus else { return }
+        returnFocus = false
+        focused = true
+    }
+
     private func openPending() {
-        guard let source = pendingSource else { return }
+        guard let source = pendingSource else {
+            // Меню закрыли без камеры/фото/файлов — фокус уже поставлен при его уходе.
+            returnFocus = false
+            return
+        }
         pendingSource = nil
         switch source {
         case .camera: showCamera = true

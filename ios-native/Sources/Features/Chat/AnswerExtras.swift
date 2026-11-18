@@ -17,6 +17,7 @@ struct SourcesButton: View {
 
     var body: some View {
         Button {
+            guard !DrawerSwipe.blocksTaps else { return }
             Haptics.tap()
             open = true
         } label: {
@@ -213,6 +214,7 @@ struct SuggestionsView: View {
             }
             if items.count > 2 {
                 Button {
+                    guard !DrawerSwipe.blocksTaps else { return }
                     Haptics.tap()
                     withAnimation(Theme.spring) { expanded.toggle() }
                 } label: {
@@ -240,7 +242,8 @@ struct SuggestionsView: View {
     }
 
     private func choose(_ text: String) {
-        guard chosen == nil, model.activeLive == nil else { return }
+        // Свайп шторки, начатый на варианте, не должен отправлять его сообщением.
+        guard chosen == nil, model.activeLive == nil, !DrawerSwipe.blocksTaps else { return }
         chosen = text
         Haptics.tap()
         Task {

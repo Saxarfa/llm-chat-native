@@ -2,12 +2,31 @@ import AVFoundation
 import SwiftUI
 import UIKit
 
-/// Лента сообщений открытого чата. Открывается у последнего сообщения и, пока
-/// пользователь не отлистал вверх, держится у низа во время живого ответа.
+/// Лента сообщений открытого чата. Открывается у последнего сообщения.
+///
+/// Отправка — как у Claude (решение пользователя 18.11.2026: «ответ идёт и тянет меня с собой… когда
+/// генерация закончилась, меня выкинуло в другую часть чата»): свой вопрос встаёт к верху экрана, ответ
+/// растёт под ним, а лента стоит. Пока ответ короче экрана, под ним держится пустое место (`room`), чтобы
+/// вопрос мог стоять у верха. За новым текстом лента идёт, только если человек сам долистал до конца
+/// ответа или нажал «вниз» (`following`).
 struct MessageFeed: View {
     @Environment(AppModel.self) private var model
-    /// Низ ленты на экране или рядом — можно следовать за новым текстом.
+    /// Низ ленты на экране или рядом: кнопка «вниз» не нужна.
     @State private var atBottom = true
+    /// Лента идёт за новым текстом. Меняет её только сам человек: долистал до конца ответа — да,
+    /// ушёл выше — нет, нажал «вниз» — да. Свой отправленный вопрос — нет.
+    @State private var following = true
+    /// Сообщение над только что отправленным вопросом: по его низу считается, где стоит вопрос
+    /// (сам вопрос въезжает снизу со сдвигом, и его рамка на это время врёт).
+    @State private var pinBaseID: String?
+    /// Низ этого сообщения в координатах ленты.
+    @State private var pinBase: CGFloat?
+    /// Вопрос ещё надо поднять к верху — как только посчитано место под ним.
+    @State private var pinPending = false
+    /// Низ последнего сообщения в координатах ленты.
+    @State private var bottomEdge: CGFloat = 0
+    /// Пустое место под ответом: без него короткий ответ не дал бы вопросу встать к верху.
+    @State private var room: CGFloat = 0
     /// Сколько последних сообщений построено.
     @State private var shown = MessageFeed.page
     @State private var touch = TouchClock()
@@ -26,15 +45,89 @@ struct MessageFeed: View {
     private static let bottomID = "feed-bottom"
     private static let space = "feed-space"
     private static let page = 30
+    /// Отступы столбца ленты: между сообщениями, сверху (под шапкой) и снизу.
+    private static let spacing: CGFloat = 26
+    private static let topPad: CGFloat = 20 + Theme.headerOverhang
+    private static let bottomPad: CGFloat = 14
 
     /// Сколько в ленте своих вопросов: по этому числу анимируется появление нового.
     private var questions: Int {
         model.thread.reduce(0) { $0 + ($1.isUser ? 1 : 0) }
     }
 
-    private func follow(_ proxy: ScrollViewProxy) {
-        guard atBottom, Date().timeIntervalSince(touch.last) > 0.3 else { return }
-        proxy.scrollTo(Self.bottomID, anchor: .bottom)
+    /// Нижний край видимой части ленты (над полем ввода и клавиатурой) в координатах ленты.
+    private func visibleBottom(_ view: UIScrollView) -> CGFloat {
+        view.bounds.height - view.adjustedContentInset.bottom
+    }
+
+    /// Ленту ведёт палец или она катится после него.
+    private func userScrolling(_ view: UIScrollView) -> Bool {
+        view.isTracking || view.isDecelerating || Date().timeIntervalSince(touch.last) < 0.3
+    }
+
+    /// Свой вопрос отправлен: он поднимется к верху экрана, лента за ответом не пойдёт.
+    private func pin(_ question: FeedMessage, in visible: [FeedMessage]) {
+        following = false
+        guard let index = visible.firstIndex(where: { $0.id == question.id }), index > 0 else {
+            // Первый вопрос сессии и так стоит наверху.
+            pinBaseID = nil
+            pinBase = nil
+            room = 0
+            return
+        }
+        pinBaseID = visible[index - 1].id
+        pinBase = nil
+        pinPending = true
+    }
+
+    /// Место под ответом: сколько не хватает, чтобы вопрос мог стоять у верха экрана.
+    /// Пока ответ растёт, место убывает на столько же — высота ленты не меняется и ничего не едет.
+    private func layoutPin() {
+        guard pinBaseID != nil, let base = pinBase, let view = scroll.view else {
+            if room != 0 { room = 0 }
+            return
+        }
+        let top = view.adjustedContentInset.top + Self.topPad
+        let tail = bottomEdge - (base + Self.spacing)
+        let need = max(0, (visibleBottom(view) - top) - tail - Self.bottomPad).rounded()
+        if abs(need - room) > 0.5 { room = need }
+        if pinPending {
+            pinPending = false
+            // После того как место под ответом попадёт в разметку.
+            DispatchQueue.main.async { scrollToPin() }
+        }
+    }
+
+    /// Поднимает вопрос к верху — туда, где стоит первое сообщение ленты.
+    private func scrollToPin() {
+        guard let view = scroll.view, let base = pinBase else { return }
+        let top = view.adjustedContentInset.top + Self.topPad
+        let shift = (base + Self.spacing) - top
+        guard abs(shift) > 0.5 else { return }
+        view.setContentOffset(view.contentOffset, animated: false)
+        view.setContentOffset(CGPoint(x: view.contentOffset.x, y: view.contentOffset.y + shift), animated: true)
+    }
+
+    /// Низ ленты сдвинулся. Если человек сам у конца ответа — ведём ленту за текстом.
+    private func bottomMoved(_ edge: CGFloat, box: CGSize) {
+        bottomEdge = edge
+        let near = edge - box.height < 80
+        // Пока лента едет вниз по кнопке, кнопка не возвращается на полпути.
+        if near || Date() >= touch.jumpUntil, near != atBottom { atBottom = near }
+        layoutPin()
+        guard let view = scroll.view else { return }
+        let gap = edge + Self.bottomPad - visibleBottom(view)
+        if userScrolling(view) {
+            // Решает только сам человек: у конца ответа — идём за текстом, выше или ниже — нет.
+            if Date() >= touch.jumpUntil {
+                let wanted = abs(gap) < 80
+                if wanted != following { following = wanted }
+            }
+            return
+        }
+        // Во время перехода по «вниз» лента и так едет к концу — не перебиваем его анимацию.
+        guard following, !pinPending, Date() >= touch.jumpUntil, gap > 0.5 else { return }
+        view.setContentOffset(CGPoint(x: view.contentOffset.x, y: view.contentOffset.y + gap), animated: false)
     }
 
     /// Кнопка «вниз». Через сам UIScrollView: остановка инерции и анимированный переход
@@ -42,6 +135,7 @@ struct MessageFeed: View {
     private func jumpToBottom(_ proxy: ScrollViewProxy) {
         Haptics.tap()
         atBottom = true
+        following = true
         touch.jumpUntil = Date().addingTimeInterval(0.6)
         guard let view = scroll.view else {
             withAnimation(Theme.spring) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
@@ -63,6 +157,8 @@ struct MessageFeed: View {
 
     var body: some View {
         let live = model.activeLive
+        // Дописанный ответ стоит на месте живого, пока лента не получит сохранённое сообщение.
+        let shownLive = live ?? model.activeSettling
         let snapshot = current
         let items = snapshot.items
         switch snapshot.state {
@@ -73,7 +169,7 @@ struct MessageFeed: View {
                 Task { await model.loadThread() }
             }
         case .loaded:
-            if items.isEmpty && live == nil {
+            if items.isEmpty && shownLive == nil {
                 FeedNotice(text: "В этой сессии пока нет сообщений.", actionTitle: nil, action: {})
             } else {
                 let visible = items.suffix(shown)
@@ -85,7 +181,7 @@ struct MessageFeed: View {
                             // оценивается приблизительно, из-за чего низ ленты обрезался.
                             // Чтобы длинный чат не строился целиком, показываем последние
                             // сообщения, а более ранние — по кнопке.
-                            VStack(alignment: .leading, spacing: 26) {
+                            VStack(alignment: .leading, spacing: Self.spacing) {
                                 if earlier > 0 {
                                     Button("Показать более ранние (\(earlier))") {
                                         let anchor = visible.first?.id
@@ -109,17 +205,21 @@ struct MessageFeed: View {
                                                 removal: .identity))
                                             .modifier(FeedEntrance(entered: entered, animated: enterAnimated,
                                                                    order: enterOrder[message.id], fromRight: true))
-                                    } else if message.rawID != live?.replacingID {
+                                            .modifier(PinMark(active: message.id == pinBaseID, space: Self.space))
+                                    } else if message.rawID != shownLive?.replacingID {
                                         // Перегенерируемый ответ на время заменяет живая строка.
                                         AssistantMessageView(message: message, canRegenerate: live == nil)
                                             .id(message.id)
                                             .transition(.identity)
                                             .modifier(FeedEntrance(entered: entered, animated: enterAnimated,
                                                                    order: enterOrder[message.id], fromRight: false))
+                                            .modifier(PinMark(active: message.id == pinBaseID, space: Self.space))
                                     }
                                 }
-                                if let live {
-                                    LiveAnswerView(live: live)
+                                if let shownLive {
+                                    // Та же ветка и для дописанного ответа: строка не пересоздаётся, раскрытые
+                                    // размышления не сворачиваются.
+                                    LiveAnswerView(live: shownLive, done: live == nil)
                                         .transition(.asymmetric(insertion: .opacity, removal: .identity))
                                 } else if let last = items.last, !last.isUser {
                                     // Варианты продолжения — как на сайте, если они не выключены в его настройках.
@@ -145,8 +245,9 @@ struct MessageFeed: View {
                                     .id(Self.bottomID)
                             }
                             .padding(.horizontal, 15)
-                            .padding(.top, 20 + Theme.headerOverhang)
-                            .padding(.bottom, 14)
+                            .padding(.top, Self.topPad)
+                            // Под ответом — место, чтобы свой вопрос мог встать к верху экрана (`room`).
+                            .padding(.bottom, Self.bottomPad + room)
                             .background(ScrollViewCatcher(holder: scroll))
                             // Короткий чат начинается сверху, а не прижимается к полю ввода.
                             .frame(minHeight: box.size.height, alignment: .top)
@@ -163,16 +264,24 @@ struct MessageFeed: View {
                                     visible.suffix(Self.enterCount).enumerated().map { ($0.element.id, $0.offset) },
                                     uniquingKeysWith: { first, _ in first })
                                 entered = true
+                                if model.preview == .threadTop { following = false }
                             }
                         }
                         .coordinateSpace(name: Self.space)
-                        .defaultScrollAnchor(model.preview == .threadTop ? .top : .bottom)
+                        // Только при открытии: «держать низ» при любом росте ленты тянуло читающего
+                        // за ответом (так `defaultScrollAnchor` без роли ведёт себя с iOS 18).
+                        .modifier(InitialScrollAnchor(anchor: model.preview == .threadTop ? .top : .bottom))
                         .scrollDismissesKeyboard(.interactively)
-                        .onPreferenceChange(BottomEdgeKey.self) { edge in
-                            let near = edge - box.size.height < 80
-                            // Пока лента едет вниз по кнопке, кнопка не возвращается на полпути.
-                            if !near, Date() < touch.jumpUntil { return }
-                            if near != atBottom { atBottom = near }
+                        // Замыкания `onPreferenceChange` не привязаны к главному потоку, а вызываются на нём:
+                        // `assumeIsolated` — чтобы звать методы ленты без предупреждений Swift 6.
+                        .onPreferenceChange(BottomEdgeKey.self) { [size = box.size] edge in
+                            MainActor.assumeIsolated { bottomMoved(edge, box: size) }
+                        }
+                        .onPreferenceChange(PinBaseKey.self) { base in
+                            MainActor.assumeIsolated {
+                                pinBase = base
+                                layoutPin()
+                            }
                         }
                         // Пока палец ведёт ленту, она не должна убегать к низу за новым текстом.
                         .simultaneousGesture(DragGesture(minimumDistance: 4).onChanged { _ in
@@ -191,20 +300,11 @@ struct MessageFeed: View {
                             }
                         }
                         .animation(.easeOut(duration: 0.18), value: atBottom)
-                        .onChange(of: live?.text.count) { follow(proxy) }
-                        .onChange(of: live?.phase) { follow(proxy) }
-                        .onChange(of: live?.arts.count) { follow(proxy) }
-                        .onChange(of: live == nil) {
-                            // Ответ дописан: под ним появляются кнопки — показать и их.
-                            DispatchQueue.main.async { follow(proxy) }
-                        }
+                        // За текстом лента идёт сама — по сдвигу низа (`bottomMoved`), а не по каждому куску.
                         .onChange(of: model.thread.count) {
-                            // Свой новый вопрос всегда показываем, даже если лента была отлистана.
-                            if model.thread.last?.isUser == true {
-                                atBottom = true
-                                withAnimation(Theme.spring) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
-                            } else {
-                                follow(proxy)
+                            // Свой новый вопрос — к верху экрана, даже если лента была отлистана.
+                            if let last = model.thread.last, last.isUser {
+                                pin(last, in: Array(visible))
                             }
                         }
                     }
@@ -353,19 +453,74 @@ private struct BottomEdgeKey: PreferenceKey {
     }
 }
 
+/// Низ сообщения над только что отправленным вопросом (`MessageFeed.pinBaseID`) в координатах ленты.
+private struct PinBaseKey: PreferenceKey {
+    static let defaultValue: CGFloat? = nil
+    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
+        value = value ?? nextValue()
+    }
+}
+
+/// Отмечает сообщение, по низу которого лента ставит свой вопрос к верху экрана.
+private struct PinMark: ViewModifier {
+    let active: Bool
+    let space: String
+
+    func body(content: Content) -> some View {
+        content.background {
+            if active {
+                GeometryReader { mark in
+                    Color.clear.preference(key: PinBaseKey.self, value: mark.frame(in: .named(space)).maxY)
+                }
+            }
+        }
+    }
+}
+
+/// Где лента открывается. С iOS 18 — только при открытии (`.initialOffset`): без роли
+/// `defaultScrollAnchor(.bottom)` ещё и держит низ при каждом росте содержимого.
+private struct InitialScrollAnchor: ViewModifier {
+    let anchor: UnitPoint
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.defaultScrollAnchor(anchor, for: .initialOffset)
+        } else {
+            content.defaultScrollAnchor(anchor)
+        }
+    }
+}
+
+/// Раскрытые строки размышлений. Живой ответ и сменившее его сохранённое сообщение — разные виды,
+/// но для глаза одна строка: раскрытая во время ответа остаётся раскрытой и после.
+enum ReasoningOpen {
+    static var keys: Set<String> = []
+
+    static func liveKey(_ chat: String) -> String { "live:" + chat }
+
+    /// Живой ответ сменился сообщением `message` (nil — сообщения нет или это другой ответ).
+    static func handOver(chat: String, to message: String?) {
+        guard keys.remove(liveKey(chat)) != nil, let message else { return }
+        keys.insert(message)
+    }
+}
+
 /// Ответ, который пишется прямо сейчас: строка рассуждений («Атом» + «Размышляет») или строка этапа
 /// (`SparkStatus`: «Атом» + короткая подпись, сменяется снизу вверх). Секунд нигде нет
 /// (убраны по просьбе пользователя 16.11.2026).
 private struct LiveAnswerView: View {
     @Environment(AppModel.self) private var model
     let live: AppModel.LiveState
+    /// Ответ уже дописан и ждёт сохранённое сообщение (`AppModel.settling`): статусов нет.
+    var done = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if !live.reasoning.isEmpty {
                 // Одна строка, как «Thinking» у Claude: пока модель думает — «Атом» и «Размышляет»;
                 // потом та же строка становится «<модель> · размышляла». Нажатие раскрывает шаги.
-                ReasoningView(text: live.reasoning, modelName: model.activeModelName, spark: working)
+                ReasoningView(text: live.reasoning, modelName: model.activeModelName, spark: working,
+                              memoryKey: model.activeChatID.map(ReasoningOpen.liveKey))
             }
             if !live.blocks.isEmpty {
                 MarkdownView(blocks: live.blocks)
@@ -374,7 +529,7 @@ private struct LiveAnswerView: View {
                 ArtView(art: art)
             }
             // Отдельная «Искра» не нужна, пока искра уже стоит в строке рассуждений (раньше статус был двойным).
-            if (live.text.isEmpty || live.stopping) && !(working && !live.stopping) {
+            if !done, (live.text.isEmpty || live.stopping) && !(working && !live.stopping) {
                 SparkStatus(text: live.stopping ? "Останавливаю" : live.phase)
                     // Уходит сразу: растворяясь 0,3 с на прежнем месте, статус ложился поверх первых
                     // строк ответа (замечание 16.11.2026). Появляется — плавно.
@@ -653,7 +808,8 @@ private struct AssistantMessageView: View {
         VStack(alignment: .leading, spacing: 12) {
             if !message.reasoning.isEmpty {
                 ReasoningView(text: message.reasoning,
-                              modelName: message.model.isEmpty ? nil : ChatConfig.modelName(message.model, profiles: model.settings.modelProfiles))
+                              modelName: message.model.isEmpty ? nil : ChatConfig.modelName(message.model, profiles: model.settings.modelProfiles),
+                              memoryKey: message.id)
             }
             if !message.blocks.isEmpty {
                 MarkdownView(blocks: message.blocks)
@@ -666,17 +822,27 @@ private struct AssistantMessageView: View {
             }
             if !message.text.isEmpty || !message.arts.isEmpty {
                 // Как под ответом у Claude: скопировать, поделиться, прочитать вслух, ответить заново.
+                // Лента едет за пальцем вместе со шторкой, и палец, начавший свайп на кнопке, отпускается
+                // на ней же — поэтому каждая кнопка ряда спрашивает `DrawerSwipe.blocksTaps`
+                // (замечание 18.11.2026: двигаю шторку, зажав кнопку под ответом, — она нажимается).
                 HStack(spacing: 0) {
                     if !message.text.isEmpty {
                         CopyButton(text: message.text, label: "Скопировать ответ", compact: true)
-                        ShareLink(item: message.text) {
+                        // Кнопка, а не ShareLink: у ShareLink нет своего действия, где проверить свайп.
+                        Button {
+                            guard !DrawerSwipe.blocksTaps else { return }
+                            Haptics.tap()
+                            ChatShare.present(message.text)
+                        } label: {
                             AnswerIcon(symbol: "square.and.arrow.up")
                         }
+                        .buttonStyle(PressScaleStyle())
                         .accessibilityLabel("Поделиться")
                         ReadAloudButton(id: message.id, text: message.text)
                     }
                     if canRegenerate {
                         Button {
+                            guard !DrawerSwipe.blocksTaps else { return }
                             Task { await model.regenerate(message) }
                         } label: {
                             AnswerIcon(symbol: "arrow.clockwise")
@@ -724,6 +890,7 @@ private struct ReadAloudButton: View {
         let reader = ReadAloud.shared
         let speaking = reader.speakingID == id
         Button {
+            guard !DrawerSwipe.blocksTaps else { return }
             Haptics.tap()
             reader.toggle(id: id, text: text)
         } label: {
@@ -803,6 +970,7 @@ private struct VariantStepper: View {
     private func step(_ symbol: String, label: String, to index: Int) -> some View {
         let possible = index >= 0 && index < message.variantCount
         return Button {
+            guard !DrawerSwipe.blocksTaps else { return }
             Task { await model.selectVariant(message, index: index) }
         } label: {
             Image(systemName: symbol)
@@ -820,6 +988,7 @@ private struct VariantStepper: View {
 /// «…» под ответом: ветка от этого места и удаление.
 private struct AnswerMoreMenu: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.drawerSwiping) private var drawerSwiping
     let message: FeedMessage
 
     var body: some View {
@@ -840,7 +1009,9 @@ private struct AnswerMoreMenu: View {
         } label: {
             AnswerIcon(symbol: "ellipsis")
         }
-        .disabled(model.branchBusy)
+        // Меню открывается системой на отрыве пальца, без действия, где проверить свайп, — поэтому
+        // пока шторку ведут или она доезжает, «⋯» выключено.
+        .disabled(model.branchBusy || drawerSwiping)
         .accessibilityLabel("Ещё действия с ответом")
     }
 }
@@ -856,24 +1027,32 @@ private struct ReasoningView: View {
     var modelName: String?
     /// Идёт рассуждение: «Атом» живой.
     var spark = false
-    @State private var open = false
+    /// Ключ в `ReasoningOpen`: раскрытая строка остаётся раскрытой, когда живой ответ сменяется сообщением.
+    var memoryKey: String?
+    @State private var open: Bool
     /// Подпись «Размышляет» держится, пока электроны стягиваются, и сменяется на вспышке.
     @State private var thinkingLabel: Bool
     /// Рассуждение закончилось на глазах — итоговая подпись собирается по буквам.
     @State private var celebrate = false
 
-    init(text: String, modelName: String? = nil, spark: Bool = false) {
+    init(text: String, modelName: String? = nil, spark: Bool = false, memoryKey: String? = nil) {
         self.text = text
         self.modelName = modelName
         self.spark = spark
+        self.memoryKey = memoryKey
+        _open = State(initialValue: memoryKey.map { ReasoningOpen.keys.contains($0) } ?? false)
         _thinkingLabel = State(initialValue: spark)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Button {
+                guard !DrawerSwipe.blocksTaps else { return }
                 Haptics.tap()
                 withAnimation(Theme.spring) { open.toggle() }
+                if let memoryKey {
+                    if open { ReasoningOpen.keys.insert(memoryKey) } else { ReasoningOpen.keys.remove(memoryKey) }
+                }
             } label: {
                 HStack(spacing: 7) {
                     AtomIndicator(size: 20, active: spark, orbits: true)

@@ -193,6 +193,7 @@ struct CopyButton: View {
 
     var body: some View {
         Button {
+            guard !DrawerSwipe.blocksTaps else { return }
             UIPasteboard.general.string = text
             Haptics.tap()
             copied = true

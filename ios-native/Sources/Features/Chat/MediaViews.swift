@@ -423,7 +423,8 @@ struct DraftAttachmentStrip: View {
 /// размытый экран под ним и сам арт, а закрытие — своё. Смахивание вверх или вниз закрывает,
 /// как в «Фото»: картинка чуть уходит по ходу пальца, уменьшаясь, и тает вместе с фоном
 /// (раньше она улетала за край, а потом ещё уезжало системное окно — замечание 13.11.2026).
-/// Открытый из студии просмотр сам переключается на новый арт, когда генерация закончилась.
+/// Открытый из студии просмотр листается вбок по артам студии, как в «Фото» (просьба пользователя
+/// 18.11.2026), и сам переключается на новый арт, когда генерация закончилась, — если смотрели последний.
 struct ImageViewer: View {
     @Environment(AppModel.self) private var model
     let item: ViewerItem
@@ -435,37 +436,54 @@ struct ImageViewer: View {
     @State private var loading = true
     @State private var note: String?
     @State private var saving = false
-    /// Какой арт показан сейчас (при слежении за студией меняется).
+    /// Какой арт показан сейчас (при листании и слежении за студией меняется).
     @State private var shownArt: String?
     @State private var drag: CGSize = .zero
     /// Просмотр проявился (первый кадр — прозрачный, затем плавное появление).
     @State private var shown = false
     @State private var closing = false
+    /// Листание вбок: сдвиг за пальцем и соседний арт, который въезжает с края.
+    @State private var pageX: CGFloat = 0
+    @State private var neighbor: Neighbor?
+    @State private var pageWidth: CGFloat = 400
+
+    /// Соседний арт студии: `delta` +1 — более старый (справа), −1 — более новый.
+    private struct Neighbor: Equatable {
+        let id: String
+        let delta: Int
+        var image: UIImage?
+    }
+
+    /// Промежуток между артами при листании, как в «Фото».
+    private static let pageGap: CGFloat = 20
 
     /// 0 — на месте, 1 — утащили далеко: фон и кнопки тают.
     private var progress: CGFloat { min(1, abs(drag.height) / 320) }
 
     private var visible: Bool { shown && !closing }
 
+    /// Листать можно только арты студии.
+    private var pageable: Bool {
+        guard followsStudio, let shownArt else { return false }
+        return model.studio.completed.contains { $0.id == shownArt }
+    }
+
     var body: some View {
         ZStack {
             background
                 .opacity(visible ? 1 - progress * 0.85 : 0)
                 .ignoresSafeArea()
-            if let image {
-                ZoomableImage(image: image,
-                              onDrag: { value in if !closing { drag = value } },
-                              onEnd: finishDrag)
-                    .ignoresSafeArea()
-                    .scaleEffect(visible ? 1 - progress * 0.14 : (closing ? 0.86 : 0.94))
-                    .offset(drag)
-                    .opacity(visible ? 1 : 0)
-            } else if !loading {
+            pages
+                .ignoresSafeArea()
+                .scaleEffect(visible ? 1 - progress * 0.14 : (closing ? 0.86 : 0.94))
+                .offset(drag)
+                .opacity(visible ? 1 : 0)
+            if image == nil, !loading {
                 Text("Не удалось открыть изображение.")
                     .font(.system(size: 16))
                     .foregroundStyle(Theme.muted)
             }
-            if loading {
+            if loading, image == nil {
                 ProgressView().tint(.white)
             }
         }
@@ -508,9 +526,42 @@ struct ImageViewer: View {
             withAnimation(.easeOut(duration: 0.24)) { shown = true }
         }
         .onDisappear { DrawerSwipe.viewerOpen = false }
-        .onChange(of: model.studio.completed.first?.id) { _, newest in
-            guard followsStudio, let newest, newest != shownArt, !closing else { return }
+        .onChange(of: model.studio.completed.first?.id) { previous, newest in
+            // Смотрели последний арт — готовый новый встаёт на его место; листали старые — не мешаем.
+            guard followsStudio, let newest, newest != shownArt, !closing,
+                  shownArt == nil || shownArt == previous else { return }
             Task { await show(art: newest) }
+        }
+    }
+
+    /// Показанный арт и, пока листают, соседний — на экран правее или левее.
+    private var pages: some View {
+        GeometryReader { geo in
+            ZStack {
+                if let image {
+                    ZoomableImage(image: image,
+                                  pageable: pageable,
+                                  onDrag: { value in if !closing { drag = value } },
+                                  onEnd: finishDrag,
+                                  onPage: page,
+                                  onPageEnd: finishPage)
+                        // Свой вид на каждый арт: увеличение прежнего не переносится на новый.
+                        .id(shownArt)
+                        .transition(.opacity)
+                        .offset(x: pageX)
+                }
+                if let neighbor, let picture = neighbor.image {
+                    Image(uiImage: picture)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .offset(x: pageX + CGFloat(neighbor.delta) * (geo.size.width + Self.pageGap))
+                        .allowsHitTesting(false)
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .onAppear { pageWidth = geo.size.width }
+            .onChange(of: geo.size.width) { _, width in pageWidth = width }
         }
     }
 
@@ -561,6 +612,72 @@ struct ImageViewer: View {
         }
     }
 
+    // MARK: - Листание артов студии
+
+    /// Соседний арт в ленте студии: +1 — более старый, −1 — более новый (как свайп по сцене).
+    private func neighborID(_ delta: Int) -> String? {
+        let done = model.studio.completed
+        guard let shownArt, let index = done.firstIndex(where: { $0.id == shownArt }),
+              done.indices.contains(index + delta) else { return nil }
+        return done[index + delta].id
+    }
+
+    /// Палец ведёт арт вбок; с той стороны, куда он идёт, подтягивается соседний.
+    private func page(_ distance: CGFloat) {
+        guard !closing, distance != 0 else { return }
+        let delta = distance < 0 ? 1 : -1
+        if neighbor?.delta != delta { prepareNeighbor(delta) }
+        // Дальше листать некуда — арт тянется туго.
+        pageX = neighbor == nil ? distance * 0.25 : distance
+    }
+
+    private func prepareNeighbor(_ delta: Int) {
+        guard let id = neighborID(delta) else {
+            neighbor = nil
+            return
+        }
+        let cached = ImageStore.image("art:\(id):o") ?? ImageStore.image("art:\(id):p")
+        neighbor = Neighbor(id: id, delta: delta, image: cached)
+        guard cached == nil else { return }
+        Task {
+            let loaded = await model.artImage(id, preview: true)
+            if neighbor?.id == id { neighbor?.image = loaded }
+        }
+    }
+
+    private func finishPage(velocity: CGFloat, distance: CGFloat) {
+        guard !closing else { return }
+        let delta = distance < -60 || velocity < -500 ? 1 : (distance > 60 || velocity > 500 ? -1 : 0)
+        guard delta != 0, let next = neighbor, next.delta == delta else {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) { pageX = 0 }
+            return
+        }
+        withAnimation(.easeOut(duration: 0.22)) {
+            pageX = -CGFloat(delta) * (pageWidth + Self.pageGap)
+        } completion: {
+            land(next)
+        }
+    }
+
+    /// Соседний арт доехал до середины: теперь он показанный, сцена студии — на нём же.
+    private func land(_ next: Neighbor) {
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) {
+            shownArt = next.id
+            set(next.image)
+            loading = next.image == nil
+            neighbor = nil
+            pageX = 0
+        }
+        if let job = model.studio.completed.first(where: { $0.id == next.id }) {
+            model.studio.select(job)
+        }
+        Task { await upgrade(next.id, fallbackNote: false) }
+    }
+
+    // MARK: - Загрузка
+
     private func load() async {
         switch item.source {
         case .attachment(let key):
@@ -570,26 +687,43 @@ struct ImageViewer: View {
             set(loaded)
         case .art(let id):
             shownArt = id
-            // Сначала то, что уже есть в ленте, затем оригинал.
-            set(await model.artImage(id, preview: true))
-            if let original = await model.artImage(id, preview: false) {
-                if shownArt == id { set(original) }
-            } else if image != nil {
-                show("Оригинал недоступен — показана уменьшенная копия.")
+            // Сначала то, что уже есть (оригинал из кэша или копия из ленты), затем оригинал.
+            if let cached = ImageStore.image("art:\(id):o") {
+                set(cached)
+            } else {
+                set(await model.artImage(id, preview: true))
             }
+            await upgrade(id, fallbackNote: true)
         case .video:
             break
         }
         loading = false
     }
 
+    /// Оригинал на месте уменьшенной копии того же арта.
+    private func upgrade(_ id: String, fallbackNote: Bool) async {
+        if let original = await model.artImage(id, preview: false) {
+            if shownArt == id {
+                set(original)
+                loading = false
+            }
+        } else if shownArt == id {
+            loading = false
+            if image != nil, fallbackNote { show("Оригинал недоступен — показана уменьшенная копия.") }
+        }
+    }
+
     /// Новый арт студии на месте прежнего: сначала уменьшенная копия, потом оригинал.
     private func show(art id: String) async {
         guard let preview = await model.artImage(id, preview: true) else { return }
-        shownArt = id
         Haptics.selection()
-        set(preview)
-        if let original = await model.artImage(id, preview: false), shownArt == id { set(original) }
+        withAnimation(.easeOut(duration: 0.25)) {
+            shownArt = id
+            neighbor = nil
+            pageX = 0
+            set(preview)
+        }
+        await upgrade(id, fallbackNote: false)
     }
 
     private func set(_ picture: UIImage?) {
@@ -634,38 +768,21 @@ struct ImageViewer: View {
 }
 
 /// Картинка в системной прокрутке с увеличением. Пока картинка не увеличена, вертикальное
-/// движение пальца тащит её (`onDrag`), а отпускание сообщает скорость и расстояние (`onEnd`).
+/// движение пальца тащит её (`onDrag`), а отпускание сообщает скорость и расстояние (`onEnd`);
+/// горизонтальное — листает (`onPage`/`onPageEnd`), если `pageable`.
 private struct ZoomableImage: UIViewRepresentable {
     let image: UIImage
+    var pageable = false
     var onDrag: (CGSize) -> Void = { _ in }
     var onEnd: (_ velocity: CGFloat, _ distance: CGFloat) -> Void = { _, _ in }
+    var onPage: (CGFloat) -> Void = { _ in }
+    var onPageEnd: (_ velocity: CGFloat, _ distance: CGFloat) -> Void = { _, _ in }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    func makeUIView(context: Context) -> UIScrollView {
-        let scroll = UIScrollView()
+    func makeUIView(context: Context) -> ZoomScrollView {
+        let scroll = ZoomScrollView(image: image)
         scroll.delegate = context.coordinator
-        scroll.minimumZoomScale = 1
-        scroll.maximumZoomScale = 5
-        scroll.showsVerticalScrollIndicator = false
-        scroll.showsHorizontalScrollIndicator = false
-        scroll.contentInsetAdjustmentBehavior = .never
-        scroll.backgroundColor = .clear
-
-        let view = UIImageView(image: image)
-        view.contentMode = .scaleAspectFit
-        view.translatesAutoresizingMaskIntoConstraints = false
-        scroll.addSubview(view)
-        NSLayoutConstraint.activate([
-            view.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
-            view.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
-            view.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
-            view.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
-            view.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor),
-            view.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor),
-        ])
-        context.coordinator.imageView = view
-        context.coordinator.shownSize = image.size
 
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.doubleTap(_:)))
         tap.numberOfTapsRequired = 2
@@ -678,51 +795,67 @@ private struct ZoomableImage: UIViewRepresentable {
         return scroll
     }
 
-    func updateUIView(_ scroll: UIScrollView, context: Context) {
-        context.coordinator.onDrag = onDrag
-        context.coordinator.onEnd = onEnd
-        guard let view = context.coordinator.imageView, view.image !== image else { return }
-        // Другая картинка (новый арт студии) — сброс увеличения и плавная смена;
-        // тот же арт в лучшем качестве — просто подмена.
-        let replacing = context.coordinator.shownSize.width / max(context.coordinator.shownSize.height, 1)
-            != image.size.width / max(image.size.height, 1) || context.coordinator.swapping
-        context.coordinator.swapping = false
-        if replacing { scroll.setZoomScale(1, animated: false) }
-        context.coordinator.shownSize = image.size
-        UIView.transition(with: view, duration: 0.25, options: .transitionCrossDissolve) {
-            view.image = image
+    func updateUIView(_ scroll: ZoomScrollView, context: Context) {
+        let coordinator = context.coordinator
+        coordinator.pageable = pageable
+        coordinator.onDrag = onDrag
+        coordinator.onEnd = onEnd
+        coordinator.onPage = onPage
+        coordinator.onPageEnd = onPageEnd
+        guard scroll.imageView.image !== image else { return }
+        // Тот же арт в лучшем качестве — подмена без сброса увеличения (пропорции копии и оригинала
+        // расходятся на доли пикселя: прежнее точное сравнение считало их разными картинками и
+        // сбрасывало увеличение — картинка на этом прыгала, замечание 18.11.2026).
+        UIView.transition(with: scroll.imageView, duration: 0.25, options: .transitionCrossDissolve) {
+            scroll.show(image)
         }
     }
 
     final class Coordinator: NSObject, UIScrollViewDelegate, UIGestureRecognizerDelegate {
-        weak var imageView: UIImageView?
-        var shownSize: CGSize = .zero
-        var swapping = false
+        private enum Axis { case vertical, horizontal }
+        private var axis: Axis?
+        var pageable = false
         var onDrag: (CGSize) -> Void = { _ in }
         var onEnd: (CGFloat, CGFloat) -> Void = { _, _ in }
+        var onPage: (CGFloat) -> Void = { _ in }
+        var onPageEnd: (CGFloat, CGFloat) -> Void = { _, _ in }
 
-        func viewForZooming(in scrollView: UIScrollView) -> UIView? { imageView }
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+            (scrollView as? ZoomScrollView)?.imageView
+        }
+
+        func scrollViewDidZoom(_ scrollView: UIScrollView) {
+            (scrollView as? ZoomScrollView)?.centerImage()
+        }
 
         @objc func doubleTap(_ gesture: UITapGestureRecognizer) {
-            guard let scroll = gesture.view as? UIScrollView else { return }
+            guard let scroll = gesture.view as? ZoomScrollView else { return }
             if scroll.zoomScale > 1.01 {
                 scroll.setZoomScale(1, animated: true)
                 return
             }
-            let point = gesture.location(in: imageView)
+            let point = gesture.location(in: scroll.imageView)
             let size = CGSize(width: scroll.bounds.width / 2.5, height: scroll.bounds.height / 2.5)
             scroll.zoom(to: CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2,
                                    width: size.width, height: size.height), animated: true)
         }
 
-        /// Смахивание — только у неувеличенной картинки и только по вертикали.
+        /// Свой жест — только у неувеличенной картинки: по вертикали — смахнуть, вбок — листать.
         func gestureRecognizerShouldBegin(_ gesture: UIGestureRecognizer) -> Bool {
             guard let pan = gesture as? UIPanGestureRecognizer,
                   let scroll = pan.view as? UIScrollView,
                   pan !== scroll.panGestureRecognizer else { return true }
             guard scroll.zoomScale <= scroll.minimumZoomScale + 0.01 else { return false }
             let velocity = pan.velocity(in: scroll)
-            return abs(velocity.y) > abs(velocity.x) * 1.2
+            if abs(velocity.y) > abs(velocity.x) * 1.2 {
+                axis = .vertical
+                return true
+            }
+            if pageable, abs(velocity.x) > abs(velocity.y) * 1.2 {
+                axis = .horizontal
+                return true
+            }
+            return false
         }
 
         func gestureRecognizer(_ gesture: UIGestureRecognizer,
@@ -734,15 +867,91 @@ private struct ZoomableImage: UIViewRepresentable {
         @objc func pan(_ gesture: UIPanGestureRecognizer) {
             // В координатах окна: сам вид едет за пальцем, его координаты не годятся.
             let shift = gesture.translation(in: nil)
+            let velocity = gesture.velocity(in: nil)
             switch gesture.state {
             case .changed:
-                onDrag(CGSize(width: shift.x * 0.35, height: shift.y))
+                if axis == .horizontal {
+                    onPage(shift.x)
+                } else {
+                    onDrag(CGSize(width: shift.x * 0.35, height: shift.y))
+                }
             case .ended, .cancelled, .failed:
-                onEnd(gesture.velocity(in: nil).y, shift.y)
+                if axis == .horizontal {
+                    onPageEnd(velocity.x, shift.x)
+                } else {
+                    onEnd(velocity.y, shift.y)
+                }
+                axis = nil
             default:
                 break
             }
         }
+    }
+}
+
+/// Прокрутка с увеличением, которая сама ставит картинку: вписывает её в свой размер и держит по центру,
+/// как образец Apple PhotoScroller. Раньше место картинке задавали ограничения autolayout вместе с
+/// увеличением, и первая раскладка выходила неточной: картинка открывалась ниже нужного и вставала
+/// на место только через полсекунды, когда приходил оригинал и сбрасывалось увеличение (замечание 18.11.2026).
+final class ZoomScrollView: UIScrollView {
+    let imageView = UIImageView()
+    /// Под какой размер прокрутки вписана картинка.
+    private var fittedFor: CGSize = .zero
+    private var imageSize: CGSize
+
+    init(image: UIImage) {
+        imageSize = image.size
+        super.init(frame: .zero)
+        minimumZoomScale = 1
+        maximumZoomScale = 5
+        showsVerticalScrollIndicator = false
+        showsHorizontalScrollIndicator = false
+        contentInsetAdjustmentBehavior = .never
+        decelerationRate = .fast
+        backgroundColor = .clear
+        imageView.image = image
+        imageView.contentMode = .scaleAspectFit
+        addSubview(imageView)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// Другая картинка того же арта; если пропорции заметно другие — вписать заново.
+    func show(_ image: UIImage) {
+        imageView.image = image
+        let old = imageSize.width / max(imageSize.height, 1)
+        let new = image.size.width / max(image.size.height, 1)
+        imageSize = image.size
+        if abs(old - new) > 0.01 {
+            fittedFor = .zero
+            setNeedsLayout()
+        }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        if bounds.size != fittedFor { fit() }
+        centerImage()
+    }
+
+    /// Картинка целиком в размер прокрутки, без увеличения.
+    private func fit() {
+        fittedFor = bounds.size
+        zoomScale = 1
+        let scale = min(bounds.width / max(imageSize.width, 1), bounds.height / max(imageSize.height, 1))
+        let size = CGSize(width: (imageSize.width * scale).rounded(), height: (imageSize.height * scale).rounded())
+        imageView.frame = CGRect(origin: .zero, size: size)
+        contentSize = size
+        contentOffset = .zero
+    }
+
+    /// Меньше экрана по стороне — по центру этой стороны (и при увеличении тоже).
+    func centerImage() {
+        var frame = imageView.frame
+        frame.origin.x = frame.width < bounds.width ? ((bounds.width - frame.width) / 2).rounded() : 0
+        frame.origin.y = frame.height < bounds.height ? ((bounds.height - frame.height) / 2).rounded() : 0
+        if frame.origin != imageView.frame.origin { imageView.frame = frame }
     }
 }
 

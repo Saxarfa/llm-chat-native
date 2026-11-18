@@ -20,6 +20,27 @@ extension AppModel {
         return lives[id]
     }
 
+    /// Дописанный ответ, который ждёт сохранённое сообщение (`settling`).
+    var activeSettling: LiveState? {
+        guard let id = activeChatID else { return nil }
+        return settling[id]
+    }
+
+    /// Лента получает сохранённые сообщения: дописанный ответ уходит в том же шаге, без кадра,
+    /// где его нет вовсе. Раскрытые во время ответа размышления остаются раскрытыми у сообщения.
+    func takeSettled(_ id: String, items: [FeedMessage]) {
+        guard let done = settling[id] else { return }
+        let answer = items.last.flatMap { !$0.isUser && done.replacingID == nil ? $0.id : nil }
+        ReasoningOpen.handOver(chat: id, to: answer)
+        settling[id] = nil
+    }
+
+    /// Сохранённое сообщение так и не пришло: дописанный ответ всё равно уходит.
+    func dropSettled(_ id: String) {
+        ReasoningOpen.handOver(chat: id, to: nil)
+        settling[id] = nil
+    }
+
     /// После входа: настройки аккаунта, список моделей и поток событий.
     func startSession() {
         guard preview == nil else { return }
@@ -155,7 +176,7 @@ extension AppModel {
         }
         guard let api else { return }
         prepareLiveBlocks()
-        if threadChatID == id, lives[id] != nil, !thread.isEmpty {
+        if threadChatID == id, lives[id] != nil || settling[id] != nil, !thread.isEmpty {
             // Только что отправленный вопрос уже в ленте — не сбрасываем её на загрузку.
         } else if let cached = threadCache[id] {
             thread = cached
@@ -223,8 +244,12 @@ extension AppModel {
             FeedMessage.build(from: raw.map { ChatMessage(json: $0) })
         }.value
         threadCache[id] = items
-        guard activeChatID == id else { return }
+        guard activeChatID == id else {
+            dropSettled(id)
+            return
+        }
         if lives[id]?.pendingUserID != nil { lives[id]?.pendingUserID = nil }
+        takeSettled(id, items: items)
         if items != thread { thread = items }
         threadChatID = id
     }
@@ -611,6 +636,14 @@ extension AppModel {
         }
         pendingFinish[id] = nil
         let wasLive = lives[id] != nil
+        // Ответ стоит на месте, пока не придёт сохранённое сообщение (`takeSettled`).
+        if error == nil, id == activeChatID, var done = lives[id] {
+            done.isThinking = false
+            done.stopping = false
+            settling[id] = done
+        } else {
+            ReasoningOpen.handOver(chat: id, to: nil)
+        }
         lives[id] = nil
         liveRaw[id] = nil
         if notify, wasLive, error == nil {
@@ -622,10 +655,17 @@ extension AppModel {
             let item = chats.remove(at: index)
             chats.insert(item, at: 0)
         }
+        // Если сообщение так и не пришло (ошибка, ранний выход), дописанный ответ всё равно уходит.
         if let chat {
-            Task { await apply(chat: chat, to: id) }
+            Task {
+                await apply(chat: chat, to: id)
+                dropSettled(id)
+            }
         } else if activeChatID == id {
-            Task { await loadThread() }
+            Task {
+                await loadThread()
+                dropSettled(id)
+            }
         } else {
             threadCache[id] = nil
         }

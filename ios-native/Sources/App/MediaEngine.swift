@@ -1,4 +1,5 @@
 import AVFoundation
+import Photos
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -21,12 +22,31 @@ extension AppModel {
         }
     }
 
-    /// Снимок из ленты последних фото в меню «+».
-    func addPhotoData(_ data: Data) async {
-        guard hasRoomForAttachment() else { return }
+    /// Снимки, отмеченные в ленте последних фото меню «+» и подтверждённые кнопкой «Добавить»
+    /// (просьба пользователя 18.11.2026: раньше снимок прикреплялся сразу по нажатию).
+    func addLibraryPhotos(_ assets: [PHAsset]) async {
         attachmentsBusy = true
         defer { attachmentsBusy = false }
-        await addPrepared { try AttachmentPrep.image(data: data, name: "Фото") }
+        for asset in assets {
+            guard hasRoomForAttachment() else { break }
+            guard let data = await Self.photoData(asset) else {
+                sendError = "Не удалось загрузить фото из галереи."
+                continue
+            }
+            await addPrepared { try AttachmentPrep.image(data: data, name: "Фото") }
+        }
+    }
+
+    /// Байты снимка из «Фото» (с iCloud, если оригинала на телефоне нет).
+    private static func photoData(_ asset: PHAsset) async -> Data? {
+        let options = PHImageRequestOptions()
+        options.isNetworkAccessAllowed = true
+        options.deliveryMode = .highQualityFormat
+        return await withCheckedContinuation { done in
+            PHImageManager.default().requestImageDataAndOrientation(for: asset, options: options) { data, _, _, _ in
+                done.resume(returning: data)
+            }
+        }
     }
 
     /// Снимок с камеры.

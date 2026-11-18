@@ -89,6 +89,7 @@ extension AppModel {
         let items = FeedMessage.build(from: local.messages.map { ChatMessage(json: $0) })
         threadCache[id] = items
         guard activeChatID == id else { return true }
+        takeSettled(id, items: items)
         if items != thread { thread = items }
         threadChatID = id
         threadState = .loaded

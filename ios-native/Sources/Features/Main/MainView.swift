@@ -61,6 +61,8 @@ struct MainView: View {
                     .frame(width: geo.size.width)
                     // Пока меню тянут вбок, лента не листается вверх-вниз.
                     .scrollDisabled(swiping)
+                    // Меню, которые проверку в действии сделать не могут («⋯» под ответом), выключаются.
+                    .environment(\.drawerSwiping, swiping)
                     .background(Theme.canvas.ignoresSafeArea())
                     .overlay {
                         Theme.canvas.opacity(0.62 * progress)
@@ -169,6 +171,12 @@ enum DrawerSwipe {
     static var blocksTaps: Bool {
         swiping || Date().timeIntervalSince(lastMove) < 0.4
     }
+}
+
+extension EnvironmentValues {
+    /// Шторку ведут пальцем или она ещё доезжает. Для `Menu`: его открытие не перехватить проверкой
+    /// `DrawerSwipe.blocksTaps` в действии, поэтому на это время меню выключается (`.disabled`).
+    @Entry var drawerSwiping = false
 }
 
 /// Прямоугольник без скруглённой середины — то, что остаётся в углах карточки чата.
