@@ -10,12 +10,15 @@ struct AttachmentThumb: View {
     let item: FeedAttachment
     let side: CGFloat
     @State private var image: UIImage?
+    /// Место миниатюры на экране: отсюда картинка вылетает на весь экран.
+    @State private var frame: CGRect = .zero
 
     var body: some View {
         Button {
             guard !DrawerSwipe.blocksTaps else { return }
             Keyboard.hide()
-            model.viewer = ViewerItem(source: .attachment(item.id))
+            model.viewer = ViewerItem(source: .attachment(item.id),
+                                      origin: ViewerOrigin(frame: frame, cornerRadius: 16, image: image))
         } label: {
             ZStack {
                 Theme.surface
@@ -32,6 +35,7 @@ struct AttachmentThumb: View {
             .frame(width: side, height: side)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel("Изображение \(item.name)")
@@ -75,6 +79,8 @@ struct ArtView: View {
     /// Картинка уже резкая. Только что докачанная появляется из блюра и «наводится на резкость» —
     /// единственный честный момент проявки: пока арт генерируется, самой картинки ещё нет (16.11.2026).
     @State private var revealed = true
+    /// Место плитки на экране: отсюда картинка вылетает на весь экран.
+    @State private var frame: CGRect = .zero
 
     var body: some View {
         if art.isVideo {
@@ -84,7 +90,8 @@ struct ArtView: View {
                 guard !DrawerSwipe.blocksTaps else { return }
                 if image != nil {
                     Keyboard.hide()
-                    model.viewer = ViewerItem(source: .art(art.id))
+                    model.viewer = ViewerItem(source: .art(art.id),
+                                              origin: ViewerOrigin(frame: frame, cornerRadius: 18, image: image))
                 } else if failed {
                     attempt += 1
                 }
@@ -109,6 +116,7 @@ struct ArtView: View {
                     }
                     .animation(.easeOut(duration: 0.35), value: image != nil)
                 }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
             }
             .buttonStyle(PressScaleStyle())
             .accessibilityLabel(image == nil ? "Изображение загружается" : "Изображение модели")
@@ -419,32 +427,41 @@ struct DraftAttachmentStrip: View {
 }
 
 /// Просмотр на весь экран: увеличение щипком и двойным нажатием, сохранение в «Фото».
-/// Показывается поверх самого экрана (а не отдельным системным окном): фон — по-настоящему
-/// размытый экран под ним и сам арт, а закрытие — своё. Смахивание вверх или вниз закрывает,
-/// как в «Фото»: картинка чуть уходит по ходу пальца, уменьшаясь, и тает вместе с фоном
-/// (раньше она улетала за край, а потом ещё уезжало системное окно — замечание 13.11.2026).
-/// Открытый из студии просмотр листается вбок по артам студии, как в «Фото» (просьба пользователя
-/// 18.11.2026), и сам переключается на новый арт, когда генерация закончилась, — если смотрели последний.
+/// Показывается поверх самого экрана (а не отдельным системным окном): фон — размытый экран под ним
+/// и сам арт.
+///
+/// Открытие и закрытие — как в «Фото» (переделано 18.11.2026: «анимация открытия сломана, переделай
+/// полностью»): картинка вылетает из своей миниатюры (`ViewerOrigin`) и раскрывается в рамку «вписать
+/// в экран», которая считается здесь же из размера просмотра, — без безопасных зон и без UIScrollView.
+/// Прокрутка с увеличением (`ZoomableImage`) подменяет летящую картинку, только когда полёт доигран, и
+/// стоит ровно там же (та же формула `ZoomScrollView.fitRect`). Закрытие — обратно в миниатюру; если
+/// показан уже другой арт (листали, сменился новым), картинка уменьшается и тает.
+/// Смахивание вверх или вниз закрывает; открытый из студии просмотр листается вбок по её артам.
 struct ImageViewer: View {
     @Environment(AppModel.self) private var model
     let item: ViewerItem
     var followsStudio = false
     /// Убрать просмотр. Вызывается, когда уход уже доигран, — родитель убирает его без анимации.
     let onClose: () -> Void
-    @State private var image: UIImage?
-    @State private var backdrop: UIImage?
+    @State private var image: UIImage? = nil
+    @State private var backdrop: UIImage? = nil
     @State private var loading = true
-    @State private var note: String?
+    @State private var note: String? = nil
     @State private var saving = false
     /// Какой арт показан сейчас (при листании и слежении за студией меняется).
-    @State private var shownArt: String?
+    @State private var shownArt: String? = nil
     @State private var drag: CGSize = .zero
-    /// Просмотр проявился (первый кадр — прозрачный, затем плавное появление).
-    @State private var shown = false
+    /// Картинка раскрыта на весь экран; меняется анимацией (миниатюра ⇄ экран).
+    @State private var expanded = false
+    /// Раскрытие доиграно: на месте летящей картинки — прокрутка с увеличением.
+    @State private var settled = false
+    @State private var started = false
     @State private var closing = false
+    /// Закрытие без миниатюры: картинка уменьшается и тает на месте.
+    @State private var fading = false
     /// Листание вбок: сдвиг за пальцем и соседний арт, который въезжает с края.
     @State private var pageX: CGFloat = 0
-    @State private var neighbor: Neighbor?
+    @State private var neighbor: Neighbor? = nil
     @State private var pageWidth: CGFloat = 400
 
     /// Соседний арт студии: `delta` +1 — более старый (справа), −1 — более новый.
@@ -456,38 +473,143 @@ struct ImageViewer: View {
 
     /// Промежуток между артами при листании, как в «Фото».
     private static let pageGap: CGFloat = 20
+    private static let openSpring = Animation.spring(response: 0.4, dampingFraction: 0.88)
+    private static let closeSpring = Animation.spring(response: 0.34, dampingFraction: 0.92)
+
+    init(item: ViewerItem, followsStudio: Bool = false, onClose: @escaping () -> Void) {
+        self.item = item
+        self.followsStudio = followsStudio
+        self.onClose = onClose
+        // Первый кадр — уже с картинкой миниатюры на её месте: летит то, что было видно.
+        _image = State(initialValue: item.origin?.image)
+        if case .art(let id) = item.source {
+            _shownArt = State(initialValue: id)
+        } else {
+            _shownArt = State(initialValue: nil)
+        }
+    }
 
     /// 0 — на месте, 1 — утащили далеко: фон и кнопки тают.
     private var progress: CGFloat { min(1, abs(drag.height) / 320) }
 
-    private var visible: Bool { shown && !closing }
-
     /// Листать можно только арты студии.
     private var pageable: Bool {
-        guard followsStudio, let shownArt else { return false }
+        guard followsStudio, settled, let shownArt else { return false }
         return model.studio.completed.contains { $0.id == shownArt }
+    }
+
+    /// Закрывать «в миниатюру» можно, пока показан тот же арт, из которого открыли.
+    private var returnable: Bool {
+        guard item.origin != nil else { return false }
+        if case .art(let id) = item.source { return shownArt == id }
+        return true
     }
 
     var body: some View {
         ZStack {
             background
-                .opacity(visible ? 1 - progress * 0.85 : 0)
+                .opacity(expanded && !fading ? 1 - progress * 0.85 : 0)
                 .ignoresSafeArea()
-            pages
-                .ignoresSafeArea()
-                .scaleEffect(visible ? 1 - progress * 0.14 : (closing ? 0.86 : 0.94))
-                .offset(drag)
-                .opacity(visible ? 1 : 0)
-            if image == nil, !loading {
-                Text("Не удалось открыть изображение.")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Theme.muted)
+            GeometryReader { geo in
+                stage(full: CGRect(origin: .zero, size: geo.size), box: geo.frame(in: .global))
+                    .onAppear { pageWidth = geo.size.width }
+                    .onChange(of: geo.size.width) { _, width in pageWidth = width }
             }
-            if loading, image == nil {
-                ProgressView().tint(.white)
+            .ignoresSafeArea()
+            if image == nil {
+                if loading {
+                    ProgressView().tint(.white)
+                } else {
+                    Text("Не удалось открыть изображение.")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+            chrome
+        }
+        // Тёмный вид только у самого просмотра; preferredColorScheme перекрасил бы всё окно.
+        .environment(\.colorScheme, .dark)
+        .task { await load() }
+        .onAppear {
+            Keyboard.hide()
+            DrawerSwipe.viewerOpen = true
+            // Через оборот: первый кадр должен успеть встать на место миниатюры.
+            DispatchQueue.main.async { open() }
+        }
+        .onDisappear { DrawerSwipe.viewerOpen = false }
+        .onChange(of: model.studio.completed.first?.id) { previous, newest in
+            // Смотрели последний арт — готовый новый встаёт на его место; листали старые — не мешаем.
+            guard followsStudio, settled, let newest, newest != shownArt, !closing,
+                  shownArt == nil || shownArt == previous else { return }
+            Task { await show(art: newest) }
+        }
+    }
+
+    /// Картинка: пока летит — обычная картинка в явной рамке; когда встала — прокрутка с увеличением
+    /// в той же рамке. `full` — весь просмотр, `box` — он же в глобальных координатах (для миниатюры).
+    @ViewBuilder
+    private func stage(full: CGRect, box: CGRect) -> some View {
+        ZStack {
+            if let image {
+                if settled {
+                    ZoomableImage(image: image,
+                                  pageable: pageable,
+                                  onDrag: { value in if !closing { drag = value } },
+                                  onEnd: finishDrag,
+                                  onPage: page,
+                                  onPageEnd: finishPage)
+                        // Свой вид на каждый арт: увеличение прежнего не переносится на новый.
+                        .id(shownArt)
+                        // Подмена летящей картинки — мгновенная, без растворения.
+                        .transition(.identity)
+                        .frame(width: full.width, height: full.height)
+                        .position(x: full.midX + pageX, y: full.midY)
+                } else {
+                    flying(image, full: full, box: box)
+                        .transition(.identity)
+                }
+            }
+            if settled, let neighbor, let picture = neighbor.image {
+                let rect = ZoomScrollView.fitRect(picture.size, in: full.size)
+                Image(uiImage: picture)
+                    .resizable()
+                    .frame(width: rect.width, height: rect.height)
+                    .position(x: rect.midX + pageX + CGFloat(neighbor.delta) * (full.width + Self.pageGap),
+                              y: rect.midY)
+                    .allowsHitTesting(false)
             }
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .frame(width: full.width, height: full.height)
+        .scaleEffect(1 - progress * 0.14)
+        .offset(drag)
+        .scaleEffect(fading ? 0.86 : 1)
+        .opacity(fading ? 0 : 1)
+    }
+
+    /// Летящая картинка: из рамки миниатюры (со скруглением и обрезкой, как там) в рамку «вписать в экран».
+    /// Без миниатюры — проявляется на месте, чуть увеличиваясь.
+    private func flying(_ picture: UIImage, full: CGRect, box: CGRect) -> some View {
+        let target = ZoomScrollView.fitRect(picture.size, in: full.size)
+        let start = item.origin.map { $0.frame.offsetBy(dx: -box.minX, dy: -box.minY) }
+        let rect = expanded ? target : (start ?? target)
+        let radius = expanded ? 0 : (item.origin?.cornerRadius ?? 0)
+        let appear = start == nil && !expanded
+        return Image(uiImage: picture)
+            .resizable()
+            .scaledToFill()
+            .frame(width: rect.width, height: rect.height)
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .scaleEffect(appear ? 0.92 : 1)
+            .opacity(appear ? 0 : 1)
+            .position(x: rect.midX, y: rect.midY)
+            .accessibilityElement()
+            .accessibilityIdentifier("viewer.image")
+            .allowsHitTesting(false)
+    }
+
+    /// Кнопки сверху и подсказка снизу — в безопасной зоне, поверх картинки.
+    private var chrome: some View {
+        VStack(spacing: 0) {
             HStack {
                 CircleIconButton(symbol: "xmark", label: "Закрыть") { close() }
                     .accessibilityIdentifier("viewer.close")
@@ -501,9 +623,8 @@ struct ImageViewer: View {
             }
             .padding(.horizontal, 12)
             .frame(height: 52)
-            .opacity(visible ? 1 - min(1, progress * 2.5) : 0)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+            .opacity(expanded && !closing ? 1 - min(1, progress * 2.5) : 0)
+            Spacer(minLength: 0)
             if let note {
                 Text(note)
                     .font(.system(size: 15, weight: .medium))
@@ -516,53 +637,6 @@ struct ImageViewer: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: note)
-        // Тёмный вид только у самого просмотра; preferredColorScheme перекрасил бы всё окно.
-        .environment(\.colorScheme, .dark)
-        .ignoresSafeArea(.keyboard)
-        .task { await load() }
-        .onAppear {
-            Keyboard.hide()
-            DrawerSwipe.viewerOpen = true
-            withAnimation(.easeOut(duration: 0.24)) { shown = true }
-        }
-        .onDisappear { DrawerSwipe.viewerOpen = false }
-        .onChange(of: model.studio.completed.first?.id) { previous, newest in
-            // Смотрели последний арт — готовый новый встаёт на его место; листали старые — не мешаем.
-            guard followsStudio, let newest, newest != shownArt, !closing,
-                  shownArt == nil || shownArt == previous else { return }
-            Task { await show(art: newest) }
-        }
-    }
-
-    /// Показанный арт и, пока листают, соседний — на экран правее или левее.
-    private var pages: some View {
-        GeometryReader { geo in
-            ZStack {
-                if let image {
-                    ZoomableImage(image: image,
-                                  pageable: pageable,
-                                  onDrag: { value in if !closing { drag = value } },
-                                  onEnd: finishDrag,
-                                  onPage: page,
-                                  onPageEnd: finishPage)
-                        // Свой вид на каждый арт: увеличение прежнего не переносится на новый.
-                        .id(shownArt)
-                        .transition(.opacity)
-                        .offset(x: pageX)
-                }
-                if let neighbor, let picture = neighbor.image {
-                    Image(uiImage: picture)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .offset(x: pageX + CGFloat(neighbor.delta) * (geo.size.width + Self.pageGap))
-                        .allowsHitTesting(false)
-                }
-            }
-            .frame(width: geo.size.width, height: geo.size.height)
-            .onAppear { pageWidth = geo.size.width }
-            .onChange(of: geo.size.width) { _, width in pageWidth = width }
-        }
     }
 
     /// Размытый фон: системное размытие экрана под просмотром и поверх — сам арт,
@@ -589,16 +663,45 @@ struct ImageViewer: View {
         .animation(.easeOut(duration: 0.3), value: backdrop)
     }
 
-    /// Закрыть: картинка уменьшается и тает вместе с фоном; direction — куда её вели пальцем.
+    // MARK: - Открытие и закрытие
+
+    /// Полёт из миниатюры на весь экран. Без картинки ждёт её (`set` позовёт снова).
+    private func open() {
+        guard !started, !closing, image != nil else { return }
+        started = true
+        withAnimation(Self.openSpring) {
+            expanded = true
+        } completion: {
+            guard !closing else { return }
+            settled = true
+        }
+    }
+
+    /// Закрыть: в миниатюру, если она есть и показан тот же арт; иначе уменьшиться и растаять.
+    /// direction — куда вели пальцем при смахивании.
     private func close(direction: CGFloat = 0) {
         guard !closing else { return }
-        withAnimation(.easeOut(duration: 0.24)) {
-            closing = true
-            if direction != 0 {
-                drag = CGSize(width: drag.width, height: drag.height + (direction < 0 ? -140 : 140))
+        closing = true
+        // Летящая картинка встаёт на место прокрутки (без увеличения) и улетает сама.
+        settled = false
+        neighbor = nil
+        pageX = 0
+        if returnable, image != nil {
+            withAnimation(Self.closeSpring) {
+                expanded = false
+                drag = .zero
+            } completion: {
+                onClose()
             }
-        } completion: {
-            onClose()
+        } else {
+            withAnimation(.easeOut(duration: 0.24)) {
+                fading = true
+                if direction != 0 {
+                    drag = CGSize(width: drag.width, height: drag.height + (direction < 0 ? -140 : 140))
+                }
+            } completion: {
+                onClose()
+            }
         }
     }
 
@@ -684,13 +787,12 @@ struct ImageViewer: View {
             let loaded = await Task.detached(priority: .userInitiated) {
                 ImageStore.attachmentImage(key, thumb: false)
             }.value
-            set(loaded)
+            if let loaded { set(loaded) }
         case .art(let id):
-            shownArt = id
             // Сначала то, что уже есть (оригинал из кэша или копия из ленты), затем оригинал.
             if let cached = ImageStore.image("art:\(id):o") {
                 set(cached)
-            } else {
+            } else if image == nil {
                 set(await model.artImage(id, preview: true))
             }
             await upgrade(id, fallbackNote: true)
@@ -717,7 +819,9 @@ struct ImageViewer: View {
     private func show(art id: String) async {
         guard let preview = await model.artImage(id, preview: true) else { return }
         Haptics.selection()
-        withAnimation(.easeOut(duration: 0.25)) {
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) {
             shownArt = id
             neighbor = nil
             pageX = 0
@@ -726,6 +830,7 @@ struct ImageViewer: View {
         await upgrade(id, fallbackNote: false)
     }
 
+    /// Новая картинка. Если полёт ещё не начинался (миниатюры не было), он начинается с ней.
     private func set(_ picture: UIImage?) {
         image = picture
         guard let picture else { return }
@@ -734,6 +839,7 @@ struct ImageViewer: View {
         let scale = side / max(picture.size.width, picture.size.height, 1)
         backdrop = picture.preparingThumbnail(of: CGSize(width: max(1, picture.size.width * scale),
                                                          height: max(1, picture.size.height * scale))) ?? picture
+        if !started { DispatchQueue.main.async { open() } }
     }
 
     private func save() async {
@@ -911,6 +1017,9 @@ final class ZoomScrollView: UIScrollView {
         backgroundColor = .clear
         imageView.image = image
         imageView.contentMode = .scaleAspectFit
+        // Для автотестов: где на экране сама картинка (как у летящей, `viewer.image`).
+        imageView.isAccessibilityElement = true
+        imageView.accessibilityIdentifier = "viewer.image"
         addSubview(imageView)
     }
 
@@ -935,12 +1044,20 @@ final class ZoomScrollView: UIScrollView {
         centerImage()
     }
 
+    /// Рамка картинки «вписать целиком» в размер `bounds`, по центру. По ней же летит картинка
+    /// при открытии просмотра — поэтому подмена летящей картинки прокруткой незаметна.
+    static func fitRect(_ size: CGSize, in bounds: CGSize) -> CGRect {
+        let scale = min(bounds.width / max(size.width, 1), bounds.height / max(size.height, 1))
+        let fitted = CGSize(width: (size.width * scale).rounded(), height: (size.height * scale).rounded())
+        return CGRect(x: ((bounds.width - fitted.width) / 2).rounded(), y: ((bounds.height - fitted.height) / 2).rounded(),
+                      width: fitted.width, height: fitted.height)
+    }
+
     /// Картинка целиком в размер прокрутки, без увеличения.
     private func fit() {
         fittedFor = bounds.size
         zoomScale = 1
-        let scale = min(bounds.width / max(imageSize.width, 1), bounds.height / max(imageSize.height, 1))
-        let size = CGSize(width: (imageSize.width * scale).rounded(), height: (imageSize.height * scale).rounded())
+        let size = Self.fitRect(imageSize, in: bounds.size).size
         imageView.frame = CGRect(origin: .zero, size: size)
         contentSize = size
         contentOffset = .zero

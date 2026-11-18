@@ -197,6 +197,41 @@ final class StudioUITests: XCTestCase {
         close.tap()
     }
 
+    /// Открытие арта со сцены (переделано 18.11.2026: картинка открывалась ниже нужного и через
+    /// полсекунды прыгала на место). Картинка вылетает из сцены, встаёт ровно по центру экрана и
+    /// дальше не двигается, когда приходит оригинал; закрытие возвращает её на сцену.
+    func testViewerOpensInPlace() {
+        let app = launch("studio")
+        let canvas = element(app, "studio.canvas")
+        XCTAssertTrue(canvas.waitForExistence(timeout: 10))
+        sleep(1)
+        canvas.tap()
+        snap("ui-14a-open")
+        let picture = element(app, "viewer.image")
+        XCTAssertTrue(picture.waitForExistence(timeout: 5))
+        snap("ui-14b-open")
+        usleep(200_000)
+        snap("ui-14c-open")
+        sleep(1)
+        let settled = picture.frame
+        snap("ui-14d-open")
+        sleep(2)
+        let later = element(app, "viewer.image").frame
+        snap("ui-14e-open")
+        let window = app.windows.firstMatch.frame
+        XCTAssertEqual(settled.midY, later.midY, accuracy: 1, "картинка сдвинулась после открытия: \(settled) → \(later)")
+        XCTAssertEqual(settled.height, later.height, accuracy: 1, "картинка поменяла размер: \(settled) → \(later)")
+        XCTAssertEqual(later.midY, window.midY, accuracy: 2, "картинка не по центру по высоте: \(later) в \(window)")
+        XCTAssertEqual(later.midX, window.midX, accuracy: 2, "картинка не по центру по ширине: \(later) в \(window)")
+        let close = element(app, "viewer.close")
+        close.tap()
+        usleep(150_000)
+        snap("ui-14f-closing")
+        wait(close, "exists == false", timeout: 5)
+        snap("ui-14g-closed")
+        XCTAssertTrue(element(app, "studio.canvas").waitForExistence(timeout: 3))
+    }
+
     /// Арт на весь экран: фон размыт, смахивание вниз закрывает просмотр (с 0.13).
     func testViewerSwipeToClose() {
         let app = launch("studioArt")

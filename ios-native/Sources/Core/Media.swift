@@ -113,6 +113,8 @@ struct ViewerItem: Identifiable, Equatable {
     }
 
     let source: Source
+    /// Откуда открыли: картинка вылетает из миниатюры и при закрытии возвращается в неё.
+    var origin: ViewerOrigin? = nil
 
     var isVideo: Bool {
         if case .video = source { return true }
@@ -125,6 +127,26 @@ struct ViewerItem: Identifiable, Equatable {
         case .art(let art): return "art:" + art
         case .video(let id, _): return "video:" + id
         }
+    }
+}
+
+/// Миниатюра, из которой открыли просмотр: её место на экране (в глобальных координатах),
+/// скругление и то, что на ней уже показано.
+struct ViewerOrigin: Equatable {
+    let frame: CGRect
+    let cornerRadius: CGFloat
+    let image: UIImage?
+
+    /// Только с настоящим местом на экране (до первой раскладки рамка нулевая).
+    init?(frame: CGRect, cornerRadius: CGFloat, image: UIImage?) {
+        guard frame.width > 4, frame.height > 4 else { return nil }
+        self.frame = frame
+        self.cornerRadius = cornerRadius
+        self.image = image
+    }
+
+    static func == (lhs: ViewerOrigin, rhs: ViewerOrigin) -> Bool {
+        lhs.frame == rhs.frame && lhs.cornerRadius == rhs.cornerRadius && lhs.image === rhs.image
     }
 }
 

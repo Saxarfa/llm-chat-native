@@ -23,7 +23,7 @@ struct StudioScreen: View {
             // как на сайте (`data-prompt-focus` в `MobileImageStudio.css`). Иначе арт сжимался в полоску.
             if !typing {
                 VStack(spacing: 0) {
-                    StudioStage(onOpen: openArt, onDetails: { panel = .details })
+                    StudioStage(onOpen: { openArt(from: $0) }, onDetails: { panel = .details })
                         .contentShape(Rectangle())
                         .onTapGesture { typing = false }
                     if !studio.completed.isEmpty || !studio.activeJobs.isEmpty {
@@ -40,7 +40,7 @@ struct StudioScreen: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .transition(.opacity)
             }
-            StudioComposer(typing: $typing, onPanel: { open($0) }, onOpenArt: openArt)
+            StudioComposer(typing: $typing, onPanel: { open($0) }, onOpenArt: { openArt() })
                 .frame(maxHeight: typing ? .infinity : nil, alignment: .top)
         }
         .animation(.easeOut(duration: 0.2), value: typing)
@@ -102,10 +102,11 @@ struct StudioScreen: View {
         panel = kind
     }
 
-    private func openArt() {
+    /// Арт на весь экран; `origin` — откуда вылетает (арт на сцене), без него просто проявляется.
+    private func openArt(from origin: ViewerOrigin? = nil) {
         typing = false
         guard let job = studio.selected else { return }
-        viewer = ViewerItem(source: .art(job.id))
+        viewer = ViewerItem(source: .art(job.id), origin: origin)
     }
 
     private func openPreviewPanel() {
@@ -132,12 +133,15 @@ private struct EdgeToEdgeRow: ViewModifier {
 /// Арт на сцене: выбранный или последний, с ходом генерации поверх.
 private struct StudioStage: View {
     @Environment(AppModel.self) private var model
-    let onOpen: () -> Void
+    /// Открыть арт на весь экран — из его места на сцене.
+    let onOpen: (ViewerOrigin?) -> Void
     let onDetails: () -> Void
     @State private var image: UIImage?
     @State private var shownID: String?
     /// Сдвиг арта за пальцем, пока сцену листают свайпом.
     @State private var dragX: CGFloat = 0
+    /// Место арта на экране: отсюда он вылетает на весь экран.
+    @State private var artFrame: CGRect = .zero
 
     private var studio: StudioModel { model.studio }
 
@@ -151,6 +155,7 @@ private struct StudioStage: View {
                         .resizable()
                         .scaledToFit()
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { artFrame = $0 }
                         .padding(6)
                         .offset(x: dragX)
                         .opacity(1 - min(abs(dragX) / 500, 0.35))
@@ -180,7 +185,9 @@ private struct StudioStage: View {
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .contentShape(Rectangle())
             .onTapGesture {
-                if studio.selected != nil, !DrawerSwipe.blocksTaps { onOpen() }
+                if studio.selected != nil, !DrawerSwipe.blocksTaps {
+                    onOpen(ViewerOrigin(frame: artFrame, cornerRadius: 16, image: image))
+                }
             }
             // Листание артов свайпом прямо по сцене, как в «Фото»; у самого левого края свайп
             // по-прежнему открывает меню.
