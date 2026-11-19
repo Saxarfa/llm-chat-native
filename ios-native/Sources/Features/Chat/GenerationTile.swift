@@ -30,29 +30,21 @@ struct GenerationAura: View {
     }
 }
 
-/// Плитка арта, который ещё создаётся (лента чата и сцена студии): живой фон и — только у
+/// Плитка арта, который ещё создаётся в чате: живой фон и — только у
 /// генерации в ComfyUI, где ход известен, — процент готовности. Подписи хода работы нет
 /// (убрана по просьбе пользователя 18.11.2026).
 /// Готовая доля «проявляется» снизу вверх тёплой полосой со светящимся краем; число процентов
-/// меняется плавно. У Nano Banana и Omni процента нет — только живой фон.
+/// меняется плавно. У Nano Banana и Omni на живом фоне виден «Атом».
 struct GenerationTile: View {
-    /// Соотношение сторон будущей картинки; `nil` — заполнить отведённое место.
-    var ratio: CGFloat?
+    let ratio: CGFloat
     /// 0…1 — доля готовности; `nil` — неизвестна.
     let progress: Double?
     let status: String
-    var cornerRadius: CGFloat = 18
-    /// Поверх прежнего арта (студия): подложка полупрозрачная, прежний арт виден размытым.
-    var translucent = false
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
         ZStack {
-            if translucent {
-                Rectangle().fill(.ultraThinMaterial)
-            } else {
-                Theme.surface
-            }
+            Theme.surface
             GenerationAura()
                 .opacity(0.9)
             if let progress {
@@ -74,7 +66,7 @@ struct GenerationTile: View {
             }
         }
         .animation(.easeOut(duration: 0.6), value: progress)
-        .modifier(RatioFrame(ratio: ratio))
+        .aspectRatio(ratio, contentMode: .fit)
         .clipShape(shape)
         .overlay(shape.strokeBorder(Theme.line))
         .accessibilityElement(children: .ignore)
@@ -114,54 +106,6 @@ struct GenerationTile: View {
             .frame(height: 3)
             .padding(.horizontal, 18)
             .padding(.bottom, 14)
-        }
-    }
-}
-
-/// Ход генерации поверх прежнего арта в студии: маленькая стеклянная капсула внизу сцены —
-/// «Атом», статус и (у ComfyUI) процент. Сам арт остаётся виден целиком, пока создаётся новый
-/// (замечание пользователя 16.11.2026: раньше его закрывало матовое стекло плитки генерации).
-struct GenerationBadge: View {
-    /// 0…1; `nil` — процент неизвестен (облачные модели).
-    let progress: Double?
-    let status: String
-
-    var body: some View {
-        HStack(spacing: 8) {
-            AtomIndicator(size: 18, orbits: true)
-            WaveText(text: status, size: 14, weight: .medium, color: Theme.ink)
-                .id(status)
-                .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
-                                        removal: .move(edge: .top).combined(with: .opacity)))
-            if let progress {
-                Text(progress, format: .percent.precision(.fractionLength(0)))
-                    .font(.system(size: 14, weight: .medium).monospacedDigit())
-                    .foregroundStyle(Theme.muted)
-                    .contentTransition(.numericText(value: progress))
-            }
-        }
-        .padding(.leading, 10)
-        .padding(.trailing, 14)
-        .frame(height: 36)
-        .clipped()
-        .glassChrome(Capsule(), interactive: false)
-        .animation(.easeOut(duration: 0.6), value: progress)
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: status)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(progress.map { "\(status) \(Int(($0 * 100).rounded()))%" } ?? status)
-        .accessibilityIdentifier("generation.badge")
-    }
-}
-
-private struct RatioFrame: ViewModifier {
-    let ratio: CGFloat?
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if let ratio {
-            content.aspectRatio(ratio, contentMode: .fit)
-        } else {
-            content
         }
     }
 }

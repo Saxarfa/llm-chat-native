@@ -340,7 +340,7 @@ private struct FeedEntrance: ViewModifier {
 }
 
 /// Колёсико загрузки появляется не сразу: быстрый ответ сервера не мигает им.
-private struct DelayedSpinner: View {
+struct DelayedSpinner: View {
     @State private var visible = false
 
     var body: some View {
@@ -505,9 +505,7 @@ enum ReasoningOpen {
     }
 }
 
-/// Ответ, который пишется прямо сейчас: строка рассуждений («Атом» + «Размышляет») или строка этапа
-/// (`SparkStatus`: «Атом» + короткая подпись, сменяется снизу вверх). Секунд нигде нет
-/// (убраны по просьбе пользователя 16.11.2026).
+/// Ответ, который пишется прямо сейчас. Ожидание и первые рассуждения занимают одну шапку.
 private struct LiveAnswerView: View {
     @Environment(AppModel.self) private var model
     let live: AppModel.LiveState
@@ -515,12 +513,14 @@ private struct LiveAnswerView: View {
     var done = false
 
     var body: some View {
+        let phase = !done && !working && (live.text.isEmpty || live.stopping)
+            ? (live.stopping ? "Останавливаю" : live.phase) : nil
+        let headerPhase = live.reasoning.isEmpty && live.text.isEmpty ? phase : nil
         VStack(alignment: .leading, spacing: 12) {
-            if !live.reasoning.isEmpty {
-                // Одна строка, как «Thinking» у Claude: пока модель думает — «Атом» и «Размышляет»;
-                // потом та же строка становится «<модель> · размышляла». Нажатие раскрывает шаги.
-                ReasoningView(text: live.reasoning, modelName: model.activeModelName, spark: working,
+            if headerPhase != nil || !live.reasoning.isEmpty {
+                ReasoningView(text: live.reasoning, modelName: model.activeModelName, spark: working, phase: headerPhase,
                               memoryKey: model.activeChatID.map(ReasoningOpen.liveKey))
+                    .transition(.identity)
             }
             if !live.blocks.isEmpty {
                 MarkdownView(blocks: live.blocks)
@@ -528,75 +528,68 @@ private struct LiveAnswerView: View {
             ForEach(live.arts) { art in
                 ArtView(art: art)
             }
-            // Отдельная «Искра» не нужна, пока искра уже стоит в строке рассуждений (раньше статус был двойным).
-            if !done, (live.text.isEmpty || live.stopping) && !(working && !live.stopping) {
-                SparkStatus(text: live.stopping ? "Останавливаю" : live.phase)
-                    // Уходит сразу: растворяясь 0,3 с на прежнем месте, статус ложился поверх первых
-                    // строк ответа (замечание 16.11.2026). Появляется — плавно.
-                    .transition(.asymmetric(insertion: .opacity, removal: .identity))
+            // После первых рассуждений общий этап «Думаю» уже пройден. Конкретные этапы
+            // (например, поиск или остановка) по-прежнему видны под содержимым.
+            if let phase, headerPhase == nil,
+               live.reasoning.isEmpty || LiveStatus.label(phase) != LiveStatus.fallback {
+                HStack(spacing: 7) {
+                    AtomIndicator(size: 20, orbits: true)
+                    LivePhaseLabel(phase: phase)
+                }
+                .frame(minHeight: 28)
+                .accessibilityElement(children: .combine)
+                .transition(.asymmetric(insertion: .opacity, removal: .identity))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .animation(.easeOut(duration: 0.3), value: live.text.isEmpty)
-        .animation(Theme.spring, value: working)
     }
 
     /// Модель сейчас рассуждает, и текст рассуждений уже идёт (его строка несёт «Атом»).
     private var working: Bool { live.isThinking && !live.reasoning.isEmpty && !live.stopping }
 }
 
-/// Строка статуса под ответом: «Атом» и короткая подпись этапа («Думаю», «Ищу в интернете», «Пишу ответ»).
-/// Подписи — не сырые строки сервера, а `LiveStatus.label`; итоговые фразы («Поиск завершён») прежнюю подпись
-/// не меняют. Каждая подпись держится не меньше `minDwell`, чтобы быстрые смены не мелькали, а сменялись
-/// плавно снизу вверх (16.11.2026).
-private struct SparkStatus: View {
-    let text: String
+/// Серверные этапы сменяются с выдержкой. При появлении рассуждений подпись меняется в тот же кадр.
+private struct LivePhaseLabel: View {
+    /// nil — уже показываем рассуждения.
+    let phase: String?
     @State private var shown: String
     @State private var shownAt = Date.distantPast
-    @State private var wanted: String?
     @State private var task: Task<Void, Never>?
 
     private static let minDwell: TimeInterval = 0.9
 
-    init(text: String) {
-        self.text = text
-        _shown = State(initialValue: LiveStatus.label(text) ?? LiveStatus.fallback)
+    init(phase: String?) {
+        self.phase = phase
+        _shown = State(initialValue: phase.flatMap(LiveStatus.label) ?? LiveStatus.fallback)
     }
 
     var body: some View {
-        HStack(spacing: 7) {
-            // Как строка размышлений: «Атом» с орбитами и волна по подписи.
-            AtomIndicator(size: 20, orbits: true)
-            WaveText(text: shown)
-                .id(shown)
-                .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
-                                        removal: .move(edge: .top).combined(with: .opacity)))
-        }
-        .clipped()
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: shown)
-        .frame(minHeight: 28)
-        .accessibilityElement(children: .combine)
-        .onChange(of: text) { _, new in update(new) }
-        .onDisappear { task?.cancel() }
+        let label = phase == nil ? "Размышляет" : shown
+        WaveText(text: label)
+            .id(label)
+            .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .identity))
+            .clipped()
+            .animation(phase == nil ? nil : .spring(response: 0.35, dampingFraction: 0.85), value: label)
+            .onChange(of: phase) { _, new in update(new) }
+            .onDisappear { task?.cancel() }
     }
 
     /// Новая подпись ждёт, пока прежняя не продержится `minDwell`; из нескольких быстрых остаётся последняя.
-    private func update(_ phase: String) {
-        guard let next = LiveStatus.label(phase) else { return }
-        if next == shown {
+    private func update(_ phase: String?) {
+        guard let phase else {
             task?.cancel()
-            wanted = nil
             return
         }
-        wanted = next
-        let wait = max(0, Self.minDwell - Date().timeIntervalSince(shownAt))
+        guard let next = LiveStatus.label(phase) else { return }
         task?.cancel()
+        guard next != shown else { return }
+        let wait = max(0, Self.minDwell - Date().timeIntervalSince(shownAt))
         task = Task { @MainActor in
             if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
-            guard !Task.isCancelled, let value = wanted else { return }
-            shown = value
+            guard !Task.isCancelled else { return }
+            shown = next
             shownAt = Date()
-            wanted = nil
         }
     }
 }
@@ -1027,6 +1020,8 @@ private struct ReasoningView: View {
     var modelName: String?
     /// Идёт рассуждение: «Атом» живой.
     var spark = false
+    /// Начальный этап ответа до первого фрагмента рассуждений.
+    let phase: String?
     /// Ключ в `ReasoningOpen`: раскрытая строка остаётся раскрытой, когда живой ответ сменяется сообщением.
     var memoryKey: String?
     @State private var open: Bool
@@ -1035,10 +1030,11 @@ private struct ReasoningView: View {
     /// Рассуждение закончилось на глазах — итоговая подпись собирается по буквам.
     @State private var celebrate = false
 
-    init(text: String, modelName: String? = nil, spark: Bool = false, memoryKey: String? = nil) {
+    init(text: String, modelName: String? = nil, spark: Bool = false, phase: String? = nil, memoryKey: String? = nil) {
         self.text = text
         self.modelName = modelName
         self.spark = spark
+        self.phase = phase
         self.memoryKey = memoryKey
         _open = State(initialValue: memoryKey.map { ReasoningOpen.keys.contains($0) } ?? false)
         _thinkingLabel = State(initialValue: spark)
@@ -1047,7 +1043,7 @@ private struct ReasoningView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Button {
-                guard !DrawerSwipe.blocksTaps else { return }
+                guard !text.isEmpty, !DrawerSwipe.blocksTaps else { return }
                 Haptics.tap()
                 withAnimation(Theme.spring) { open.toggle() }
                 if let memoryKey {
@@ -1055,20 +1051,24 @@ private struct ReasoningView: View {
                 }
             } label: {
                 HStack(spacing: 7) {
-                    AtomIndicator(size: 20, active: spark, orbits: true)
+                    AtomIndicator(size: 20, active: phase != nil || spark, orbits: true)
                     Group {
-                        if thinkingLabel {
-                            WaveText(text: "Размышляет")
+                        if phase != nil || spark || thinkingLabel {
+                            LivePhaseLabel(phase: phase)
                                 .transition(Self.swap)
                         } else {
                             ReasoningTitle(modelName: modelName, byLetter: celebrate)
+                                .accessibilityLabel("Размышления")
                                 .transition(Self.swap)
                         }
                     }
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Theme.subtle)
-                        .rotationEffect(.degrees(open ? 90 : 0))
+                    if !text.isEmpty {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Theme.subtle)
+                            .rotationEffect(.degrees(open ? 90 : 0))
+                            .accessibilityHidden(true)
+                    }
                 }
                 .foregroundStyle(Theme.muted)
                 .clipped()
@@ -1076,32 +1076,32 @@ private struct ReasoningView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(PressScaleStyle())
-            .accessibilityLabel(thinkingLabel ? "Размышляет" : "Размышления")
-            .accessibilityHint(open ? "Свернуть" : "Развернуть")
+            .allowsHitTesting(!text.isEmpty)
+            .accessibilityRemoveTraits(text.isEmpty ? .isButton : [])
+            .accessibilityHint(text.isEmpty ? "" : (open ? "Свернуть" : "Развернуть"))
 
-            if open {
+            if open && !text.isEmpty {
                 ReasoningTimeline(text: text, live: spark)
                     .transition(.opacity)
             }
         }
         // Строка — шапка ответа: прижата к тексту под ней (зона нажатия 44 pt остаётся).
         .padding(.top, -20)
-        .padding(.bottom, open ? 4 : -12)
-        .onChange(of: spark) { _, now in
-            if now {
+        .padding(.bottom, open && !text.isEmpty ? 4 : -12)
+        .task(id: spark) {
+            if spark {
                 thinkingLabel = true
                 celebrate = false
-            } else {
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: UInt64(AtomIndicator.collapse * 1_000_000_000))
-                    celebrate = true
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { thinkingLabel = false }
-                }
+            } else if thinkingLabel {
+                try? await Task.sleep(nanoseconds: UInt64(AtomIndicator.collapse * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                celebrate = true
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { thinkingLabel = false }
             }
         }
     }
 
-    /// Подписи сменяются снизу вверх, как статусы ответа (`SparkStatus`).
+    /// Рассуждение закончилось: появляется итоговая подпись.
     private static let swap = AnyTransition.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
                                                        removal: .move(edge: .top).combined(with: .opacity))
 }

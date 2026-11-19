@@ -130,18 +130,12 @@ private struct EdgeToEdgeRow: ViewModifier {
     }
 }
 
-/// Арт на сцене: выбранный или последний, с ходом генерации поверх.
+/// На сцене — выбранный или последний арт, ход генерации — в строке под ним.
 private struct StudioStage: View {
     @Environment(AppModel.self) private var model
     /// Открыть арт на весь экран — из его места на сцене.
     let onOpen: (ViewerOrigin?) -> Void
     let onDetails: () -> Void
-    @State private var image: UIImage?
-    @State private var shownID: String?
-    /// Сдвиг арта за пальцем, пока сцену листают свайпом.
-    @State private var dragX: CGFloat = 0
-    /// Место арта на экране: отсюда он вылетает на весь экран.
-    @State private var artFrame: CGRect = .zero
 
     private var studio: StudioModel { model.studio }
 
@@ -150,48 +144,35 @@ private struct StudioStage: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(Theme.surface)
-                if let image, studio.selected != nil {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { artFrame = $0 }
-                        .padding(6)
-                        .offset(x: dragX)
-                        .opacity(1 - min(abs(dragX) / 500, 0.35))
-                        .id(shownID)
+                if let selected = studio.selected {
+                    TabView(selection: Binding(
+                        get: { studio.selected?.id ?? selected.id },
+                        set: { id in
+                            if id != studio.selected?.id, let job = studio.completed.first(where: { $0.id == id }) {
+                                studio.select(job)
+                            }
+                        }
+                    )) {
+                        ForEach(studio.completed) { job in
+                            StudioArtPage(id: job.id) { origin in
+                                guard studio.selected?.id == job.id, !DrawerSwipe.blocksTaps else { return }
+                                onOpen(origin)
+                            }
+                            .tag(job.id)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                } else if studio.pendingJob != nil {
+                    GenerationAura()
                         .transition(.opacity)
-                } else if studio.pendingJob == nil {
+                } else {
                     empty
                         .transition(.opacity)
                 }
-                // Идёт генерация. Прежний арт остаётся виден целиком, ход работы — капсула внизу сцены
-                // (раньше его закрывало матовое стекло); пустая сцена — живая плитка с ходом работы.
-                if let job = studio.pendingJob {
-                    let progress = job.isCloud ? nil : job.progress.map { Double($0) / 100 }
-                    if image != nil && studio.selected != nil {
-                        GenerationBadge(progress: progress, status: job.statusText)
-                            .padding(.bottom, 16)
-                            .frame(maxHeight: .infinity, alignment: .bottom)
-                            .transition(.opacity.combined(with: .offset(y: 12)))
-                    } else {
-                        GenerationTile(progress: progress, status: job.statusText, cornerRadius: 22)
-                            .transition(.opacity)
-                    }
-                }
             }
-            .animation(.easeOut(duration: 0.25), value: shownID)
-            .animation(.easeOut(duration: 0.35), value: studio.pendingJob?.id)
+            .animation(.easeOut(duration: 0.35), value: studio.pendingJob != nil)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .contentShape(Rectangle())
-            .onTapGesture {
-                if studio.selected != nil, !DrawerSwipe.blocksTaps {
-                    onOpen(ViewerOrigin(frame: artFrame, cornerRadius: 16, image: image))
-                }
-            }
-            // Листание артов свайпом прямо по сцене, как в «Фото»; у самого левого края свайп
-            // по-прежнему открывает меню.
-            .gesture(swipe)
             .modifier(DrawerFreeZone(leadingGap: 36))
             // Все действия с артом — по долгому нажатию.
             .contextMenu { artMenu }
@@ -204,36 +185,6 @@ private struct StudioStage: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
-        .task(id: studio.selected?.id) { await load() }
-    }
-
-    private var swipe: some Gesture {
-        DragGesture(minimumDistance: 16)
-            .onChanged { value in
-                guard image != nil, studio.selected != nil,
-                      abs(value.translation.width) > abs(value.translation.height) else { return }
-                let delta = value.translation.width < 0 ? 1 : -1
-                // За краем ленты арт тянется туго — дальше листать некуда.
-                dragX = value.translation.width * (studio.canStep(delta) ? 1 : 0.25)
-            }
-            .onEnded { value in
-                let width = value.translation.width
-                let predicted = value.predictedEndTranslation.width
-                let delta = width < -60 || predicted < -160 ? 1 : (width > 60 || predicted > 160 ? -1 : 0)
-                guard dragX != 0 else { return }
-                if delta != 0, studio.canStep(delta) {
-                    studio.step(delta)
-                    // Новый арт въезжает с той стороны, куда ушёл палец.
-                    var instant = Transaction()
-                    instant.disablesAnimations = true
-                    withTransaction(instant) { dragX = CGFloat(delta) * 80 }
-                    DispatchQueue.main.async {
-                        withAnimation(Theme.spring) { dragX = 0 }
-                    }
-                } else {
-                    withAnimation(Theme.spring) { dragX = 0 }
-                }
-            }
     }
 
     @ViewBuilder
@@ -244,7 +195,7 @@ private struct StudioStage: View {
             } label: {
                 Label("Сохранить в «Фото»", systemImage: "square.and.arrow.down")
             }
-            if let image {
+            if let image = ImageStore.image("art:\(job.id):p") ?? ImageStore.image("art:\(job.id):t") {
                 ShareLink(item: Image(uiImage: image), preview: SharePreview("Арт", image: Image(uiImage: image))) {
                     Label("Поделиться", systemImage: "square.and.arrow.up")
                 }
@@ -283,35 +234,19 @@ private struct StudioStage: View {
 
     private var empty: some View {
         VStack(spacing: 10) {
-            Group {
-                if studio.pendingJob != nil {
-                    AtomIndicator(size: 40, orbits: true)
-                } else {
-                    Image(systemName: "photo.badge.plus")
-                        .font(.system(size: 30, weight: .light))
-                        .foregroundStyle(Theme.muted)
-                }
-            }
-            .frame(height: 40)
-            if let job = studio.pendingJob {
-                WaveText(text: job.statusText, size: 17, weight: .semibold, color: Theme.ink)
-            } else {
-                Text("Начни с идеи")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
-            }
-            Text(emptyHint)
+            Image(systemName: "photo.badge.plus")
+                .font(.system(size: 30, weight: .light))
+                .foregroundStyle(Theme.muted)
+                .frame(height: 40)
+            Text("Начни с идеи")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+            Text("Опиши, что хочешь увидеть.\nТвой арт появится здесь.")
                 .font(.system(size: 15))
                 .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
         }
         .padding(24)
-    }
-
-    private var emptyHint: String {
-        guard let job = studio.pendingJob else { return "Опиши, что хочешь увидеть.\nТвой арт появится здесь." }
-        if let progress = job.progress { return "Выполнено \(progress)% · арт скоро появится" }
-        return "Твой арт сейчас создаётся…"
     }
 
     private var tools: some View {
@@ -357,21 +292,45 @@ private struct StudioStage: View {
         .animation(.easeOut(duration: 0.2), value: studio.status)
     }
 
-    private func load() async {
-        guard let job = studio.selected else {
-            image = nil
-            shownID = nil
-            return
+}
+
+/// У каждой страницы своё изображение. Системный пейджер ведёт обе страницы за пальцем и завершает
+/// перелистывание или возврат с текущей позиции.
+private struct StudioArtPage: View {
+    @Environment(AppModel.self) private var model
+    let id: String
+    let onOpen: (ViewerOrigin?) -> Void
+    @State private var preview: UIImage?
+
+    var body: some View {
+        GeometryReader { page in
+            let image = preview ?? ImageStore.image("art:\(id):p") ?? ImageStore.image("art:\(id):t")
+            ZStack {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .padding(6)
+                } else {
+                    DelayedSpinner()
+                }
+            }
+            .frame(width: page.size.width, height: page.size.height)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard let image else {
+                    onOpen(nil)
+                    return
+                }
+                let box = page.frame(in: .global).insetBy(dx: 6, dy: 6)
+                let frame = ZoomScrollView.fitRect(image.size, in: box.size).offsetBy(dx: box.minX, dy: box.minY)
+                onOpen(ViewerOrigin(frame: frame, cornerRadius: 16, image: image))
+            }
         }
-        if let ready = ImageStore.image("art:\(job.id):p") {
-            image = ready
-            shownID = job.id
-            return
-        }
-        // Пока грузится новый, на сцене остаётся прежний арт.
-        if let loaded = await model.artImage(job.id, preview: true), studio.selected?.id == job.id {
-            image = loaded
-            shownID = job.id
+        .task(id: id) {
+            let loaded = await model.artImage(id, preview: true)
+            if !Task.isCancelled { preview = loaded }
         }
     }
 }
@@ -384,11 +343,12 @@ private struct StudioFilmstrip: View {
 
     var body: some View {
         let studio = model.studio
+        let currentID = studio.pendingJob?.id
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 8) {
                     ForEach(studio.activeJobs) { job in
-                        QueueTile(job: job, running: job.id == studio.pendingJob?.id)
+                        QueueTile(job: job, isCurrent: job.id == currentID && job.status != "queued")
                             .id(job.id)
                             .transition(.scale(scale: 0.6).combined(with: .opacity))
                     }
@@ -425,61 +385,45 @@ private struct StudioFilmstrip: View {
     }
 }
 
-/// Плитка очереди в ленте: идущий арт — «Атом» и процент, ждущий — «Ждёт»; крестик отменяет задание.
+/// Рамка связывает текущую плитку со статусом под сценой, часы обозначают ожидание.
 private struct QueueTile: View {
     @Environment(AppModel.self) private var model
     let job: StudioJob
-    let running: Bool
+    let isCurrent: Bool
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Theme.surface)
-            if running {
-                GenerationAura().opacity(0.7)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-            VStack(spacing: 3) {
-                if running {
-                    AtomIndicator(size: 18, orbits: true)
-                    if let progress = job.progress, !job.isCloud {
-                        Text("\(progress)%")
-                            .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(Theme.ink)
-                            .contentTransition(.numericText(value: Double(progress)))
-                    }
-                } else {
-                    Image(systemName: "hourglass")
-                        .font(.system(size: 14, weight: .regular))
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        shape.fill(Theme.surface)
+            .overlay {
+                if job.status == "queued" {
+                    Image(systemName: "clock")
+                        .font(.system(size: 15))
                         .foregroundStyle(Theme.muted)
-                    Text("Ждёт")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Theme.muted)
+                        .accessibilityHidden(true)
                 }
             }
-        }
-        .frame(width: 58, height: 58)
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.line))
-        .overlay(alignment: .topTrailing) {
-            Button {
-                Task { await model.studio.stop(job) }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Theme.ink)
-                    .frame(width: 20, height: 20)
-                    .background(Theme.fillActive, in: Circle())
-                    // Зона нажатия 44 pt (было 32 — аудит 18.11.2026); кружок на прежнем месте.
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+            .frame(width: 58, height: 58)
+            .overlay(shape.strokeBorder(isCurrent ? Theme.accent : Theme.line, lineWidth: isCurrent ? 1.5 : 1))
+            .overlay(alignment: .topTrailing) {
+                Button {
+                    Task { await model.studio.stop(job) }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 20, height: 20)
+                        .background(Theme.fillActive, in: Circle())
+                        // Зона нажатия 44 pt (было 32 — аудит 18.11.2026); кружок на прежнем месте.
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressScaleStyle())
+                // Кружок крестика целиком внутри плитки: лента обрезает всё, что выступает за её высоту.
+                .offset(x: 12, y: -12)
+                .accessibilityLabel(job.status == "queued" ? "Убрать из очереди" : "Остановить генерацию")
+                .accessibilityValue(Text(job.prompt))
             }
-            .buttonStyle(PressScaleStyle())
-            // Кружок крестика целиком внутри плитки: лента обрезает всё, что выступает за её высоту.
-            .offset(x: 12, y: -12)
-            .accessibilityLabel(running ? "Остановить генерацию" : "Убрать из очереди")
-        }
-        .animation(.easeOut(duration: 0.4), value: job.progress)
-        .accessibilityIdentifier("studio.queue")
+            .accessibilityIdentifier("studio.queue")
     }
 }
 

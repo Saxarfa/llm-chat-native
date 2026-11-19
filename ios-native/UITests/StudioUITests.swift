@@ -113,7 +113,12 @@ final class StudioUITests: XCTestCase {
         let create = element(app, "studio.create")
         XCTAssertTrue(create.isEnabled)
         create.tap()
-        XCTAssertTrue(text(app, beginsWith: "Создаю арт").waitForExistence(timeout: 5))
+        let status = text(app, beginsWith: "Создаю арт")
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        let canvas = element(app, "studio.canvas")
+        XCTAssertGreaterThanOrEqual(status.frame.minY, canvas.frame.maxY - 1, "статус должен быть под артом")
+        XCTAssertFalse(canvas.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Создаю арт")).firstMatch.exists)
         snap("ui-04-generating")
         wait(create, "label CONTAINS 'Создать'", timeout: 15)
         sleep(1)
@@ -145,6 +150,10 @@ final class StudioUITests: XCTestCase {
         snap("ui-05c-swipe-stage")
         XCTAssertTrue(thumbs.element(boundBy: 1).isSelected, "свайп по сцене не перелистнул арт")
         XCTAssertEqual(format.frame.minX, left, accuracy: 2, "свайп по сцене открыл меню")
+        element(app, "studio.canvas").swipeRight()
+        wait(thumbs.element(boundBy: 0), "selected == true")
+        thumbs.element(boundBy: 1).tap()
+        wait(thumbs.element(boundBy: 1), "selected == true")
 
         // Контроль: свайп от самого левого края меню по-прежнему открывает,
         // иначе проверка ленты выше ничего не доказывает.

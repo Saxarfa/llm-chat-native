@@ -67,7 +67,9 @@ final class StudioModel {
     /// Задание, которое рисуется сейчас (или первое в очереди, пока ни одно не началось).
     var pendingJob: StudioJob? {
         let active = activeJobs
-        return active.first { $0.status != "queued" } ?? active.first
+        return active.first { $0.status == "generating" }
+            ?? active.first { $0.status == "preparing" }
+            ?? active.first
     }
     var queueFull: Bool { activeJobs.count >= Self.queueLimit }
     var available: Bool { config?.online == true }
@@ -95,9 +97,10 @@ final class StudioModel {
     /// Строка состояния над лентой.
     var status: String? {
         if let job = pendingJob {
-            var text = job.statusText
-            if let progress = job.progress { text += " · \(progress)%" }
-            return text
+            if job.status == "generating", !job.isCloud, let progress = job.progress {
+                return "\(job.statusText) · \(progress)%"
+            }
+            return job.statusText
         }
         return loop ? "Цикл включён" : nil
     }
@@ -382,20 +385,6 @@ final class StudioModel {
     func select(_ job: StudioJob) {
         Haptics.tap()
         selectedID = job.id == completed.first?.id ? nil : job.id
-    }
-
-    /// Листание сцены свайпом: `+1` — более старый арт (правее в ленте), `-1` — более новый.
-    func canStep(_ delta: Int) -> Bool {
-        let done = completed
-        guard let current = selected, let index = done.firstIndex(where: { $0.id == current.id }) else { return false }
-        return done.indices.contains(index + delta)
-    }
-
-    func step(_ delta: Int) {
-        let done = completed
-        guard let current = selected, let index = done.firstIndex(where: { $0.id == current.id }),
-              done.indices.contains(index + delta) else { return }
-        select(done[index + delta])
     }
 
     /// Замок seed у «Создать»: закрепить seed арта на сцене (или новый случайный) либо вернуть случайный.

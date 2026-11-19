@@ -74,11 +74,11 @@ final class StudioDataTests: XCTestCase {
         let studio = StudioModel()
         studio.loadPreview()
         XCTAssertEqual(studio.selected?.id, "p0")
-        XCTAssertFalse(studio.canStep(-1), "новее самого нового нет")
-        studio.step(1)
+        studio.select(studio.completed[1])
         XCTAssertEqual(studio.selected?.id, "p1")
-        studio.step(-1)
+        studio.select(studio.completed[0])
         XCTAssertEqual(studio.selected?.id, "p0")
+        XCTAssertNil(studio.selectedID, "выбор первого арта снова включает показ самого нового")
 
         XCTAssertFalse(studio.seedLocked)
         studio.toggleSeedLock()
@@ -90,6 +90,7 @@ final class StudioDataTests: XCTestCase {
         var running = StudioJob(id: "r")
         running.status = "generating"
         running.created = 10
+        running.progress = 64
         var waiting = StudioJob(id: "w")
         waiting.status = "queued"
         waiting.created = 20
@@ -97,5 +98,17 @@ final class StudioDataTests: XCTestCase {
         XCTAssertEqual(studio.activeJobs.map(\.id), ["r", "w"])
         XCTAssertEqual(studio.pendingJob?.id, "r", "идёт тот, что не ждёт в очереди")
         XCTAssertFalse(studio.queueFull)
+        XCTAssertEqual(studio.status, "Создаю арт · 64%")
+
+        var preparing = StudioJob(id: "prep")
+        preparing.status = "preparing"
+        studio.jobs = [preparing, waiting, running]
+        XCTAssertEqual(studio.pendingJob?.id, running.id)
+        running.progress = nil
+        studio.jobs = [running]
+        XCTAssertEqual(studio.status, "Создаю арт")
+        waiting.progress = 100
+        studio.jobs = [waiting]
+        XCTAssertEqual(studio.status, "В очереди")
     }
 }
