@@ -10,15 +10,15 @@ struct AttachmentThumb: View {
     let item: FeedAttachment
     let side: CGFloat
     @State private var image: UIImage?
-    /// Место миниатюры на экране: отсюда картинка вылетает на весь экран.
-    @State private var frame: CGRect = .zero
+    /// Место миниатюры на экране (отсюда картинка вылетает на весь экран) — берётся в момент нажатия.
+    @State private var probe = FrameProbe()
 
     var body: some View {
         Button {
             guard !DrawerSwipe.blocksTaps else { return }
             Keyboard.hide()
             model.viewer = ViewerItem(source: .attachment(item.id),
-                                      origin: ViewerOrigin(frame: frame, cornerRadius: 16, image: image))
+                                      origin: ViewerOrigin(frame: probe.frame, cornerRadius: 16, image: image))
         } label: {
             ZStack {
                 Theme.surface
@@ -35,7 +35,7 @@ struct AttachmentThumb: View {
             .frame(width: side, height: side)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+            .frameProbe(probe)
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel("Изображение \(item.name)")
@@ -47,6 +47,43 @@ struct AttachmentThumb: View {
                 ImageStore.attachmentImage(key, thumb: true)
             }.value
         }
+    }
+}
+
+/// Место вида на экране — по запросу, в момент нажатия. Раньше миниатюры и арты ленты следили за своим местом
+/// через `onGeometryChange(.global)` и обновляли его на каждом кадре прокрутки и свайпа шторки (аудит 20.11.2026).
+@MainActor
+final class FrameProbe {
+    fileprivate weak var view: UIView?
+
+    /// Рамка в координатах окна (как `.global` у SwiftUI); нулевая, пока вида нет на экране.
+    var frame: CGRect {
+        guard let view, view.window != nil else { return .zero }
+        return view.convert(view.bounds, to: nil)
+    }
+}
+
+/// Пустой UIView под видом — по нему `FrameProbe` узнаёт место вида.
+private struct FrameProbeView: UIViewRepresentable {
+    let probe: FrameProbe
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.isUserInteractionEnabled = false
+        view.backgroundColor = .clear
+        probe.view = view
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) {
+        probe.view = view
+    }
+}
+
+extension View {
+    /// Подкладывает под вид `FrameProbe`: его место на экране можно спросить в любой момент.
+    func frameProbe(_ probe: FrameProbe) -> some View {
+        background(FrameProbeView(probe: probe))
     }
 }
 
@@ -79,8 +116,8 @@ struct ArtView: View {
     /// Картинка уже резкая. Только что докачанная появляется из блюра и «наводится на резкость» —
     /// единственный честный момент проявки: пока арт генерируется, самой картинки ещё нет (16.11.2026).
     @State private var revealed = true
-    /// Место плитки на экране: отсюда картинка вылетает на весь экран.
-    @State private var frame: CGRect = .zero
+    /// Место плитки на экране (отсюда картинка вылетает на весь экран) — берётся в момент нажатия.
+    @State private var probe = FrameProbe()
 
     var body: some View {
         if art.isVideo {
@@ -91,7 +128,7 @@ struct ArtView: View {
                 if image != nil {
                     Keyboard.hide()
                     model.viewer = ViewerItem(source: .art(art.id),
-                                              origin: ViewerOrigin(frame: frame, cornerRadius: 18, image: image))
+                                              origin: ViewerOrigin(frame: probe.frame, cornerRadius: 18, image: image))
                 } else if failed {
                     attempt += 1
                 }
@@ -116,7 +153,7 @@ struct ArtView: View {
                     }
                     .animation(.easeOut(duration: 0.35), value: image != nil)
                 }
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+                .frameProbe(probe)
             }
             .buttonStyle(PressScaleStyle())
             .accessibilityLabel(image == nil ? "Изображение загружается" : "Изображение модели")
@@ -649,10 +686,11 @@ struct ImageViewer: View {
             Color.clear
                 .overlay {
                     if let backdrop {
+                        // Копия уже размыта (`ImageStore.backdrop`): живого фильтра на каждом кадре нет.
                         Image(uiImage: backdrop)
                             .resizable()
+                            .interpolation(.high)
                             .scaledToFill()
-                            .blur(radius: 40, opaque: true)
                             .opacity(0.6)
                             .transition(.opacity)
                     }
@@ -834,12 +872,12 @@ struct ImageViewer: View {
     private func set(_ picture: UIImage?) {
         image = picture
         guard let picture else { return }
-        // Для фона хватает крошечной копии — размытие дешёвое.
-        let side: CGFloat = 48
-        let scale = side / max(picture.size.width, picture.size.height, 1)
-        backdrop = picture.preparingThumbnail(of: CGSize(width: max(1, picture.size.width * scale),
-                                                         height: max(1, picture.size.height * scale))) ?? picture
         if !started { DispatchQueue.main.async { open() } }
+        // Фон — крошечная размытая копия, готовится вне главного потока; пришла другая картинка — не нужна.
+        Task {
+            let blurred = await Task.detached(priority: .userInitiated) { ImageStore.backdrop(picture) }.value
+            if image === picture { backdrop = blurred }
+        }
     }
 
     private func save() async {

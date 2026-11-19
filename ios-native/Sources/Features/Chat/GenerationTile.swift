@@ -1,7 +1,9 @@
 import SwiftUI
 
 /// Живой фон генерации: тёплые мягкие пятна медленно плывут, как картинка в проявителе.
-/// Перерисовывается с частотой экрана, только пока плитка на экране.
+/// 30 кадров в секунду; стоит, пока плитка за краем прокрутки (iOS 18+) или в закрытой шторке.
+/// Каждое пятно — радиальный градиент с тем же мягким краем, что давал прежний круг под фильтром размытия:
+/// фильтр радиусом ~54 pt пересчитывался на каждом кадре и был самым тяжёлым эффектом приложения (аудит 20.11.2026).
 struct GenerationAura: View {
     private static let colors: [Color] = [
         Color(hex: 0xC6613F, alpha: 0.5),   // коралл кнопки «Отправить»
@@ -9,24 +11,51 @@ struct GenerationAura: View {
         Color(hex: 0x8C7BD9, alpha: 0.26),  // лаванда
     ]
 
+    @Environment(\.motionPaused) private var motionPaused
+    @State private var offscreen = false
+
     var body: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: motionPaused || offscreen)) { timeline in
             let time = timeline.date.timeIntervalSinceReferenceDate
             Canvas { context, size in
                 let side = min(size.width, size.height)
-                context.addFilter(.blur(radius: side * 0.16))
+                let blur = side * 0.16
                 for (index, color) in Self.colors.enumerated() {
                     let phase = time * (0.32 + Double(index) * 0.11) + Double(index) * 2.1
                     let x = size.width * (0.5 + 0.3 * cos(phase))
                     let y = size.height * (0.5 + 0.26 * sin(phase * 1.27))
                     let radius = side * (0.36 + 0.07 * sin(phase * 0.8))
-                    context.fill(Path(ellipseIn: CGRect(x: x - radius, y: y - radius, width: radius * 2, height: radius * 2)),
-                                 with: .color(color))
+                    // Край размытого круга: полная сила до `radius − blur`, половина на самом радиусе, ноль к `radius + blur`.
+                    let outer = radius + blur
+                    let gradient = Gradient(stops: [
+                        .init(color: color, location: 0),
+                        .init(color: color, location: (radius - blur) / outer),
+                        .init(color: color.opacity(0.85), location: (radius - blur / 2) / outer),
+                        .init(color: color.opacity(0.5), location: radius / outer),
+                        .init(color: color.opacity(0.15), location: (radius + blur / 2) / outer),
+                        .init(color: color.opacity(0), location: 1),
+                    ])
+                    context.fill(Path(ellipseIn: CGRect(x: x - outer, y: y - outer, width: outer * 2, height: outer * 2)),
+                                 with: .radialGradient(gradient, center: CGPoint(x: x, y: y), startRadius: 0, endRadius: outer))
                 }
             }
         }
+        .modifier(OffscreenPause(offscreen: $offscreen))
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// Плитка ушла за край прокрутки — живой фон стоит (iOS 18+; на iOS 17 видимость не отслеживается).
+private struct OffscreenPause: ViewModifier {
+    @Binding var offscreen: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollVisibilityChange(threshold: 0.01) { visible in offscreen = !visible }
+        } else {
+            content
+        }
     }
 }
 

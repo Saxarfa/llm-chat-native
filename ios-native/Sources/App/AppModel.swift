@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 
 /// Состояние приложения: адрес ПК, вход, список диалогов.
 enum MainScreen: Equatable {
@@ -53,12 +54,26 @@ final class AppModel {
     /// Чей это `thread`: пока не совпал с `activeChatID`, лента показывает загрузку.
     var threadChatID: String?
 
-    /// Идущий ответ модели в чате: текст приходит целиком с каждым событием сервера.
+    /// Идущий ответ модели в чате: этап, флаги, картинки. Текст приходит целиком с каждым событием сервера,
+    /// но хранится не здесь, а в `content` (`LiveText`): он меняется ~30 раз в секунду, и, лежи он в `lives`,
+    /// каждый шаг вывода пересчитывал бы всё, что читает `lives`, — ленту целиком и поле ввода (аудит 20.11.2026).
     struct LiveState: Equatable {
         var phase = "Обработка запроса…"
-        var text = ""
-        var blocks: [MarkdownBlock] = []
-        var reasoning = ""
+        /// Показанный текст, его разметка и рассуждения. Объект общий у всех копий этого состояния,
+        /// поэтому новый текст не меняет само состояние в `lives`.
+        let content = LiveText()
+        var text: String {
+            get { content.text }
+            nonmutating set { content.text = newValue }
+        }
+        var blocks: [MarkdownBlock] {
+            get { content.blocks }
+            nonmutating set { content.blocks = newValue }
+        }
+        var reasoning: String {
+            get { content.reasoning }
+            nonmutating set { content.reasoning = newValue }
+        }
         var isThinking = false
         var stopping = false
         /// Запрос на отправку ещё не подтверждён сервером.
@@ -156,6 +171,10 @@ final class AppModel {
     @ObservationIgnored var api: APIClient?
     /// Уже открывавшиеся чаты показываются сразу, пока идёт обновление с сервера.
     @ObservationIgnored var threadCache: [String: [FeedMessage]] = [:]
+    /// Последние открытые сессии, новые — в конце: по ним `trimCaches` решает, чьи ленты держать в памяти.
+    @ObservationIgnored var recentChatIDs: [String] = []
+    /// Картинки модели, которые сейчас качаются: одна загрузка на арт, сколько бы мест её ни ждало.
+    @ObservationIgnored var artLoads: [String: Task<UIImage?, Never>] = [:]
     @ObservationIgnored var eventsTask: Task<Void, Never>?
     @ObservationIgnored var eventsConnectedOnce = false
     /// Последний текст потока; в `lives` переносится не чаще нескольких раз в секунду.
@@ -316,6 +335,8 @@ final class AppModel {
         threadState = .idle
         threadChatID = nil
         threadCache = [:]
+        recentChatIDs = []
+        artLoads = [:]
         phase = .needsLogin
     }
 
@@ -480,4 +501,48 @@ final class AppModel {
             phase = .ready
         }
     }
+}
+
+/// Текст идущего ответа: показанная часть, её разметка и рассуждения. Отдельный наблюдаемый объект —
+/// новые куски перерисовывают только строку живого ответа (`LiveAnswerView`), а не всё, что читает `lives`.
+@Observable
+final class LiveText {
+    var text = ""
+    var blocks: [MarkdownBlock] = []
+    var reasoning = ""
+    /// Сколько символов (`Character`) в `text`; −1 — ещё не посчитано. Вывод по шагам не пересчитывает
+    /// длину всего текста на каждом шаге.
+    @ObservationIgnored var shownCount = -1
+    /// Полученный текст, из которого идёт вывод, и его длина в символах (считается раз на событие сервера).
+    @ObservationIgnored var source = ""
+    @ObservationIgnored var sourceCount = 0
+    @ObservationIgnored private var stream = MarkdownStream()
+
+    /// Новый показанный текст. Разметка разбирается только для чата на экране (`parse`) и только с начала
+    /// предпоследнего блока (`MarkdownStream`); `count` — длина `value` в символах, если уже известна.
+    func show(_ value: String, count: Int? = nil, parse: Bool) {
+        if let count { shownCount = count }
+        if value == text, !parse || !blocks.isEmpty || value.isEmpty { return }
+        if value != text {
+            text = value
+            if count == nil { shownCount = -1 }
+        }
+        if parse {
+            let next = stream.update(value)
+            if next != blocks { blocks = next }
+        } else if !blocks.isEmpty {
+            blocks = []
+            stream.reset()
+        }
+    }
+
+    /// Рассуждения; одинаковый текст не перерисовывает строку заново.
+    func setReasoning(_ value: String) {
+        if value != reasoning { reasoning = value }
+    }
+}
+
+extension LiveText: Equatable {
+    /// Один и тот же ответ — один и тот же объект.
+    static func == (left: LiveText, right: LiveText) -> Bool { left === right }
 }

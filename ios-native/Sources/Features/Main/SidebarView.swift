@@ -31,7 +31,7 @@ struct SidebarView: View {
                 }
                 .accessibilityIdentifier("sidebar.studio")
                 navRow("Модели на телефоне", symbol: "iphone", active: false,
-                       busy: !model.phone.downloads.isEmpty) {
+                       busy: model.phone.hasActiveDownloads) {
                     showPhone = true
                 }
                 .accessibilityIdentifier("sidebar.phone")
@@ -46,7 +46,7 @@ struct SidebarView: View {
         }
         .refreshable { await model.refreshChats() }
         // Штатное размытие прокрутки без тонированного Material поверх списка.
-        .softEdgeBar(edge: .top, tint: Theme.rail, reach: Theme.headerReach, blurDepth: Theme.drawerBlurDepth) {
+        .softEdgeBar(edge: .top, tint: Theme.rail) {
             HStack {
                 Wordmark(size: 25)
                 Spacer()

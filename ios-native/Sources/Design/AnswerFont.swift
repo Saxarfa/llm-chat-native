@@ -52,6 +52,39 @@ enum AnswerSize: String, CaseIterable {
     }
 }
 
+/// Начертание и размеры текста ответа для ленты. Считается один раз на ответ (`MarkdownView`) и передаётся
+/// блокам готовым — блоки не читают настройки сами (раньше каждый блок и абзац держал два `@AppStorage`,
+/// сотни подписок на UserDefaults в длинной ленте; аудит 20.11.2026).
+struct AnswerStyle: Equatable {
+    let design: Font.Design
+    /// Множитель размера: шрифт (моноширинный мельче) × размер из настроек.
+    let scale: CGFloat
+
+    init(font: AnswerFont, size: AnswerSize) {
+        design = font.design
+        scale = font.sizeFactor * size.factor
+    }
+
+    /// Как сейчас в настройках — для разбора разметки заранее, вне видов (`InlineMarkdown.warm`).
+    static var current: AnswerStyle {
+        let defaults = UserDefaults.standard
+        return AnswerStyle(font: AnswerFont(rawValue: defaults.string(forKey: AnswerFont.key) ?? "") ?? .serif,
+                           size: AnswerSize(rawValue: defaults.string(forKey: AnswerSize.key) ?? "") ?? .regular)
+    }
+
+    /// Обычный текст ответа: абзацы, пункты списков, цитаты.
+    var textSize: CGFloat { 16.5 * scale }
+
+    func heading(_ level: Int) -> CGFloat {
+        switch level {
+        case 1: return 24 * scale
+        case 2: return 21 * scale
+        case 3: return 19 * scale
+        default: return 17 * scale
+        }
+    }
+}
+
 /// Выбор шрифта ответов: четыре плитки «Аа» и размер, ниже — образец ответа.
 struct AnswerFontPicker: View {
     @AppStorage(AnswerFont.key) private var font = AnswerFont.serif

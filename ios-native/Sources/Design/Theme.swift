@@ -61,12 +61,6 @@ enum Theme {
     /// время, что системная клавиатура, иначе две разные кривые (клавиатура и капсула) дёргают логотип.
     static let keyboardMorph = Animation.spring(duration: 0.45, bounce: 0)
 
-    /// Размытие под плавающей шапкой: «остров» и ещё столько pt (замечание 14.11.2026 — было слишком высоко).
-    static let headerReach: CGFloat = 10
-    /// Прогрессивное размытие сверху (16.11.2026, по референсам Claude): в чате — под строкой состояния
-    /// и чуть ниже (текст у кнопок шапки уже чёткий), в шторке и «Недавних» — до низа шапки.
-    static let chatBlurDepth: CGFloat = 14
-    static let drawerBlurDepth: CGFloat = 52
     /// Круглые кнопки шапок и шторок: у Claude стеклянный круг 44 pt, центр на 22 pt ниже
     /// безопасной зоны, поле 20 pt от края экрана (замер снимков 16.11.2026).
     static let headerButton: CGFloat = 44
@@ -157,29 +151,44 @@ enum Haptics {
         UserDefaults.standard.object(forKey: key) as? Bool ?? true
     }
 
+    /// Генераторы живут всё время работы приложения и после каждого отклика готовятся к следующему (`prepare`):
+    /// новый генератор на каждое касание отзывался с задержкой (аудит 20.11.2026). Зовутся, как и прежде,
+    /// с главного потока (кнопки, жесты, `AppModel`).
+    private static let impact = UIImpactFeedbackGenerator(style: .light)
+    private static let notice = UINotificationFeedbackGenerator()
+    private static let picker = UISelectionFeedbackGenerator()
+
     static func tap() {
         guard enabled else { return }
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        impact.impactOccurred()
+        impact.prepare()
     }
 
     static func success() {
         guard enabled else { return }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        notice.notificationOccurred(.success)
+        notice.prepare()
     }
 
     static func error() {
         guard enabled else { return }
-        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        notice.notificationOccurred(.error)
+        notice.prepare()
     }
 
     /// Лёгкий щелчок шага ползунка.
     static func selection() {
         guard enabled else { return }
-        UISelectionFeedbackGenerator().selectionChanged()
+        picker.selectionChanged()
+        picker.prepare()
     }
 }
 
 /// Свайп от левого края возвращает назад и там, где вместо системной кнопки «Назад» — своя круглая.
+/// Расширение действует на все навигационные контроллеры, в том числе системные (выбор фото, файлы),
+/// поэтому жест разрешается только самому жесту «назад» и не во время перехода: свайп посреди анимации
+/// перехода мог «заморозить» стек экранов (аудит 20.11.2026). Жест «назад» на всю ширину iOS 26 —
+/// отдельный распознаватель, его этот делегат не трогает.
 extension UINavigationController: UIGestureRecognizerDelegate {
     override open func viewDidLoad() {
         super.viewDidLoad()
@@ -187,33 +196,59 @@ extension UINavigationController: UIGestureRecognizerDelegate {
     }
 
     public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        viewControllers.count > 1
+        guard gestureRecognizer === interactivePopGestureRecognizer else { return true }
+        return viewControllers.count > 1 && transitionCoordinator == nil
     }
 }
 
-/// Размеры экрана, которые нужны раскладке: есть ли внизу полоса «домой».
+/// Размеры экрана, которые нужны раскладке: есть ли внизу полоса «домой». Приложение только в портретной
+/// ориентации, поэтому безопасная зона окна постоянна; берётся у основного окна сцены (`keyWindow`), а не
+/// у первого попавшегося (им могло оказаться служебное окно клавиатуры или системного листа).
 enum Screen {
-    /// Верхняя безопасная зона окна («остров» и строка состояния).
     @MainActor
-    static var topInset: CGFloat {
-        for scene in UIApplication.shared.connectedScenes {
-            if let window = (scene as? UIWindowScene)?.windows.first { return window.safeAreaInsets.top }
-        }
-        return 0
+    private static var window: UIWindow? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        return scenes.lazy.compactMap(\.keyWindow).first ?? scenes.first?.windows.first
     }
 
+    /// Верхняя безопасная зона окна («остров» и строка состояния).
     @MainActor
-    static var bottomInset: CGFloat {
-        for scene in UIApplication.shared.connectedScenes {
-            if let window = (scene as? UIWindowScene)?.windows.first { return window.safeAreaInsets.bottom }
-        }
-        return 0
-    }
+    static var topInset: CGFloat { window?.safeAreaInsets.top ?? 0 }
+
+    @MainActor
+    static var bottomInset: CGFloat { window?.safeAreaInsets.bottom ?? 0 }
 }
 
 enum Keyboard {
     static func hide() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    /// Поле, в котором сейчас курсор (первый ответчик UIKit).
+    @MainActor
+    fileprivate static weak var focused: UIResponder?
+
+    /// Курсор — в конец текста поля, в котором идёт ввод. Для полей, которым фокус ставим сами (нажатие
+    /// по рамке): UIKit оставлял курсор в начале, и набранное вставало перед прежним текстом —
+    /// «…в облакахдевушка-рыцарь…» на снимке ui-03-typing 0.16.4. Фокус приходит не сразу — до трёх попыток.
+    @MainActor
+    static func caretToEnd(attempts: Int = 3) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            focused = nil
+            UIApplication.shared.sendAction(#selector(UIResponder.llmchatRememberFocused), to: nil, from: nil, for: nil)
+            guard let input = focused as? UITextInput else {
+                if attempts > 1 { caretToEnd(attempts: attempts - 1) }
+                return
+            }
+            input.selectedTextRange = input.textRange(from: input.endOfDocument, to: input.endOfDocument)
+        }
+    }
+}
+
+private extension UIResponder {
+    /// Ответ первого ответчика на `Keyboard.caretToEnd`: запоминает себя.
+    @objc func llmchatRememberFocused() {
+        Keyboard.focused = self
     }
 }
 
@@ -439,19 +474,13 @@ extension View {
     /// Плавающая панель со штатным постепенным размытием прокручиваемого содержимого.
     /// safeAreaBar связывает эффект с самой прокруткой: отдельного Material поверх неё нет.
     /// Как и safeAreaInset, панель учитывает клавиатуру; контейнеры и .keyboard не игнорируем.
-    /// `reach` — высота размытой полосы под шапкой (только iOS 26, верхний край): шапка тогда
-    /// плавает поверх ленты отдельным слоем, а размытие захватывает лишь «остров» и `reach` pt под ним.
-    /// Высоту шапки сверх `reach` экран добавляет к верхнему отступу своей ленты (`Theme.headerOverhang`).
-    /// `blurDepth` — на сколько pt ниже безопасной зоны тянется прогрессивное размытие (`ProgressiveTopBlur`,
-    /// 16.11.2026): в чате — чуть ниже строки состояния, в шторке — до низа шапки, как у Claude.
     @ViewBuilder
     func softEdgeBar<Bar: View>(edge: VerticalEdge, tint: Color, hasScrollContent: Bool = true,
-                               reach: CGFloat? = nil, blurDepth: CGFloat? = nil,
                                @ViewBuilder content: () -> Bar) -> some View {
         // Верх — так же, как низ под капсулой (замечание пользователя 17.11.2026: «верх чата и шторки —
         // блюр, как сейчас внизу»): шапка целиком в safeAreaBar, системное размытие края прокрутки на всю
-        // её высоту. Прежняя схема (полоса 10 pt + шапка отдельным слоем + `ProgressiveTopBlur` с
-        // затемнением) давала светлую муть вместо размытия. `reach`/`blurDepth` больше не используются.
+        // её высоту. Прежняя схема (полоса 10 pt + шапка отдельным слоем + своё прогрессивное размытие
+        // с затемнением, `VariableBlur.swift` — удалён 20.11.2026) давала светлую муть вместо размытия.
         if #available(iOS 26.0, *), hasScrollContent {
             self.safeAreaBar(edge: edge, spacing: 0, content: content)
                 .scrollEdgeEffectStyle(.soft, for: edge == .top ? .top : .bottom)

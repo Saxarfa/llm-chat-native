@@ -123,10 +123,21 @@ struct PhoneModelsSheet: View {
                             .font(.system(size: 16, weight: selected ? .semibold : .regular))
                             .foregroundStyle(Theme.ink)
                             .lineLimit(2)
-                        HStack(spacing: 6) {
-                            Text([item.quant, PhoneMemory.gigabytes(item.size), loaded ? "в памяти" : nil]
-                                .compactMap { $0 }.joined(separator: " · "))
-                            FitBadge(fit: phone.fit(item.size, context: phone.wantedContext(item.file), file: item.file))
+                        // Не влезает в строку — бейдж уходит на следующую, а не рвётся вместе с размером на две
+                        // («Q4_K_M · / 7,3 ГБ», «Может не / хватить» — снимок phoneModels 0.16.4).
+                        let details = Text([item.quant, PhoneMemory.gigabytes(item.size), loaded ? "в памяти" : nil]
+                            .compactMap { $0 }.joined(separator: " · "))
+                            .lineLimit(1)
+                        let badge = FitBadge(fit: phone.fit(item.size, context: phone.wantedContext(item.file), file: item.file))
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 6) {
+                                details
+                                badge
+                            }
+                            VStack(alignment: .leading, spacing: 4) {
+                                details
+                                badge
+                            }
                         }
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.subtle)
@@ -405,6 +416,9 @@ struct FitBadge: View {
         Text(text)
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(color)
+            // Бейдж всегда в одну строку: перенос внутри капсулы ломал её («Может не / хватить»).
+            .lineLimit(1)
+            .fixedSize()
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
             .background(color.opacity(0.14), in: Capsule())

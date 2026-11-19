@@ -81,7 +81,7 @@ struct RecentsScreen: View {
             .animation(Theme.spring, value: shown.map(\.id))
         }
         .refreshable { await model.refreshChats() }
-        .softEdgeBar(edge: .top, tint: Theme.page, reach: Theme.headerReach, blurDepth: Theme.drawerBlurDepth) {
+        .softEdgeBar(edge: .top, tint: Theme.page) {
             ZStack {
                 Text("Недавние")
                     .font(.system(size: 17, weight: .semibold))

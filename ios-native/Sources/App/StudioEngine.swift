@@ -22,7 +22,20 @@ final class StudioModel {
     var switching = false
     var syncError: String?
     var config: StudioConfig?
-    var jobs: [StudioJob] = []
+    var jobs: [StudioJob] = [] {
+        didSet {
+            // Готовые и очередь считаются один раз на изменение заданий, а не при каждом обращении:
+            // виды студии и шторка зовут их по многу раз за перерисовку (аудит 20.11.2026).
+            let done = jobs.filter(\.isDone)
+            if done != completed { completed = done }
+            let active = jobs.filter(\.isActive).sorted { $0.created < $1.created }
+            if active != activeJobs { activeJobs = active }
+        }
+    }
+    /// Готовые арты, самый новый первым.
+    private(set) var completed: [StudioJob] = []
+    /// Очередь: идущие и ждущие задания, первым — то, что запущено раньше.
+    private(set) var activeJobs: [StudioJob] = []
     var loop = false
     var busy = false
     var error: String?
@@ -61,9 +74,6 @@ final class StudioModel {
 
     // MARK: - Что показывать
 
-    var completed: [StudioJob] { jobs.filter(\.isDone) }
-    /// Очередь: идущие и ждущие задания, первым — то, что запущено раньше.
-    var activeJobs: [StudioJob] { jobs.filter(\.isActive).sorted { $0.created < $1.created } }
     /// Задание, которое рисуется сейчас (или первое в очереди, пока ни одно не началось).
     var pendingJob: StudioJob? {
         let active = activeJobs

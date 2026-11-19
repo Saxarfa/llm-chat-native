@@ -26,7 +26,18 @@ final class PhoneModels {
     }
 
     var installed: [PhoneModel] = []
-    var downloads: [String: Download] = [:]
+    var downloads: [String: Download] = [:] {
+        didSet {
+            let active = downloads.values.contains { item in
+                if case .failed = item.state { return false }
+                return true
+            }
+            if active != hasActiveDownloads { hasActiveDownloads = active }
+        }
+    }
+    /// Идёт хотя бы одна загрузка (упавшая не считается). Для шторки: она перерисовывается, только когда
+    /// загрузки начались или кончились, а не на каждый кусок файла (аудит 20.11.2026).
+    private(set) var hasActiveDownloads = false
     var hasToken = false
 
     var query = ""
@@ -629,9 +640,23 @@ final class DownloadCenter: NSObject, URLSessionDownloadDelegate, @unchecked Sen
         }
     }
 
+    /// Когда прогресс загрузки последний раз уходил на экран и описание её задачи — по номеру задачи.
+    /// Трогаются только из очереди делегата (она последовательная).
+    private var reported: [Int: Date] = [:]
+    private var tags: [Int: Tag] = [:]
+
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
                     totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        guard let tag = tag(downloadTask) else { return }
+        // Прогресс — не чаще 4 раз в секунду, а описание задачи разбирается из JSON один раз: раньше каждый
+        // кусок файла разбирал JSON и перерисовывал шторку и окно моделей (аудит 20.11.2026).
+        let id = downloadTask.taskIdentifier
+        let now = Date()
+        let complete = totalBytesExpectedToWrite > 0 && totalBytesWritten >= totalBytesExpectedToWrite
+        if !complete, let last = reported[id], now.timeIntervalSince(last) < 0.25 { return }
+        reported[id] = now
+        let known = tags[id]
+        guard let tag = known ?? tag(downloadTask) else { return }
+        if known == nil { tags[id] = tag }
         Task { @MainActor in
             self.owner?.progress(file: tag.file, repo: tag.repo, path: tag.path ?? tag.file,
                                  received: totalBytesWritten, total: totalBytesExpectedToWrite)
@@ -663,6 +688,8 @@ final class DownloadCenter: NSObject, URLSessionDownloadDelegate, @unchecked Sen
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        reported[task.taskIdentifier] = nil
+        tags[task.taskIdentifier] = nil
         guard let error, let tag = tag(task) else { return }
         let nsError = error as NSError
         if nsError.code == NSURLErrorCancelled, nsError.userInfo[NSURLSessionDownloadTaskResumeData] == nil { return }

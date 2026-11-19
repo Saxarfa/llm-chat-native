@@ -93,17 +93,25 @@ extension AppModel {
     // MARK: - Картинки модели
 
     /// Картинка, созданная моделью: `preview` — уменьшенная для ленты, иначе оригинал.
+    /// Одновременные запросы одного арта (лента, сцена студии, просмотр) ждут одну загрузку.
     func artImage(_ id: String, preview small: Bool) async -> UIImage? {
         let key = "art:\(id):" + (small ? "p" : "o")
         if let ready = ImageStore.image(key) { return ready }
+        if let running = artLoads[key] { return await running.value }
         guard let api else { return nil }
         let path = "/api/images/\(APIClient.pathSafe(id))/image/0" + (small ? "?preview=true&preview_size=960" : "")
-        guard let data = try? await api.data(path) else { return nil }
-        let image = await Task.detached(priority: .userInitiated) { () -> UIImage? in
-            guard let decoded = UIImage(data: data) else { return nil }
-            return decoded.preparingForDisplay() ?? decoded
-        }.value
-        if let image { ImageStore.put(image, key: key) }
+        let load = Task { () -> UIImage? in
+            guard let data = try? await api.data(path) else { return nil }
+            let image = await Task.detached(priority: .userInitiated) { () -> UIImage? in
+                guard let decoded = UIImage(data: data) else { return nil }
+                return decoded.preparingForDisplay() ?? decoded
+            }.value
+            if let image { ImageStore.put(image, key: key) }
+            return image
+        }
+        artLoads[key] = load
+        let image = await load.value
+        artLoads[key] = nil
         return image
     }
 

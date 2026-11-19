@@ -30,7 +30,18 @@ enum MarkdownParser {
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
             .components(separatedBy: "\n")
-        var kinds: [MarkdownBlock.Kind] = []
+        return numbered(blocks(in: lines).map { $0.kind })
+    }
+
+    static func numbered(_ kinds: [MarkdownBlock.Kind]) -> [MarkdownBlock] {
+        kinds.enumerated().map { MarkdownBlock(id: $0.offset, kind: $0.element) }
+    }
+
+    /// Блоки по порядку и номер строки, с которой начинается каждый. Разбор идёт только вперёд:
+    /// блок зависит от своих строк и смотрит не дальше строк следующего за ним блока (на этом
+    /// держится разбор по хвосту — `MarkdownStream`).
+    static func blocks(in lines: [String]) -> [(kind: MarkdownBlock.Kind, line: Int)] {
+        var kinds: [(kind: MarkdownBlock.Kind, line: Int)] = []
         var index = 0
 
         while index < lines.count {
@@ -41,6 +52,7 @@ enum MarkdownParser {
                 index += 1
                 continue
             }
+            let start = index
 
             if let fence = fenceMarker(trimmed) {
                 let language = String(trimmed.dropFirst(fence.count)).trimmingCharacters(in: .whitespaces)
@@ -54,18 +66,18 @@ enum MarkdownParser {
                     body.append(lines[index])
                     index += 1
                 }
-                kinds.append(.code(language: language, text: body.joined(separator: "\n")))
+                kinds.append((kind: .code(language: language, text: body.joined(separator: "\n")), line: start))
                 continue
             }
 
             if let heading = heading(trimmed) {
-                kinds.append(.heading(level: heading.level, text: heading.text))
+                kinds.append((kind: .heading(level: heading.level, text: heading.text), line: start))
                 index += 1
                 continue
             }
 
             if isRule(trimmed) {
-                kinds.append(.rule)
+                kinds.append((kind: .rule, line: start))
                 index += 1
                 continue
             }
@@ -82,7 +94,7 @@ enum MarkdownParser {
                     rows.append(Array(cells.prefix(header.count)))
                     index += 1
                 }
-                kinds.append(.table(header: header, rows: rows))
+                kinds.append((kind: .table(header: header, rows: rows), line: start))
                 continue
             }
 
@@ -94,7 +106,7 @@ enum MarkdownParser {
                     body.append(String(quoteLine.dropFirst()).trimmingCharacters(in: .whitespaces))
                     index += 1
                 }
-                kinds.append(.quote(body.joined(separator: "\n")))
+                kinds.append((kind: .quote(body.joined(separator: "\n")), line: start))
                 continue
             }
 
@@ -127,7 +139,7 @@ enum MarkdownParser {
                     MarkdownBlock.ListItem(id: offset, indent: min((item.indent - base) / 2, 4),
                                            marker: item.marker, text: item.text)
                 }
-                kinds.append(.list(rows))
+                kinds.append((kind: .list(rows), line: start))
                 continue
             }
 
@@ -140,10 +152,10 @@ enum MarkdownParser {
                 body.append(next)
                 index += 1
             }
-            kinds.append(.paragraph(body.joined(separator: "\n")))
+            kinds.append((kind: .paragraph(body.joined(separator: "\n")), line: start))
         }
 
-        return kinds.enumerated().map { MarkdownBlock(id: $0.offset, kind: $0.element) }
+        return kinds
     }
 
     private static func fenceMarker(_ trimmed: String) -> String? {
@@ -220,5 +232,54 @@ enum MarkdownParser {
         let rest = afterDigits.dropFirst()
         guard rest.first == " " else { return nil }
         return (indent, "\(digits).", String(rest).trimmingCharacters(in: .whitespaces))
+    }
+}
+
+/// Разбор растущего текста живого ответа: заново разбирается только хвост — с начала предпоследнего
+/// блока. Дописанный текст меняет лишь последнюю строку и добавляет новые, а блок смотрит не дальше строк
+/// следующего за ним блока (`MarkdownParser.blocks(in:)`). Поэтому блоки до предпоследнего остаются
+/// прежними, и результат совпадает с полным `MarkdownParser.parse` (проверяет `MarkdownStreamTests`).
+/// Раньше живой ответ разбирался целиком ~30 раз в секунду, и длинный ответ к концу тормозил (аудит 20.11.2026).
+struct MarkdownStream {
+    /// Разобранный текст.
+    private var text = ""
+    private var kinds: [MarkdownBlock.Kind] = []
+    /// Где в `text` начинается каждый блок (байты UTF-8).
+    private var offsets: [Int] = []
+
+    mutating func update(_ source: String) -> [MarkdownBlock] {
+        // Перевод строки \r сдвигает смещения — такой текст всегда разбираем целиком.
+        if source.utf8.contains(13) {
+            reset()
+            return MarkdownParser.parse(source)
+        }
+        // Текст дописан, а не переписан заново: прежние блоки до предпоследнего остаются.
+        let grown = kinds.count >= 2 && source.utf8.count >= text.utf8.count
+            && source.utf8.starts(with: text.utf8)
+        let keep = grown ? kinds.count - 2 : 0
+        let base = grown ? offsets[keep] : 0
+        let start = source.utf8.index(source.utf8.startIndex, offsetBy: base)
+        let lines = source[start...].components(separatedBy: "\n")
+        var lineOffsets: [Int] = []
+        lineOffsets.reserveCapacity(lines.count)
+        var position = base
+        for line in lines {
+            lineOffsets.append(position)
+            position += line.utf8.count + 1
+        }
+        kinds.removeSubrange(keep...)
+        offsets.removeSubrange(keep...)
+        for block in MarkdownParser.blocks(in: lines) {
+            kinds.append(block.kind)
+            offsets.append(lineOffsets[block.line])
+        }
+        text = source
+        return MarkdownParser.numbered(kinds)
+    }
+
+    mutating func reset() {
+        text = ""
+        kinds = []
+        offsets = []
     }
 }

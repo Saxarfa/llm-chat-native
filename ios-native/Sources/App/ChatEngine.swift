@@ -161,6 +161,7 @@ extension AppModel {
             threadChatID = nil
             return
         }
+        rememberOpened(id)
         if preview != nil {
             threadChatID = id
             threadState = .loaded
@@ -214,6 +215,32 @@ extension AppModel {
         }
     }
 
+    /// Сколько последних открытых сессий держат в памяти ленту и сырые сообщения.
+    static let cachedChats = 12
+
+    /// Сессию открыли: она — самая свежая в кэше, самые давние уходят (`trimCaches`).
+    func rememberOpened(_ id: String) {
+        recentChatIDs.removeAll { $0 == id }
+        recentChatIDs.append(id)
+        if recentChatIDs.count > Self.cachedChats * 2 {
+            recentChatIDs.removeFirst(recentChatIDs.count - Self.cachedChats * 2)
+        }
+        trimCaches()
+    }
+
+    /// Ленты и сырые сообщения — только последних `cachedChats` открытых сессий (аудит 20.11.2026: сырые
+    /// сообщения держат картинки вложений в base64, и память росла с каждой открытой сессией).
+    /// Не трогаем открытую сессию, сессии с идущим или дописанным ответом и копии чатов телефона:
+    /// их сырые сообщения нужны для работы без ПК. Ушедшая из кэша сессия при открытии загрузится заново.
+    func trimCaches() {
+        let keep = Set(recentChatIDs.suffix(Self.cachedChats))
+        for id in Set(threadCache.keys).union(rawChats.keys) where !keep.contains(id) {
+            guard id != activeChatID, lives[id] == nil, settling[id] == nil, !phoneRuns.contains(id) else { continue }
+            threadCache[id] = nil
+            if store.chats[id] == nil { rawChats[id] = nil }
+        }
+    }
+
     /// Принимает чат с сервера: параметры для отправки и сообщения для ленты.
     func apply(chat: [String: Any], to id: String) async {
         chatMeta[id] = ChatMeta(overrides: ChatConfig.dict(chat["overrides"]),
@@ -239,9 +266,12 @@ extension AppModel {
                 persistPhone(id, model: model, dirty: false)
             }
         }
-        // Разбор Markdown длинного чата — вне главного потока.
-        let items = await Task.detached(priority: .userInitiated) {
-            FeedMessage.build(from: raw.map { ChatMessage(json: $0) })
+        // Разбор Markdown длинного чата — вне главного потока, вместе со строчной разметкой последних ответов
+        // (лента строит 30 последних сообщений): при первой отрисовке абзацы берутся из кэша готовыми.
+        let items = await Task.detached(priority: .userInitiated) { () -> [FeedMessage] in
+            let items = FeedMessage.build(from: raw.map { ChatMessage(json: $0) })
+            InlineMarkdown.warm(items.suffix(30))
+            return items
         }.value
         threadCache[id] = items
         guard activeChatID == id else {
@@ -693,12 +723,10 @@ extension AppModel {
         }
         if instant {
             // Снимок уже идущего ответа показываем целиком, а не печатаем заново.
-            live.reasoning = raw.reasoning
-            if live.text != raw.text {
-                live.text = raw.text
-                live.blocks = id == activeChatID ? MarkdownParser.parse(raw.text) : []
-            }
+            live.content.setReasoning(raw.reasoning)
+            live.content.show(raw.text, parse: id == activeChatID)
         }
+        // Текст живёт в `live.content`: состояние в `lives` меняется только при смене этапа, флагов и картинок.
         if live != lives[id] { lives[id] = live }
         startReveal()
     }
@@ -717,30 +745,36 @@ extension AppModel {
     }
 
     /// Один шаг вывода. `true` — на экране ещё не весь полученный текст.
+    /// Шаг меняет только `live.content` (`LiveText`): перерисовывается строка живого ответа, а не лента и поле
+    /// ввода. Разметка разбирается с начала предпоследнего блока, длина текста не пересчитывается на каждом шаге.
     private func revealStep() -> Bool {
         var more = false
         for (id, raw) in liveRaw {
-            guard var live = lives[id] else { continue }
-            let firstText = live.text.isEmpty && !raw.text.isEmpty
-            live.reasoning = raw.reasoning
-            if live.text != raw.text {
+            guard let live = lives[id] else { continue }
+            let content = live.content
+            let firstText = content.text.isEmpty && !raw.text.isEmpty
+            content.setReasoning(raw.reasoning)
+            if content.text != raw.text {
                 if id == activeChatID {
-                    let total = raw.text.count
-                    let shown = min(live.text.count, total)
+                    // Длина полученного текста считается раз на событие сервера, показанного — помнится с прошлого шага.
+                    if content.source != raw.text {
+                        content.source = raw.text
+                        content.sourceCount = raw.text.count
+                    }
+                    let total = content.sourceCount
+                    if content.shownCount < 0 { content.shownCount = content.text.count }
+                    let shown = min(content.shownCount, total)
                     // Чем больше накопилось, тем быстрее догоняем; после конца ответа — ещё быстрее.
                     let closing = pendingFinish[id] != nil
                     let share = Double(total - shown) * (closing ? 0.25 : 0.1)
                     let next = min(total, shown + max(closing ? 6 : 2, Int(share.rounded(.up))))
-                    live.text = next == total ? raw.text : String(raw.text.prefix(next))
-                    live.blocks = MarkdownParser.parse(live.text)
+                    content.show(next == total ? raw.text : String(raw.text.prefix(next)), count: next, parse: true)
                     if next < total { more = true }
                 } else {
                     // Разметку разбираем только для чата на экране.
-                    live.text = raw.text
-                    live.blocks = []
+                    content.show(raw.text, parse: false)
                 }
             }
-            if live != lives[id] { lives[id] = live }
             if firstText, id == activeChatID { Haptics.tap() }
         }
         // Ответы, которые сервер уже закончил, а лента только что допоказала.
@@ -756,8 +790,7 @@ extension AppModel {
 
     /// Открыли чат с идущим ответом, разметка которого не разбиралась в фоне.
     func prepareLiveBlocks() {
-        guard let id = activeChatID, var live = lives[id], live.blocks.isEmpty, !live.text.isEmpty else { return }
-        live.blocks = MarkdownParser.parse(live.text)
-        lives[id] = live
+        guard let id = activeChatID, let live = lives[id], live.blocks.isEmpty, !live.text.isEmpty else { return }
+        live.content.show(live.text, parse: true)
     }
 }

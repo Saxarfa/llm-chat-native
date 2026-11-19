@@ -26,6 +26,21 @@ extension AppModel {
     func startOnPhone(_ id: String, model: String, text: String, messageID: String, now: Double, isNew: Bool,
                       attachments: [DraftAttachment] = []) async -> Bool {
         let file = PhoneModelID.file(of: model)
+        // Переписка этой сессии ещё не пришла с ПК (или ушла из памяти, `trimCaches`): без неё модель телефона
+        // не увидела бы историю, а снимок на ПК заменил бы переписку одним вопросом. Ответа не будет —
+        // текст вернётся в поле, сессия перечитывается.
+        if !isNew, rawChats[id] == nil {
+            lives[id] = nil
+            liveRaw[id] = nil
+            if threadChatID == id {
+                thread.removeAll { $0.rawID == messageID }
+                threadCache[id] = thread
+            }
+            sendError = "Сессия ещё загружается. Повторите через секунду."
+            Haptics.error()
+            if activeChatID == id { Task { await loadThread() } }
+            return false
+        }
         phoneRuns.insert(id)
         // Картинки — как у вопросов на ПК (`dataUrl`): так их видят и лента, и сайт после синхронизации.
         let files: [[String: Any]] = attachments.map { ["name": $0.name, "dataUrl": $0.dataURL] }
@@ -95,17 +110,25 @@ extension AppModel {
         let box = StatsBox()
         var output = ""
         var failure: String?
+        // Ответ делится на рассуждения и текст по всему написанному — не на каждый токен, а не чаще, чем
+        // лента показывает новый кусок (~30 раз в секунду): иначе работа росла квадратично с длиной ответа.
+        var lastPush = Date.distantPast
+        func pushLive() {
+            let parts = ThinkSplitter.split(output)
+            applyLive(id, event: ["text": parts.text, "reasoning": parts.reasoning,
+                                  "is_thinking": parts.text.isEmpty && !parts.reasoning.isEmpty])
+            lastPush = Date()
+        }
         do {
             for try await piece in phone.stream(messages: prompt, images: images, sampling: PhoneSampling(config: config),
                                                 stats: { box.set($0) }) {
                 output += piece
-                let parts = ThinkSplitter.split(output)
-                applyLive(id, event: ["text": parts.text, "reasoning": parts.reasoning,
-                                      "is_thinking": parts.text.isEmpty && !parts.reasoning.isEmpty])
+                if Date().timeIntervalSince(lastPush) >= 0.033 { pushLive() }
             }
         } catch {
             failure = (error as? PhoneEngineError)?.message ?? error.localizedDescription
         }
+        if !output.isEmpty { pushLive() }
         phone.generating = false
 
         let parts = ThinkSplitter.split(output)

@@ -2,8 +2,53 @@ import SwiftUI
 import UIKit
 
 /// Строчная разметка (жирный, курсив, `код`, ссылки, зачёркивание) средствами системы.
+/// Готовый результат кэшируется по тексту и размеру: абзац разбирается один раз, а не при каждой перерисовке,
+/// и последние ответы чата разбираются заранее в фоне (`warm`) — раньше `AttributedString(markdown:)` шёл в
+/// `body` каждого абзаца и при входе в длинный чат держал главный поток (аудит 20.11.2026).
 enum InlineMarkdown {
+    private final class Rendered {
+        let value: AttributedString
+        init(_ value: AttributedString) { self.value = value }
+    }
+
+    /// `NSCache` потокобезопасен: кэш заполняется и с главного потока, и из фоновой задачи `warm`.
+    private static let cache: NSCache<NSString, Rendered> = {
+        let cache = NSCache<NSString, Rendered>()
+        cache.countLimit = 4000
+        return cache
+    }()
+
     static func render(_ text: String, size: CGFloat = 17) -> AttributedString {
+        let key = "\(size)|\(text)" as NSString
+        if let ready = cache.object(forKey: key) { return ready.value }
+        let result = make(text, size: size)
+        cache.setObject(Rendered(result), forKey: key)
+        return result
+    }
+
+    /// Строчная разметка последних ответов — заранее, в фоне (вызывается из разбора ленты, `apply`).
+    /// Размеры те же, что у видов ленты (`AnswerStyle`, ячейки таблиц — 15 pt).
+    static func warm(_ messages: ArraySlice<FeedMessage>) {
+        let style = AnswerStyle.current
+        for message in messages where !message.isUser {
+            for block in message.blocks {
+                switch block.kind {
+                case .heading(let level, let text):
+                    _ = render(text, size: style.heading(level))
+                case .paragraph(let text), .quote(let text):
+                    _ = render(text, size: style.textSize)
+                case .list(let items):
+                    for item in items { _ = render(item.text, size: style.textSize) }
+                case .table(let header, let rows):
+                    for cell in header + rows.flatMap({ $0 }) { _ = render(TableCell.clean(cell), size: 15) }
+                case .code, .rule:
+                    break
+                }
+            }
+        }
+    }
+
+    private static func make(_ text: String, size: CGFloat) -> AttributedString {
         var options = AttributedString.MarkdownParsingOptions()
         options.interpretedSyntax = .inlineOnlyPreservingWhitespace
         options.failurePolicy = .returnPartiallyParsedIfPossible
@@ -97,11 +142,16 @@ struct DrawerFreeZone: ViewModifier {
 /// Ответ модели: блоки Markdown один под другим.
 struct MarkdownView: View {
     let blocks: [MarkdownBlock]
+    /// Шрифт ответов из настроек (по умолчанию — с засечками, как у Claude). Читается здесь, один раз на ответ;
+    /// блоки получают готовый `AnswerStyle`.
+    @AppStorage(AnswerFont.key) private var font = AnswerFont.serif
+    @AppStorage(AnswerSize.key) private var size = AnswerSize.regular
 
     var body: some View {
+        let style = AnswerStyle(font: font, size: size)
         VStack(alignment: .leading, spacing: 14) {
             ForEach(blocks) { block in
-                MarkdownBlockView(block: block)
+                MarkdownBlockView(block: block, style: style)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -110,23 +160,19 @@ struct MarkdownView: View {
 
 private struct MarkdownBlockView: View {
     let block: MarkdownBlock
-    /// Шрифт ответов из настроек (по умолчанию — с засечками, как у Claude).
-    @AppStorage(AnswerFont.key) private var font = AnswerFont.serif
-    @AppStorage(AnswerSize.key) private var size = AnswerSize.regular
-
-    private var scale: CGFloat { font.sizeFactor * size.factor }
+    let style: AnswerStyle
 
     var body: some View {
         switch block.kind {
         case .heading(let level, let text):
-            Text(InlineMarkdown.render(text, size: headingSize(level) * scale))
-                .font(.system(size: headingSize(level) * scale, weight: .semibold, design: font.design))
+            Text(InlineMarkdown.render(text, size: style.heading(level)))
+                .font(.system(size: style.heading(level), weight: .semibold, design: style.design))
                 .foregroundStyle(Theme.ink)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, level <= 2 ? 6 : 2)
                 .accessibilityAddTraits(.isHeader)
         case .paragraph(let text):
-            BodyText(text: text)
+            BodyText(text: text, style: style)
         case .code(let language, let text):
             CodeBlockView(language: language, code: text)
         case .list(let items):
@@ -134,16 +180,16 @@ private struct MarkdownBlockView: View {
                 ForEach(items) { item in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(item.marker)
-                            .font(.system(size: 16.5 * scale, design: font.design).monospacedDigit())
+                            .font(.system(size: style.textSize, design: style.design).monospacedDigit())
                             .foregroundStyle(Theme.muted)
                             .frame(minWidth: 16, alignment: .trailing)
-                        BodyText(text: item.text)
+                        BodyText(text: item.text, style: style)
                     }
                     .padding(.leading, CGFloat(item.indent) * 20)
                 }
             }
         case .quote(let text):
-            BodyText(text: text, color: Theme.muted)
+            BodyText(text: text, style: style, color: Theme.muted)
                 .padding(.leading, 14)
                 .overlay(alignment: .leading) {
                     Capsule().fill(Theme.fillActive).frame(width: 3)
@@ -154,28 +200,18 @@ private struct MarkdownBlockView: View {
             Rectangle().fill(Theme.line).frame(height: 1).padding(.vertical, 4)
         }
     }
-
-    private func headingSize(_ level: Int) -> CGFloat {
-        switch level {
-        case 1: return 24
-        case 2: return 21
-        case 3: return 19
-        default: return 17
-        }
-    }
 }
 
 private struct BodyText: View {
     let text: String
+    let style: AnswerStyle
     var color: Color = Theme.ink
-    @AppStorage(AnswerFont.key) private var font = AnswerFont.serif
-    @AppStorage(AnswerSize.key) private var size = AnswerSize.regular
 
     var body: some View {
         // Текст ответа — шрифтом из настроек; по умолчанию с засечками, как в приложении Claude.
-        let points = 16.5 * font.sizeFactor * size.factor
+        let points = style.textSize
         Text(InlineMarkdown.render(text, size: points))
-            .font(.system(size: points, design: font.design))
+            .font(.system(size: points, design: style.design))
             .foregroundStyle(color)
             .lineSpacing(5)
             .fixedSize(horizontal: false, vertical: true)
@@ -252,6 +288,34 @@ enum TableWidth {
     static var last: CGFloat = 0
 }
 
+/// Ширина текста ячейки таблицы: вся строка и самое длинное слово. Ячейка меряется один раз: пока таблица
+/// печатается, заново меряются только новые ячейки (раньше вся таблица — на каждом шаге вывода, ~30 раз
+/// в секунду; аудит 20.11.2026). Только с главного потока — из `body` таблицы.
+@MainActor
+private enum TableMeasure {
+    private static var cells: [String: (line: CGFloat, word: CGFloat)] = [:]
+
+    static func cell(_ text: String, header: Bool) -> (line: CGFloat, word: CGFloat) {
+        let key = (header ? "h|" : "c|") + text
+        if let ready = cells[key] { return ready }
+        if cells.count > 3000 { cells.removeAll(keepingCapacity: true) }
+        let font = UIFont.systemFont(ofSize: 15, weight: header ? .semibold : .regular)
+        // Тот же размер, что у самой ячейки (`TableCell`): разметка берётся из общего кэша.
+        let plain = String(InlineMarkdown.render(TableCell.clean(text), size: 15).characters)
+        var widest: CGFloat = 0
+        var longestWord: CGFloat = 0
+        for line in plain.split(separator: "\n", omittingEmptySubsequences: false) {
+            widest = max(widest, (String(line) as NSString).size(withAttributes: [.font: font]).width)
+            for word in line.split(separator: " ") {
+                longestWord = max(longestWord, (String(word) as NSString).size(withAttributes: [.font: font]).width)
+            }
+        }
+        let size = (line: widest, word: longestWord)
+        cells[key] = size
+        return size
+    }
+}
+
 /// Таблица ответа. Ширины столбцов считаются заранее по тексту ячеек, а не отдаются Grid:
 /// Grid внутри горизонтальной прокрутки мерял высоту строки по одной строчке текста, и перенесённый
 /// текст налезал на соседние строки (снимок 16.11.2026, Qwen3.5 9B). Узкая таблица лежит в ширину
@@ -275,14 +339,9 @@ private struct TableBlockView: View {
             var longestWord: CGFloat = 0
             let all = [header[column]] + rows.map { $0.indices.contains(column) ? $0[column] : "" }
             for (index, cell) in all.enumerated() {
-                let font = UIFont.systemFont(ofSize: 15, weight: index == 0 ? .semibold : .regular)
-                let plain = String(InlineMarkdown.render(TableCell.clean(cell)).characters)
-                for line in plain.split(separator: "\n", omittingEmptySubsequences: false) {
-                    widest = max(widest, (String(line) as NSString).size(withAttributes: [.font: font]).width)
-                    for word in line.split(separator: " ") {
-                        longestWord = max(longestWord, (String(word) as NSString).size(withAttributes: [.font: font]).width)
-                    }
-                }
+                let size = TableMeasure.cell(cell, header: index == 0)
+                widest = max(widest, size.line)
+                longestWord = max(longestWord, size.word)
             }
             let wanted = ceil(widest * 1.04) + Self.padding * 2 + 2
             let full = min(max(wanted, Self.minColumn), Self.maxColumn)
@@ -376,8 +435,9 @@ private struct TableCell: View {
     let text: String
     let isHeader: Bool
 
-    /// Переносы `<br>` из ответов моделей становятся настоящими.
-    static func clean(_ text: String) -> String {
+    /// Переносы `<br>` из ответов моделей становятся настоящими. Без привязки к главному потоку: её зовёт и
+    /// разбор разметки заранее, в фоне (`InlineMarkdown.warm`).
+    nonisolated static func clean(_ text: String) -> String {
         text.replacingOccurrences(of: "<br>", with: "\n", options: .caseInsensitive)
             .replacingOccurrences(of: "<br/>", with: "\n", options: .caseInsensitive)
             .replacingOccurrences(of: "<br />", with: "\n", options: .caseInsensitive)

@@ -112,10 +112,13 @@ struct HFFile: Identifiable, Equatable {
 
 enum PhoneModelNames {
     private static let quantPattern = #"(?i)(?:^|[-_.])((?:I?Q\d(?:_[A-Z0-9]+)*)|BF16|F16|F32|MXFP4(?:_MOE)?)(?=\.gguf$|[-_.])"#
+    /// Собирается один раз: `quant` зовут строки списков на каждой перерисовке (раньше — новый разбор шаблона
+    /// на каждый вызов, аудит 20.11.2026). `NSRegularExpression` неизменяем и потокобезопасен.
+    private static let quantRegex = try? NSRegularExpression(pattern: quantPattern)
 
     /// Квантование из имени файла: `Q4_K_M`, `IQ3_XXS`, `Q8_0`, `F16`.
     static func quant(_ file: String) -> String? {
-        guard let regex = try? NSRegularExpression(pattern: quantPattern) else { return nil }
+        guard let regex = quantRegex else { return nil }
         let range = NSRange(file.startIndex..., in: file)
         guard let match = regex.matches(in: file, range: range).last,
               let found = Range(match.range(at: 1), in: file) else { return nil }

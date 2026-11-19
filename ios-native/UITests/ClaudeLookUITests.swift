@@ -187,6 +187,12 @@ final class ClaudeLookUITests: XCTestCase {
         XCTAssertTrue(chip.waitForExistence(timeout: 5), "при фокусе раскрывается карточка с моделью")
         sleep(1)
         assertAboveKeyboard(element(app, "chat.input"), in: app)
+        // Лента стояла у конца — конец переписки (подпись «…может ошибаться») остаётся над полем ввода,
+        // а не уходит под клавиатуру (в 0.16.4 уходил, и кнопки «вниз» не было).
+        let tail = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'может ошибаться'")).firstMatch
+        XCTAssertTrue(tail.waitForExistence(timeout: 3), "подпись под последним ответом")
+        XCTAssertLessThanOrEqual(tail.frame.maxY, element(app, "chat.input").frame.minY,
+                                 "конец ленты над полем ввода")
         snap("ui-k5-thread-keyboard")
     }
 

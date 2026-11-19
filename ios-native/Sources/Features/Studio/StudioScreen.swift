@@ -153,11 +153,14 @@ private struct StudioStage: View {
                             }
                         }
                     )) {
-                        ForEach(studio.completed) { job in
+                        ForEach(pages(around: selected.id)) { job in
                             StudioArtPage(id: job.id) { origin in
                                 guard studio.selected?.id == job.id, !DrawerSwipe.blocksTaps else { return }
                                 onOpen(origin)
                             }
+                            // Страница сравнивается по арту: опрос студии (раз в 1,2 с при генерации) не
+                            // пересчитывает страницы с тем же артом.
+                            .equatable()
                             .tag(job.id)
                         }
                     }
@@ -185,6 +188,17 @@ private struct StudioStage: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
+    }
+
+    /// Страницы сцены — готовые арты около показанного: окно до 30 артов, сдвигается шагом 10, так что
+    /// по обе стороны от показанного всегда есть куда листать. Раньше пейджер держал всю историю и
+    /// пересобирал её на каждом опросе студии (аудит 20.11.2026).
+    private func pages(around id: String) -> ArraySlice<StudioJob> {
+        let done = studio.completed
+        let index = done.firstIndex { $0.id == id } ?? 0
+        let lower = max(0, index / 10 * 10 - 10)
+        let upper = min(done.count, lower + 30)
+        return done[lower..<upper]
     }
 
     @ViewBuilder
@@ -333,6 +347,11 @@ private struct StudioArtPage: View {
             if !Task.isCancelled { preview = loaded }
         }
     }
+}
+
+extension StudioArtPage: Equatable {
+    /// Одна и та же страница — один и тот же арт; замыкание открытия не сравнивается.
+    nonisolated static func == (left: StudioArtPage, right: StudioArtPage) -> Bool { left.id == right.id }
 }
 
 /// Лента: сначала очередь (идущий арт и ждущие, у каждого — крестик отмены), затем готовые арты.
@@ -685,9 +704,14 @@ private struct StudioComposer: View {
             .frame(maxWidth: .infinity, maxHeight: typing.wrappedValue ? .infinity : nil, alignment: .topLeading)
             .background(Theme.surface, in: shape)
             .overlay(shape.strokeBorder(typing.wrappedValue ? Theme.capsuleLine : Theme.line))
-            // Касание в любом месте рамки (и под текстом) ставит курсор.
+            // Касание в любом месте рамки (и под текстом) ставит курсор — в конец промпта: фокус ставим сами,
+            // и UIKit оставлял курсор в начале (набранное вставало перед прежним промптом, снимок ui-03-typing 0.16.4).
             .contentShape(shape)
-            .onTapGesture { typing.wrappedValue = true }
+            .onTapGesture {
+                guard !typing.wrappedValue else { return }
+                typing.wrappedValue = true
+                Keyboard.caretToEnd()
+            }
             .overlay(alignment: .topTrailing) {
                 // Длинный промпт с телефона не стереть — одна кнопка очищает поле.
                 if showsClear {

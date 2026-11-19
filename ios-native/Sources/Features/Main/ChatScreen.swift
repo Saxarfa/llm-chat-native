@@ -49,8 +49,7 @@ struct ChatScreen: View {
         }
         .animation(.easeOut(duration: 0.26), value: model.activeChatID)
         // Закрытие клавиатуры привязано только к содержимому, не к контейнеру панелей.
-        .softEdgeBar(edge: .top, tint: Theme.canvas, hasScrollContent: model.activeChatID != nil,
-                     reach: Theme.headerReach, blurDepth: Theme.chatBlurDepth) {
+        .softEdgeBar(edge: .top, tint: Theme.canvas, hasScrollContent: model.activeChatID != nil) {
             VStack(spacing: 0) {
                 header
                 if model.offline {

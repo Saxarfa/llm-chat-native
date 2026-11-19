@@ -27,7 +27,10 @@ struct MainView: View {
             ZStack(alignment: .leading) {
                 Theme.rail.ignoresSafeArea()
 
+                // `.equatable()` у шторки и экранов: замыкание в параметре SwiftUI сравнить не может, и без этого
+                // на каждом кадре свайпа (новый `dragX`) их тела считались заново целиком (аудит 20.11.2026).
                 SidebarView(onClose: { setOpen(false) })
+                    .equatable()
                     .frame(width: width)
                     // Закрываясь, меню чуть уезжает влево и гаснет (вход в чат «Навстречу», 18.11.2026);
                     // от хода карточки, поэтому так же ведёт себя и под пальцем. Гаснет под слоем цвета
@@ -42,18 +45,23 @@ struct MainView: View {
                     .allowsHitTesting(isOpen && !swiping)
                     .scrollDisabled(swiping)
                     .accessibilityHidden(!isOpen)
+                    // Закрытая шторка целиком под чатом — её анимации стоят.
+                    .environment(\.motionPaused, offset == 0)
 
                 // Group, не ZStack: с отдельным контейнером капсула и поиск не поднимались над клавиатурой (0.14).
                 Group {
                     // Смена раздела (чат, студия, «Недавние») — мягкое проявление, а не резкая подмена.
                     if model.screen == .studio {
                         StudioScreen(onMenu: { setOpen(!isOpen) })
+                            .equatable()
                             .transition(.opacity)
                     } else if model.screen == .recents {
                         RecentsScreen(onMenu: { setOpen(!isOpen) })
+                            .equatable()
                             .transition(.opacity)
                     } else {
                         ChatScreen(onMenu: { setOpen(!isOpen) })
+                            .equatable()
                             .transition(.opacity)
                     }
                 }
@@ -177,6 +185,28 @@ extension EnvironmentValues {
     /// Шторку ведут пальцем или она ещё доезжает. Для `Menu`: его открытие не перехватить проверкой
     /// `DrawerSwipe.blocksTaps` в действии, поэтому на это время меню выключается (`.disabled`).
     @Entry var drawerSwiping = false
+    /// Вид сейчас не видно (закрытая шторка лежит под чатом): «Атом», волна и живой фон не перерисовываются
+    /// впустую — раньше «Атом» у «Студии картинок» крутился под чатом всю генерацию (аудит 20.11.2026).
+    @Entry var motionPaused = false
+}
+
+/// Шторка и экраны под ней сравниваются без замыканий-параметров (других параметров у них нет): свежее
+/// замыкание на каждом кадре свайпа не заставляет пересчитывать их тела. Своё состояние и данные модели
+/// они по-прежнему отслеживают сами.
+extension SidebarView: Equatable {
+    nonisolated static func == (left: SidebarView, right: SidebarView) -> Bool { true }
+}
+
+extension ChatScreen: Equatable {
+    nonisolated static func == (left: ChatScreen, right: ChatScreen) -> Bool { true }
+}
+
+extension StudioScreen: Equatable {
+    nonisolated static func == (left: StudioScreen, right: StudioScreen) -> Bool { true }
+}
+
+extension RecentsScreen: Equatable {
+    nonisolated static func == (left: RecentsScreen, right: RecentsScreen) -> Bool { true }
 }
 
 /// Прямоугольник без скруглённой середины — то, что остаётся в углах карточки чата.

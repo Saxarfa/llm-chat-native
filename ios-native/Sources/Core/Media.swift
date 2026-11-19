@@ -1,3 +1,4 @@
+import CoreImage
 import ImageIO
 import UIKit
 
@@ -216,6 +217,21 @@ enum ImageStore {
         return UIImage(cgImage: image)
     }
 
+    private static let blurContext = CIContext()
+
+    /// Фон просмотра картинки: копия в 48 px, размытая один раз (зовётся вне главного потока). Прежде копия
+    /// уменьшалась на главном потоке, а размытие радиусом 40 pt во весь экран пересчитывалось на каждом кадре
+    /// открытия и смахивания (аудит 20.11.2026). 40 pt на экране — около 5 px на такой копии.
+    static func backdrop(_ picture: UIImage) -> UIImage? {
+        let scale = 48 / max(picture.size.width, picture.size.height, 1)
+        let size = CGSize(width: max(1, picture.size.width * scale), height: max(1, picture.size.height * scale))
+        guard let small = picture.preparingThumbnail(of: size), let pixels = small.cgImage else { return nil }
+        let source = CIImage(cgImage: pixels)
+        let blurred = source.clampedToExtent().applyingGaussianBlur(sigma: 5).cropped(to: source.extent)
+        guard let result = blurContext.createCGImage(blurred, from: source.extent) else { return small }
+        return UIImage(cgImage: result)
+    }
+
     /// Картинка вложения: `thumb` — для ленты, иначе в полном размере для просмотра.
     static func attachmentImage(_ key: String, thumb: Bool) -> UIImage? {
         let cacheKey = key + (thumb ? ":thumb" : ":full")
@@ -269,6 +285,9 @@ enum AttachmentPrep {
         let item = DraftAttachment(name: (base.isEmpty ? "Фото" : base) + ".jpg",
                                    dataURL: "data:image/jpeg;base64," + jpeg.base64EncodedString(), kind: .image)
         ImageStore.put(jpeg, key: item.storeKey)
+        // Миниатюра для ленты над полем ввода — здесь, вне главного потока: иначе её раскодировал `body`
+        // ленты вложений при первом показе (аудит 20.11.2026).
+        _ = ImageStore.attachmentImage(item.storeKey, thumb: true)
         return item
     }
 

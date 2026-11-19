@@ -111,9 +111,10 @@ struct MessageFeed: View {
     /// Низ ленты сдвинулся. Если человек сам у конца ответа — ведём ленту за текстом.
     private func bottomMoved(_ edge: CGFloat, box: CGSize) {
         bottomEdge = edge
-        let near = edge - box.height < 80
-        // Пока лента едет вниз по кнопке, кнопка не возвращается на полпути.
-        if near || Date() >= touch.jumpUntil, near != atBottom { atBottom = near }
+        // Палец ведёт ленту или она катится после него: время для `userScrolling` — по самой прокрутке,
+        // без отдельного жеста на ленте (он лишь дублировал `isTracking`).
+        if let view = scroll.view, view.isTracking || view.isDecelerating { touch.last = Date() }
+        refreshBottom(box: box)
         layoutPin()
         guard let view = scroll.view else { return }
         let gap = edge + Self.bottomPad - visibleBottom(view)
@@ -128,6 +129,30 @@ struct MessageFeed: View {
         // Во время перехода по «вниз» лента и так едет к концу — не перебиваем его анимацию.
         guard following, !pinPending, Date() >= touch.jumpUntil, gap > 0.5 else { return }
         view.setContentOffset(CGPoint(x: view.contentOffset.x, y: view.contentOffset.y + gap), animated: false)
+    }
+
+    /// Конец переписки на экране — кнопка «вниз» не нужна. Низ считается видимый — над полем ввода и
+    /// клавиатурой: раньше бралась высота всей области, и с открытой клавиатурой конец ленты прятался под ней,
+    /// а кнопки «вниз» не было (снимок ui-k5-thread-keyboard 0.16.4, аудит 20.11.2026).
+    private func refreshBottom(box: CGSize) {
+        let visible = scroll.view.map { visibleBottom($0) } ?? box.height
+        let near = bottomEdge - visible < 80
+        // Пока лента едет вниз по кнопке, кнопка не возвращается на полпути.
+        if near || Date() >= touch.jumpUntil, near != atBottom { atBottom = near }
+    }
+
+    /// Видимый низ ленты сдвинулся: открылась клавиатура или раскрылась карточка ввода. Если конец переписки
+    /// был на экране, он остаётся над полем ввода (как у Claude); если человек читал выше — лента стоит,
+    /// а над полем появляется «вниз».
+    private func visibleChanged(shrunk: Bool, box: CGSize) {
+        layoutPin()
+        guard shrunk, atBottom, let view = scroll.view, !userScrolling(view) else {
+            refreshBottom(box: box)
+            return
+        }
+        let gap = bottomEdge + Self.bottomPad - visibleBottom(view)
+        guard gap > 0.5 else { return }
+        view.setContentOffset(CGPoint(x: view.contentOffset.x, y: view.contentOffset.y + gap), animated: true)
     }
 
     /// Кнопка «вниз». Через сам UIScrollView: остановка инерции и анимированный переход
@@ -283,10 +308,12 @@ struct MessageFeed: View {
                                 layoutPin()
                             }
                         }
-                        // Пока палец ведёт ленту, она не должна убегать к низу за новым текстом.
-                        .simultaneousGesture(DragGesture(minimumDistance: 4).onChanged { _ in
-                            touch.last = Date()
-                        })
+                        // Клавиатура или раскрытая карточка ввода подняли видимый низ: конец переписки остаётся
+                        // над полем ввода. Следующим тактом — когда UIScrollView уже получил новые отступы.
+                        .onChange(of: box.size.height - box.safeAreaInsets.bottom) { old, new in
+                            let size = box.size
+                            DispatchQueue.main.async { visibleChanged(shrunk: new < old - 0.5, box: size) }
+                        }
                         // Лента отлистана вверх — кнопка «вниз» над полем ввода, как у Claude.
                         // Это UIButton (стекло iOS 26): касание не забирает себе UIScrollView, пока
                         // лента ещё катится по инерции, — прежняя SwiftUI-кнопка срабатывала только после остановки.
@@ -611,6 +638,8 @@ struct AtomIndicator: View {
     @State private var stoppedAt: Date?
     /// Завершающее движение доиграно — рисуется неподвижный «Атом», кадры остановлены.
     @State private var settled: Bool
+    /// «Атом» не видно (закрытая шторка) — кадры не идут.
+    @Environment(\.motionPaused) private var motionPaused
 
     private static let tilts: [Double] = [0, 60, 120].map { $0 * .pi / 180 }
     private static let periods: [Double] = [1.5, 2.1, 2.8]
@@ -626,7 +655,8 @@ struct AtomIndicator: View {
     }
 
     var body: some View {
-        TimelineView(.animation(paused: settled)) { context in
+        // 60 кадров в секунду: на экране 120 Гц точки летели бы с той же скоростью, а работы вдвое больше.
+        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: settled || motionPaused)) { context in
             let time = context.date.timeIntervalSinceReferenceDate
             // Секунды с конца рассуждения: nil — рассуждение идёт, .infinity — «Атом» в покое.
             let since: Double? = active ? nil : (settled ? .infinity : stoppedAt.map { context.date.timeIntervalSince($0) } ?? .infinity)
@@ -1117,24 +1147,43 @@ struct WaveText: View {
     var size: CGFloat = 15
     var weight: Font.Weight = .regular
     var color: Color = Theme.muted
+    /// Волну не видно (закрытая шторка) — кадры не идут.
+    @Environment(\.motionPaused) private var motionPaused
 
     var body: some View {
-        TimelineView(.animation) { context in
+        // 30 кадров в секунду хватает волне (гребень проходит слово за 1,3 с); на экране 120 Гц она
+        // пересчитывалась вчетверо чаще (аудит 20.11.2026).
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: motionPaused)) { context in
             let time = context.date.timeIntervalSinceReferenceDate
-            Text(wave(time: time))
+            if #available(iOS 18.0, *) {
+                // Текст раскладывается один раз, а каждый кадр буквы только рисуются со своим подъёмом и
+                // прозрачностью (`WaveRenderer`). Прежняя строка с атрибутами на каждую букву раскладывалась заново.
+                Text(text)
+                    .font(.system(size: size, weight: weight))
+                    .foregroundStyle(color)
+                    .textRenderer(WaveRenderer(time: time, lift: size / 10))
+            } else {
+                Text(wave(time: time))
+            }
         }
         .frame(height: size + 5)
         .fixedSize()
         .accessibilityLabel(text)
     }
 
+    /// Подъём буквы `index` в момент `time`, 0…1: гребень волны проходит слово за 1,3 с, между буквами 0,07 с.
+    /// Без привязки к главному потоку: её зовёт и `WaveRenderer` при отрисовке.
+    nonisolated static func rise(time: Double, index: Int) -> Double {
+        let phase = ((time - Double(index) * 0.07).truncatingRemainder(dividingBy: 1.3) + 1.3)
+            .truncatingRemainder(dividingBy: 1.3) / 1.3
+        return phase < 0.6 ? sin(.pi * phase / 0.6) : 0
+    }
+
+    /// iOS 17: строка с атрибутами на каждую букву.
     private func wave(time: Double) -> AttributedString {
         var result = AttributedString()
         for (index, letter) in text.enumerated() {
-            // Гребень волны проходит слово за 1,3 с; между буквами 0,07 с.
-            let phase = ((time - Double(index) * 0.07).truncatingRemainder(dividingBy: 1.3) + 1.3)
-                .truncatingRemainder(dividingBy: 1.3) / 1.3
-            let lift = phase < 0.6 ? sin(.pi * phase / 0.6) : 0
+            let lift = Self.rise(time: time, index: index)
             var piece = AttributedString(String(letter))
             piece.swiftUI.font = .system(size: size, weight: weight)
             piece.swiftUI.foregroundColor = color.opacity(0.45 + 0.55 * lift)
@@ -1142,6 +1191,32 @@ struct WaveText: View {
             result += piece
         }
         return result
+    }
+}
+
+/// Волна по буквам при отрисовке уже разложенного текста (iOS 18+): буква светлеет и чуть поднимается.
+@available(iOS 18.0, *)
+private struct WaveRenderer: TextRenderer {
+    let time: Double
+    /// Наибольший подъём буквы, pt.
+    let lift: CGFloat
+
+    var displayPadding: EdgeInsets { EdgeInsets(top: lift, leading: 0, bottom: 0, trailing: 0) }
+
+    func draw(layout: Text.Layout, in context: inout GraphicsContext) {
+        var index = 0
+        for line in layout {
+            for run in line {
+                for glyph in run {
+                    let rise = WaveText.rise(time: time, index: index)
+                    var copy = context
+                    copy.opacity = 0.45 + 0.55 * rise
+                    copy.translateBy(x: 0, y: -lift * rise)
+                    copy.draw(glyph)
+                    index += 1
+                }
+            }
+        }
     }
 }
 
@@ -1174,7 +1249,7 @@ private struct ReasoningTitle: View {
     var body: some View {
         Group {
             if byLetter, !done {
-                TimelineView(.animation) { context in
+                TimelineView(.animation(minimumInterval: 1.0 / 60)) { context in
                     Text(title(elapsed: context.date.timeIntervalSince(start)))
                 }
                 .task {
@@ -1301,11 +1376,12 @@ private struct ReasoningTimeline: View {
     /// Точка шага; у идущего шага плавно пульсирует.
     private struct Dot: View {
         let pulsing: Bool
+        @Environment(\.motionPaused) private var motionPaused
 
         var body: some View {
             Group {
                 if pulsing {
-                    TimelineView(.animation) { context in
+                    TimelineView(.animation(minimumInterval: 1.0 / 30, paused: motionPaused)) { context in
                         let time = context.date.timeIntervalSinceReferenceDate
                         Circle()
                             .fill(Theme.muted)
