@@ -107,6 +107,8 @@ final class ComposerUITests: XCTestCase {
         let closed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: chip)
         wait(for: [closed], timeout: 5)
         input.tap()
+        // Системная подсказка клавиатуры («Continue») может всплыть и при повторном показе — тогда набор теряется.
+        app.skipKeyboardTip()
         XCTAssertTrue(chip.waitForExistence(timeout: 5))
         input.typeText("Первая строка\nВторая строка")
         XCTAssertEqual(input.value as? String, "Первая строка\nВторая строка", "перенос строки сохраняется")
