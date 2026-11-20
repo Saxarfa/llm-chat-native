@@ -246,12 +246,13 @@ final class APIClient: @unchecked Sendable {
 
     /// Поток событий сервера (`/api/sync/events`): живой ответ модели, смена названий и т.п.
     /// Каждое событие — одна строка `data: {json}`; строки `: heartbeat` раз в 15 секунд
-    /// не дают соединению считаться зависшим.
+    /// не дают соединению считаться зависшим. Живой ответ приходит дельтами (`?delta=1`): `StreamDeltas`
+    /// собирает полный текст до выдачи события, при пропуске — ошибка `StreamDeltas.Gap` и новое соединение.
     func events() -> AsyncThrowingStream<[String: Any], Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    var request = try self.makeRequest("/api/sync/events", method: "GET", json: nil)
+                    var request = try self.makeRequest("/api/sync/events?delta=1", method: "GET", json: nil)
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                     request.timeoutInterval = 45
                     let (bytes, response) = try await self.streamSession.bytes(for: request)
@@ -262,6 +263,7 @@ final class APIClient: @unchecked Sendable {
                     // Разбор по байту перевода строки: готовый `lines` режет ещё и по
                     // редким символам-разделителям внутри текста ответа.
                     var buffer = Data()
+                    var deltas = StreamDeltas()
                     let prefix = Data("data:".utf8)
                     for try await byte in bytes {
                         if byte != 0x0A {
@@ -269,7 +271,8 @@ final class APIClient: @unchecked Sendable {
                             continue
                         }
                         if buffer.starts(with: prefix),
-                           let object = try? JSONSerialization.jsonObject(with: Data(buffer.dropFirst(prefix.count))) as? [String: Any] {
+                           var object = try? JSONSerialization.jsonObject(with: Data(buffer.dropFirst(prefix.count))) as? [String: Any] {
+                            try deltas.expand(&object)
                             continuation.yield(object)
                         }
                         buffer.removeAll(keepingCapacity: true)

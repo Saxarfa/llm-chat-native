@@ -546,6 +546,10 @@ extension AppModel {
                 } catch let error as APIError where error.status == 401 {
                     await self?.logout()
                     return
+                } catch is StreamDeltas.Gap {
+                    // Дельта без базы: связь цела, сразу новое соединение — текст придёт целиком.
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    continue
                 } catch {
                     // Обрыв связи: ниже пауза и новая попытка.
                 }
