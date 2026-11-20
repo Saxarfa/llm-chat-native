@@ -278,6 +278,12 @@ struct MessageFeed: View {
                                             .padding(.top, -8)
                                             .transition(.opacity)
                                     }
+                                    // Место прежней подписи «…может ошибаться» (убрана 20.11.2026): пустая полоса держит
+                                    // тот же отступ до поля ввода, и касание по ней, как по всей ленте, убирает клавиатуру.
+                                    Color.clear
+                                        .frame(height: 16)
+                                        .padding(.top, -10)
+                                        .transition(.identity)
                                 }
                                 Color.clear
                                     .frame(height: 1)
