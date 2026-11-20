@@ -141,18 +141,42 @@ struct MessageFeed: View {
         if near || Date() >= touch.jumpUntil, near != atBottom { atBottom = near }
     }
 
-    /// Видимый низ ленты сдвинулся: открылась клавиатура или раскрылась карточка ввода. Если конец переписки
-    /// был на экране, он остаётся над полем ввода (как у Claude); если человек читал выше — лента стоит,
-    /// а над полем появляется «вниз».
-    private func visibleChanged(shrunk: Bool, box: CGSize) {
-        layoutPin()
-        guard shrunk, atBottom, let view = scroll.view, !userScrolling(view) else {
+    /// Низ переписки — низ последнего сообщения с отступом под ним — в координатах содержимого прокрутки.
+    /// Считается по самому UIKit (подложка содержимого `ScrollViewCatcher`): запомненный из SwiftUI низ ленты
+    /// (`bottomEdge`) отстаёт, пока лента едет, и при двух изменениях подряд (карточка ввода, затем клавиатура)
+    /// лента не доезжала до конца (UI-тест сборки 0.16.5 (44), run 44641843961).
+    private func contentEnd(_ view: UIScrollView) -> CGFloat? {
+        guard let content = scroll.content, content.isDescendant(of: view) else { return nil }
+        return content.convert(content.bounds, to: view).maxY - room
+    }
+
+    /// Видимый низ ленты поднялся или опустился: открылась клавиатура, раскрылась карточка ввода и обратно.
+    /// Если конец переписки был на экране, он остаётся над полем ввода (как у Claude); если человек читал
+    /// выше — лента стоит, а над полем появляется «вниз». `old`, `new` — высота видимой части до и после.
+    private func visibleChanged(from old: CGFloat, to new: CGFloat, box: CGSize) {
+        guard let view = scroll.view, let end = contentEnd(view) else {
+            layoutPin()
             refreshBottom(box: box)
             return
         }
-        let gap = bottomEdge + Self.bottomPad - visibleBottom(view)
-        guard gap > 0.5 else { return }
-        view.setContentOffset(CGPoint(x: view.contentOffset.x, y: view.contentOffset.y + gap), animated: true)
+        let bottom = visibleBottom(view)
+        let shrink = old - new
+        // Был ли конец на экране до изменения: видимый низ тогда был ниже на `shrink`; порог — как у «вниз».
+        let wasAtEnd = end - view.contentOffset.y - (bottom + shrink) < 80
+        let target = end - bottom
+        guard shrink > 0.5, wasAtEnd, !view.isTracking, !view.isDecelerating,
+              target > view.contentOffset.y + 0.5 else {
+            layoutPin()
+            refreshBottom(box: box)
+            return
+        }
+        // Смещение меняется сразу, а движется анимацией: следующее изменение (клавиатура после карточки)
+        // считается уже от нового места.
+        UIView.animate(withDuration: 0.3, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseOut]) {
+            view.contentOffset = CGPoint(x: view.contentOffset.x, y: target)
+        }
+        if !atBottom { atBottom = true }
+        layoutPin()
     }
 
     /// Кнопка «вниз». Через сам UIScrollView: остановка инерции и анимированный переход
@@ -312,7 +336,7 @@ struct MessageFeed: View {
                         // над полем ввода. Следующим тактом — когда UIScrollView уже получил новые отступы.
                         .onChange(of: box.size.height - box.safeAreaInsets.bottom) { old, new in
                             let size = box.size
-                            DispatchQueue.main.async { visibleChanged(shrunk: new < old - 0.5, box: size) }
+                            DispatchQueue.main.async { visibleChanged(from: old, to: new, box: size) }
                         }
                         // Лента отлистана вверх — кнопка «вниз» над полем ввода, как у Claude.
                         // Это UIButton (стекло iOS 26): касание не забирает себе UIScrollView, пока
@@ -390,9 +414,11 @@ private final class TouchClock {
     var jumpUntil = Date.distantPast
 }
 
-/// UIScrollView ленты — для кнопки «вниз». Слабая ссылка: лента живёт, пока открыт чат.
+/// UIScrollView ленты — для кнопки «вниз» — и подложка её содержимого (по ней считается низ переписки,
+/// `MessageFeed.contentEnd`). Слабые ссылки: лента живёт, пока открыт чат.
 final class ScrollHolder {
     weak var view: UIScrollView?
+    weak var content: UIView?
 }
 
 /// Невидимая подложка содержимого ленты: находит свой UIScrollView среди родителей.
@@ -421,6 +447,7 @@ struct ScrollViewCatcher: UIViewRepresentable {
         }
 
         func attach() {
+            holder?.content = self
             var parent = superview
             while let view = parent {
                 if let scroll = view as? UIScrollView {
