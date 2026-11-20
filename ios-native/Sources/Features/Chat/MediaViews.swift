@@ -243,7 +243,7 @@ private struct VideoArtView: View {
                                     .background(Color.black.opacity(0.55), in: Circle())
                             }
                             if poster == nil || failure != nil {
-                                Text(failure ?? (loading ? "Загружаю видео…" : "Видео · нажмите, чтобы посмотреть"))
+                                Text(failure ?? (loading ? "Загружаю видео…" : "Видео"))
                                     .font(.system(size: 14))
                                     .foregroundStyle(failure == nil ? Theme.muted : Theme.danger)
                                     .multilineTextAlignment(.center)

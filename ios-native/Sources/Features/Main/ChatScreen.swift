@@ -117,8 +117,6 @@ struct ChatScreen: View {
                 model.pendingDelete = nil
             }
             Button("Отмена", role: .cancel) { model.pendingDelete = nil }
-        } message: {
-            Text("Сообщение исчезнет из этой ветки. Другие ветки не изменятся.")
         }
         .onAppear {
             if [.parameters, .nano, .omni, .phoneParameters].contains(model.preview) { showParameters = true }
@@ -261,7 +259,7 @@ struct ChatScreen: View {
                     GhostGlyph(filled: true)
                         .frame(width: 30, height: 33)
                         .foregroundStyle(Theme.ink)
-                    Text("Сессии в режиме инкогнито не попадают в историю и поиск. Память, базы знаний и создание картинок в них выключены.")
+                    Text("Сессия без истории")
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.muted)
                         .multilineTextAlignment(.center)

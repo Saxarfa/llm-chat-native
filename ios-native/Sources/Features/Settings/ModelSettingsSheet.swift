@@ -228,8 +228,8 @@ private struct PhoneContextSection: View {
             let need = phone.needed(size, context: wanted, file: file)
             let fit = phone.fit(size, context: wanted, file: file)
             SettingsNote(text: fit == .tooBig
-                         ? "Сколько переписки модель помнит за раз. Нужно около \(PhoneMemory.gigabytes(need)), свободно \(PhoneMemory.gigabytes(phone.availableMemory)) — памяти может не хватить, и iOS закроет приложение. Уменьшите контекст, если так случится."
-                         : "Сколько переписки модель помнит за раз. Больше контекст — больше памяти: сейчас нужно около \(PhoneMemory.gigabytes(need)) из \(PhoneMemory.gigabytes(phone.availableMemory)).",
+                         ? "Нужно около \(PhoneMemory.gigabytes(need)), свободно \(PhoneMemory.gigabytes(phone.availableMemory)) — памяти может не хватить."
+                         : "Нужно около \(PhoneMemory.gigabytes(need)) из \(PhoneMemory.gigabytes(phone.availableMemory)).",
                          symbol: fit == .tooBig ? "exclamationmark.triangle" : "memorychip")
         }
     }

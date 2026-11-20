@@ -278,12 +278,6 @@ struct MessageFeed: View {
                                             .padding(.top, -8)
                                             .transition(.opacity)
                                     }
-                                    // Как у Claude: 13 pt третичным цветом (#888781).
-                                    Text("\(last.model.isEmpty ? "Модель" : ChatConfig.modelName(last.model, profiles: model.settings.modelProfiles)) — это ИИ, который может ошибаться.")
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(Theme.subtle)
-                                        .padding(.top, -10)
-                                        .transition(.identity)
                                 }
                                 Color.clear
                                     .frame(height: 1)

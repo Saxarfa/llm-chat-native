@@ -255,13 +255,6 @@ private struct StudioStage: View {
                 .font(.system(size: 30, weight: .light))
                 .foregroundStyle(Theme.muted)
                 .frame(height: 40)
-            Text("Начни с идеи")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Theme.ink)
-            Text("Опиши, что хочешь увидеть.\nТвой арт появится здесь.")
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.muted)
-                .multilineTextAlignment(.center)
         }
         .padding(24)
     }
@@ -812,7 +805,7 @@ private struct StudioComposer: View {
     private var message: String? {
         if let error = studio.lastError { return error }
         if let flash = studio.flash { return flash }
-        if studio.loop { return studio.valid ? "Изменения применятся к следующему арту" : "Следующий арт ждёт корректных настроек" }
+        if studio.loop, !studio.valid { return "Следующий арт ждёт корректных настроек" }
         if let notice = studio.notice { return notice }
         if studio.seedLocked { return "Seed закреплён · \(studio.draft.seed)" }
         return nil

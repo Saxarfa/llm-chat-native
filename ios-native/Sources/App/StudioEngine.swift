@@ -100,7 +100,7 @@ final class StudioModel {
 
     /// Пояснение под кнопкой, когда генерация недоступна не по вине настроек.
     var notice: String? {
-        if let config, !config.online, pendingJob == nil { return "ComfyUI не запущен. Запусти его — генерация включится сама." }
+        if let config, !config.online, pendingJob == nil { return "ComfyUI не запущен" }
         return nil
     }
 

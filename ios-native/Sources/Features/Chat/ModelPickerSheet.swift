@@ -274,7 +274,7 @@ struct ModelPickerSheet: View {
         }
         switch item.group {
         case .local: return item.loaded ? "На компьютере · загружена в память" : "На компьютере"
-        case .phone: return "Работает на iPhone без компьютера"
+        case .phone: return "На телефоне"
         case .studio: return Self.isImageModel(item.id) ? "AI Studio · создаёт изображения" : "AI Studio"
         case .hosted: return "\(HostedService.of(item.id)?.title ?? "API") · бесплатный API"
         }

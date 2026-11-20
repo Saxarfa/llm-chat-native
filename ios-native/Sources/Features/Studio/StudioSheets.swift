@@ -156,9 +156,6 @@ private struct CustomSize: View {
                 field("Ширина", text: Binding(get: { studio.draft.width }, set: { value in studio.edit { $0.width = digits(value) } }))
                 field("Высота", text: Binding(get: { studio.draft.height }, set: { value in studio.edit { $0.height = digits(value) } }))
             }
-            Text("256–4096 px · кратно \(StudioModels.alignment(studio.draft.model))")
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.subtle)
         }
     }
 

@@ -42,8 +42,6 @@ struct BranchesSheet: View {
                 deleting = nil
             }
             Button("Отмена", role: .cancel) { deleting = nil }
-        } message: {
-            Text("Сообщения этой ветки будут удалены. Другие ветки, включая дочерние, сохранятся.")
         }
         .onChange(of: branches.count) { _, count in
             if count < 2 { dismiss() }
