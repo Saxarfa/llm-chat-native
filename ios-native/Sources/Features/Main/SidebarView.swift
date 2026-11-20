@@ -4,7 +4,7 @@ import SwiftUI
 /// («Показать все» — отдельный экран), внизу поверх списка — фото профиля (настройки) и «Новая сессия».
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
-    let onClose: () -> Void
+    let onClose: DrawerAction
     @State private var renaming: ChatSummary?
     @State private var deleting: ChatSummary?
     @State private var showSettings = false

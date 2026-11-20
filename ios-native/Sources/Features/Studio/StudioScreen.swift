@@ -10,7 +10,7 @@ enum StudioPanel: String, Identifiable {
 /// сверху арт, под ним лента последних, внизу промпт, быстрые настройки и «Создать».
 struct StudioScreen: View {
     @Environment(AppModel.self) private var model
-    let onMenu: () -> Void
+    let onMenu: DrawerAction
     @State private var panel: StudioPanel?
     @State private var viewer: ViewerItem?
     @FocusState private var typing: Bool
@@ -70,7 +70,7 @@ struct StudioScreen: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: onMenu)
+            CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: { onMenu() })
             Spacer()
             Text("Студия")
                 .font(.system(size: 17, weight: .semibold))
@@ -158,9 +158,6 @@ private struct StudioStage: View {
                                 guard studio.selected?.id == job.id, !DrawerSwipe.blocksTaps else { return }
                                 onOpen(origin)
                             }
-                            // Страница сравнивается по арту: опрос студии (раз в 1,2 с при генерации) не
-                            // пересчитывает страницы с тем же артом.
-                            .equatable()
                             .tag(job.id)
                         }
                     }
@@ -347,11 +344,6 @@ private struct StudioArtPage: View {
             if !Task.isCancelled { preview = loaded }
         }
     }
-}
-
-extension StudioArtPage: Equatable {
-    /// Одна и та же страница — один и тот же арт; замыкание открытия не сравнивается.
-    nonisolated static func == (left: StudioArtPage, right: StudioArtPage) -> Bool { left.id == right.id }
 }
 
 /// Лента: сначала очередь (идущий арт и ждущие, у каждого — крестик отмены), затем готовые арты.

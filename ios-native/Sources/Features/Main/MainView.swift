@@ -13,6 +13,9 @@ struct MainView: View {
     @State private var settling = false
     /// Сбрасывается сам, даже если жест отменила система (например, перехватила прокрутка).
     @GestureState private var dragging = false
+    /// Открыть-закрыть шторку и закрыть её — для экранов под ней (`DrawerAction`).
+    @State private var toggle = DrawerAction()
+    @State private var close = DrawerAction()
 
     init(startOpen: Bool = false) {
         _isOpen = State(initialValue: startOpen)
@@ -27,10 +30,9 @@ struct MainView: View {
             ZStack(alignment: .leading) {
                 Theme.rail.ignoresSafeArea()
 
-                // `.equatable()` у шторки и экранов: замыкание в параметре SwiftUI сравнить не может, и без этого
-                // на каждом кадре свайпа (новый `dragX`) их тела считались заново целиком (аудит 20.11.2026).
-                SidebarView(onClose: { setOpen(false) })
-                    .equatable()
+                // Шторка и экраны получают постоянные `DrawerAction`, а не свежие замыкания: так на каждом кадре
+                // свайпа (новый `dragX`) их тела не считаются заново целиком (аудит 20.11.2026).
+                SidebarView(onClose: close)
                     .frame(width: width)
                     // Закрываясь, меню чуть уезжает влево и гаснет (вход в чат «Навстречу», 18.11.2026);
                     // от хода карточки, поэтому так же ведёт себя и под пальцем. Гаснет под слоем цвета
@@ -52,16 +54,13 @@ struct MainView: View {
                 Group {
                     // Смена раздела (чат, студия, «Недавние») — мягкое проявление, а не резкая подмена.
                     if model.screen == .studio {
-                        StudioScreen(onMenu: { setOpen(!isOpen) })
-                            .equatable()
+                        StudioScreen(onMenu: toggle)
                             .transition(.opacity)
                     } else if model.screen == .recents {
-                        RecentsScreen(onMenu: { setOpen(!isOpen) })
-                            .equatable()
+                        RecentsScreen(onMenu: toggle)
                             .transition(.opacity)
                     } else {
-                        ChatScreen(onMenu: { setOpen(!isOpen) })
-                            .equatable()
+                        ChatScreen(onMenu: toggle)
                             .transition(.opacity)
                     }
                 }
@@ -93,6 +92,10 @@ struct MainView: View {
                     .accessibilityHidden(isOpen)
             }
             .simultaneousGesture(drag(width: width))
+            .onAppear {
+                toggle.run = { setOpen(!isOpen) }
+                close.run = { setOpen(false) }
+            }
             .onChange(of: dragging) { _, active in
                 guard !active else { return }
                 // Жест отменён без onEnded — возвращаем меню на место.
@@ -190,23 +193,16 @@ extension EnvironmentValues {
     @Entry var motionPaused = false
 }
 
-/// Шторка и экраны под ней сравниваются без замыканий-параметров (других параметров у них нет): свежее
-/// замыкание на каждом кадре свайпа не заставляет пересчитывать их тела. Своё состояние и данные модели
-/// они по-прежнему отслеживают сами.
-extension SidebarView: Equatable {
-    nonisolated static func == (left: SidebarView, right: SidebarView) -> Bool { true }
-}
+/// Действие шторки (открыть, закрыть) для экранов под ней — один объект на всё время жизни `MainView`.
+/// Экран получает его вместо замыкания: SwiftUI сравнивает объект по ссылке и не пересчитывает экран на каждом
+/// кадре свайпа (замыкания он сравнить не может, аудит 20.11.2026). `.equatable()` для этого не годится: с ним
+/// экран переставал получать безопасную зону клавиатуры, и капсула ввода оставалась под клавиатурой
+/// (UI-тесты сборки 0.16.5 (45), при тёмной теме системы).
+@MainActor
+final class DrawerAction {
+    var run: () -> Void = {}
 
-extension ChatScreen: Equatable {
-    nonisolated static func == (left: ChatScreen, right: ChatScreen) -> Bool { true }
-}
-
-extension StudioScreen: Equatable {
-    nonisolated static func == (left: StudioScreen, right: StudioScreen) -> Bool { true }
-}
-
-extension RecentsScreen: Equatable {
-    nonisolated static func == (left: RecentsScreen, right: RecentsScreen) -> Bool { true }
+    func callAsFunction() { run() }
 }
 
 /// Прямоугольник без скруглённой середины — то, что остаётся в углах карточки чата.

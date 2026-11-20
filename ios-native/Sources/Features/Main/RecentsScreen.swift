@@ -26,7 +26,7 @@ enum RecentsFilter: String, CaseIterable, Identifiable {
 /// справа в шапке «⋯» с фильтром, внизу строка поиска (открывает лист поиска), над ней — «Новая сессия».
 struct RecentsScreen: View {
     @Environment(AppModel.self) private var model
-    let onMenu: () -> Void
+    let onMenu: DrawerAction
     @State private var filter: RecentsFilter = .all
     @State private var showSearch = false
     @State private var renaming: ChatSummary?
@@ -87,7 +87,7 @@ struct RecentsScreen: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 HStack {
-                    CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: onMenu)
+                    CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: { onMenu() })
                     Spacer()
                     filterMenu
                 }

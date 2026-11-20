@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 /// Экран чата: шапка, лента сообщений (или приветствие нового чата) и поле ввода у клавиатуры.
 struct ChatScreen: View {
     @Environment(AppModel.self) private var model
-    let onMenu: () -> Void
+    let onMenu: DrawerAction
     @State private var draft = ""
     // Состояние редактирования приходит от самого UITextView: FocusState внутри
     // safeAreaBar в проверенной версии iOS не обновлялся при появлении курсора.
@@ -141,7 +141,7 @@ struct ChatScreen: View {
                     .accessibilityIdentifier("chat.incognitoTitle")
             }
             HStack(spacing: 8) {
-                CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: onMenu)
+                CircleIconButton(symbol: "line.3.horizontal", label: "Меню", action: { onMenu() })
                 Spacer()
                 if let chat = model.activeChat, !chat.temporary {
                     openChatCapsule(chat)
