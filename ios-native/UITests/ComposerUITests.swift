@@ -100,22 +100,26 @@ final class ComposerUITests: XCTestCase {
         sleep(1)
         snap("ui-c4-card")
         // Пустая карточка сворачивается после ухода клавиатуры и раскрывается повторно.
-        // Клавиатуру убирает касание по ленте под последним ответом — пустое место между рядом значков
-        // и капсулой (там стояла подпись «…может ошибаться»). Касание в фиксированную точку попадало в таблицу
-        // с прокруткой и не доходило до ленты, а короткий свайп вниз клавиатуру не убирает (runs 43783145183,
-        // 43785551079); после касания по абзацу выше в ленте набор обрывался (runs 44775968054, 44781171155).
-        let shares = app.buttons.matching(NSPredicate(format: "label == 'Поделиться'")).allElementsBoundByIndex
-        guard let lastShare = shares.max(by: { $0.frame.minY < $1.frame.minY }) else {
-            return XCTFail("ряд значков под последним ответом")
-        }
-        lastShare.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1.4)).tap()
+        // Клавиатуру убирает касание по обычному тексту ленты — последнему абзацу ответа (без ссылок).
+        // Касание в фиксированную точку попадало в таблицу с прокруткой и не доходило до ленты, а короткий
+        // свайп вниз клавиатуру не убирает (runs 43783145183, 43785551079). Пустая полоса под рядом значков —
+        // уже нижняя панель с капсулой, касание туда клавиатуру не убирает (run 44785519114).
+        text(app, contains: "почти всегда верный выбор").tap()
         let closed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: chip)
         wait(for: [closed], timeout: 5)
+        // Набор сразу после повторного фокуса обрывался на первых буквах (runs 44775968054, 44781171155):
+        // ждём, пока клавиатура уйдёт и вернётся целиком.
+        let keyboard = app.keyboards.firstMatch
+        let hidden = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: keyboard)
+        wait(for: [hidden], timeout: 5)
         input.tap()
-        // Системная подсказка клавиатуры («Continue») может всплыть и при повторном показе — тогда набор теряется.
+        // Системная подсказка клавиатуры («Continue») может всплыть и при повторном показе.
         app.skipKeyboardTip()
         XCTAssertTrue(chip.waitForExistence(timeout: 5))
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5), "клавиатура снова на экране")
+        sleep(1)
         input.typeText("Первая строка\nВторая строка")
+        snap("ui-c4b-typed")
         XCTAssertEqual(input.value as? String, "Первая строка\nВторая строка", "перенос строки сохраняется")
         XCTAssertTrue(app.buttons["Отправить"].firstMatch.isEnabled)
         XCTAssertLessThanOrEqual(chip.frame.maxY, app.keyboards.firstMatch.frame.minY + 1)
