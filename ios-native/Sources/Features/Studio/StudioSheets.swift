@@ -73,8 +73,6 @@ private struct StudioModelPanel: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                SettingsNote(text: "У каждого движка свои сохранённые настройки — они подставятся сами.")
-                    .padding(.horizontal, 16)
             }
             .padding(.bottom, 24)
         }
@@ -188,12 +186,9 @@ private struct StudioSettingsPanel: View {
     /// Пользователь сам открыл «Свои».
     @State private var custom = false
 
-    private static let steps = ParameterSpec(key: "steps", label: "Шаги", min: 1, max: 80, step: 1,
-                                             hint: "Сколько раз модель уточняет картинку. Больше — детальнее, но дольше.")
-    private static let cfg = ParameterSpec(key: "cfg", label: "CFG", min: 0, max: 20, step: 0.1,
-                                           hint: "Насколько строго следовать промпту. Слишком высокое значение пережигает цвета.")
-    private static let denoise = ParameterSpec(key: "denoise", label: "Denoise", min: 0, max: 1, step: 0.01,
-                                               hint: "Доля шума, которую модель убирает. Для новой картинки — 1.")
+    private static let steps = ParameterSpec(key: "steps", label: "Шаги", min: 1, max: 80, step: 1)
+    private static let cfg = ParameterSpec(key: "cfg", label: "CFG", min: 0, max: 20, step: 0.1)
+    private static let denoise = ParameterSpec(key: "denoise", label: "Denoise", min: 0, max: 1, step: 0.01)
 
     var body: some View {
         let studio = model.studio
@@ -244,7 +239,7 @@ private struct StudioSettingsPanel: View {
                     SectionCaption(text: "Негативный промпт")
                     TextEditorCard(text: Binding(get: { studio.draft.negative },
                                                  set: { value in studio.edit { $0.negative = String(value.prefix(16000)) } }),
-                                   placeholder: "Чего не должно быть на арте")
+                                   placeholder: "Негатив")
                     if let problem = studio.problem {
                         SettingsNote(text: problem, symbol: "exclamationmark.triangle")
                     }
@@ -324,7 +319,7 @@ private struct SeedCard: View {
         let studio = model.studio
         let random = studio.draft.seed == "-1"
         SettingsCard {
-            ToggleRow(title: "Случайный", hint: "Новый seed для каждого арта", isOn: random) { on in
+            ToggleRow(title: "Случайный", isOn: random) { on in
                 studio.edit { $0.seed = on ? "-1" : String(Int.random(in: 0...4_294_967_295)) }
             }
             if !random {
@@ -593,9 +588,6 @@ private struct StudioHistoryPanel: View {
             VStack(alignment: .leading, spacing: 12) {
                 SheetHeader(title: "История артов", subtitle: jobs.isEmpty ? nil : "Всего \(jobs.count)")
                 HStack {
-                    Text("Нажми, чтобы показать на сцене")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.subtle)
                     Spacer()
                     Button(role: .destructive) {
                         confirmClear = true
@@ -609,7 +601,7 @@ private struct StudioHistoryPanel: View {
                 }
                 .padding(.horizontal, 16)
                 if jobs.isEmpty {
-                    SettingsNote(text: "Здесь появятся готовые арты.")
+                    SettingsNote(text: "Артов пока нет.")
                         .padding(.horizontal, 16)
                 } else {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
@@ -628,7 +620,7 @@ private struct StudioHistoryPanel: View {
             }
             Button("Отмена", role: .cancel) {}
         } message: {
-            Text("Будет удалено артов: \(studio.clearableCount). Избранное останется. Вернуть можно сразу после очистки.")
+            Text("Будет удалено артов: \(studio.clearableCount). Избранное останется.")
         }
     }
 
@@ -757,7 +749,6 @@ private struct StudioDetailsPanel: View {
                                 .frame(maxWidth: .infinity, minHeight: 50)
                         }
                         .disabled(studio.deleting)
-                        SettingsNote(text: "Долгое нажатие на арт в студии — все действия сразу: сохранить, поделиться, скопировать промпт, взять seed.")
                     }
                     .padding(.horizontal, 16)
                 }

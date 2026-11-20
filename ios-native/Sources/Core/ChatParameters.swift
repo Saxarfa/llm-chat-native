@@ -13,14 +13,13 @@ struct Choice: Hashable, Identifiable {
     var id: String { value }
 }
 
-/// Числовой параметр генерации: подпись, пределы, шаг, пояснение.
+/// Числовой параметр генерации: подпись, пределы, шаг.
 struct ParameterSpec: Identifiable {
     let key: String
     let label: String
     let min: Double
     let max: Double
     let step: Double
-    let hint: String
     /// Значение, которое показывать, пока параметр нигде не задан (у моделей телефона — умолчание движка).
     var fallback: Double?
 
@@ -34,56 +33,38 @@ struct ParameterSpec: Identifiable {
 enum ChatParameters {
     /// Названия параметров генерации не переводятся (решение пользователя 16.11.2026): так их знает llama.cpp.
     static let specs: [ParameterSpec] = [
-        ParameterSpec(key: "temperature", label: "Temperature", min: 0, max: 2, step: 0.05,
-                      hint: "Меньше — более предсказуемый выбор токенов. Больше — больше разнообразия."),
-        ParameterSpec(key: "top_p", label: "Top-P", min: 0, max: 1, step: 0.05,
-                      hint: "Оставляет токены с суммарной вероятностью до этого порога. 1 отключает фильтр."),
-        ParameterSpec(key: "min_p", label: "Min-P", min: 0, max: 1, step: 0.01,
-                      hint: "Порог относительно наиболее вероятного токена. 0 отключает фильтр."),
-        ParameterSpec(key: "max_tokens", label: "Max tokens", min: 1, max: 131072, step: 1,
-                      hint: "Максимум новых токенов, включая рассуждения."),
-        ParameterSpec(key: "top_k", label: "Top-K", min: 0, max: 1000, step: 1,
-                      hint: "Оставляет K наиболее вероятных токенов. 0 отключает фильтр."),
-        ParameterSpec(key: "repeat_penalty", label: "Repeat penalty", min: 0, max: 3, step: 0.05,
-                      hint: "1 отключает штраф. Повышение может уменьшить повторы, но и исказить текст."),
-        ParameterSpec(key: "presence_penalty", label: "Presence penalty", min: -2, max: 2, step: 0.05,
-                      hint: "Штраф за появление токена в контексте."),
-        ParameterSpec(key: "frequency_penalty", label: "Frequency penalty", min: -2, max: 2, step: 0.05,
-                      hint: "Штраф пропорционально частоте токена."),
+        ParameterSpec(key: "temperature", label: "Temperature", min: 0, max: 2, step: 0.05),
+        ParameterSpec(key: "top_p", label: "Top-P", min: 0, max: 1, step: 0.05),
+        ParameterSpec(key: "min_p", label: "Min-P", min: 0, max: 1, step: 0.01),
+        ParameterSpec(key: "max_tokens", label: "Max tokens", min: 1, max: 131072, step: 1),
+        ParameterSpec(key: "top_k", label: "Top-K", min: 0, max: 1000, step: 1),
+        ParameterSpec(key: "repeat_penalty", label: "Repeat penalty", min: 0, max: 3, step: 0.05),
+        ParameterSpec(key: "presence_penalty", label: "Presence penalty", min: -2, max: 2, step: 0.05),
+        ParameterSpec(key: "frequency_penalty", label: "Frequency penalty", min: -2, max: 2, step: 0.05),
     ]
 
     /// Остальные параметры выборки llama.cpp. Есть только у моделей на телефоне: ими управляет
     /// `LlamaRunner.makeSampler`, а сервер ПК их не знает. Умолчания — как у движка (`fallback`).
     static let phoneSpecs: [ParameterSpec] = [
         ParameterSpec(key: "repeat_last_n", label: "Repeat last N", min: 0, max: 4096, step: 1,
-                      hint: "Сколько последних токенов учитывают Repeat, Presence и Frequency penalty. 0 отключает все три штрафа.",
                       fallback: 64),
         ParameterSpec(key: "typical_p", label: "Typical-P", min: 0, max: 1, step: 0.01,
-                      hint: "Оставляет токены, неожиданность которых близка к средней. 1 отключает фильтр.",
                       fallback: 1),
         ParameterSpec(key: "top_n_sigma", label: "Top-N sigma", min: 0, max: 5, step: 0.1,
-                      hint: "Отсекает токены дальше N стандартных отклонений от лучшего. 0 отключает фильтр.",
                       fallback: 0),
         ParameterSpec(key: "xtc_probability", label: "XTC probability", min: 0, max: 1, step: 0.01,
-                      hint: "Шанс, что на шаге уберут самые вероятные токены (XTC), чтобы ответ был менее шаблонным. 0 отключает.",
                       fallback: 0),
         ParameterSpec(key: "xtc_threshold", label: "XTC threshold", min: 0, max: 0.5, step: 0.01,
-                      hint: "Токены вероятнее этого порога могут быть убраны. Работает, только если XTC probability больше 0.",
                       fallback: 0.1),
         ParameterSpec(key: "dry_multiplier", label: "DRY multiplier", min: 0, max: 5, step: 0.05,
-                      hint: "Сила штрафа за повторение целых фраз (DRY). 0 отключает.",
                       fallback: 0),
         ParameterSpec(key: "dry_base", label: "DRY base", min: 1, max: 4, step: 0.05,
-                      hint: "Во сколько раз растёт штраф с каждым лишним токеном повторяющейся фразы.",
                       fallback: 1.75),
         ParameterSpec(key: "dry_allowed_length", label: "DRY allowed length", min: 1, max: 20, step: 1,
-                      hint: "Повтор короче этого числа токенов не штрафуется.",
                       fallback: 2),
         ParameterSpec(key: "dry_penalty_last_n", label: "DRY penalty last N", min: 0, max: 8192, step: 1,
-                      hint: "Сколько последних токенов проверяет DRY на повторы. 0 отключает DRY.",
                       fallback: 512),
         ParameterSpec(key: "seed", label: "Seed", min: -1, max: 2147483647, step: 1,
-                      hint: "Одинаковое число даёт одинаковый ответ при тех же параметрах. -1 — каждый раз новое.",
                       fallback: -1),
     ]
 
@@ -132,15 +113,14 @@ enum ChatParameters {
     }
 
     static func studioOutputLimit(_ model: String) -> Int {
-        ["aistudio/gemini-4-hydrogen", "aistudio/gemini-3.5-flash-lite"].contains(model) ? 65536 : 32768
+        ["aistudio/gemini-4-neon", "aistudio/gemini-4-hydrogen", "aistudio/gemini-3.5-flash-lite"].contains(model) ? 65536 : 32768
     }
 
     /// Пределы параметра для этой модели (у AI Studio длина ответа ограничена самой моделью).
     static func spec(_ spec: ParameterSpec, for model: String) -> ParameterSpec {
         guard spec.key == "max_tokens", model.hasPrefix("aistudio/") else { return spec }
         let limit = studioOutputLimit(model)
-        return ParameterSpec(key: spec.key, label: spec.label, min: spec.min, max: Double(limit), step: 1,
-                             hint: "До \(limit.formatted()) токенов вместе с рассуждениями.")
+        return ParameterSpec(key: spec.key, label: spec.label, min: spec.min, max: Double(limit), step: 1)
     }
 
     enum Reasoning {
@@ -153,6 +133,7 @@ enum ChatParameters {
     private static let studioLevels: [String: [Choice]] = [
         "aistudio/gemma-4-31b-it": [Choice("minimal", "Минимальный"), Choice("high", "Высокий")],
         "aistudio/gemma-4-26b-a4b-it": [Choice("minimal", "Минимальный"), Choice("high", "Высокий")],
+        "aistudio/gemini-4-neon": [Choice("low", "Низкий"), Choice("medium", "Средний"), Choice("high", "Высокий"), Choice("xhigh", "Максимальный")],
         "aistudio/gemini-4-hydrogen": [Choice("low", "Низкий"), Choice("medium", "Средний"), Choice("high", "Высокий"), Choice("xhigh", "Максимальный")],
         "aistudio/gemini-3.5-flash-lite": [Choice("minimal", "Минимальный"), Choice("low", "Низкий"), Choice("medium", "Средний"), Choice("high", "Высокий")],
         "aistudio/gemini-4-argon": [Choice("low", "Низкий"), Choice("medium", "Средний"), Choice("high", "Высокий")],
@@ -163,14 +144,6 @@ enum ChatParameters {
         "gemma-31b-iq3", "gemma-26b-uncensored", "gemma-26b-qat", "gemma-12b-uncensored",
         "gemma-4-e4b-uncensored", "qwen-3.8-27b-it", "qwen-3.6-35b-a3b-mtp",
     ]
-
-    /// Уровень рассуждений по умолчанию (как `reasoningStrength` в `ChatConfig` без сохранённого выбора) —
-    /// у Claude рядом с ним отметка «Рекомендуется».
-    static func recommendedLevel(_ model: String) -> String {
-        let defaults = ["aistudio/gemini-4-hydrogen": "high", "aistudio/gemini-3.5-flash-lite": "minimal",
-                        "aistudio/gemini-4-argon": "medium", "aistudio/gemini-4-carbon": "medium"]
-        return defaults[model] ?? "high"
-    }
 
     static func reasoning(_ model: String) -> Reasoning? {
         if let levels = studioLevels[model] { return .levels(levels) }
@@ -184,12 +157,9 @@ enum ChatParameters {
     // MARK: - Nano Banana
 
     static let nanoSpecs: [String: ParameterSpec] = [
-        "nano_temperature": ParameterSpec(key: "nano_temperature", label: "Temperature", min: 0, max: 2, step: 0.05,
-                                          hint: "Меньше — изображения ближе к описанию и друг к другу. Больше — больше разнообразия."),
-        "nano_top_p": ParameterSpec(key: "nano_top_p", label: "Top-P", min: 0, max: 1, step: 0.05,
-                                    hint: "Оставляет варианты с суммарной вероятностью до этого порога. 1 отключает фильтр."),
-        "nano_max_output_tokens": ParameterSpec(key: "nano_max_output_tokens", label: "Max output tokens", min: 1, max: 65536, step: 1,
-                                                hint: "Вместе с рассуждениями и изображением. Слишком малое значение может оборвать картинку."),
+        "nano_temperature": ParameterSpec(key: "nano_temperature", label: "Temperature", min: 0, max: 2, step: 0.05),
+        "nano_top_p": ParameterSpec(key: "nano_top_p", label: "Top-P", min: 0, max: 1, step: 0.05),
+        "nano_max_output_tokens": ParameterSpec(key: "nano_max_output_tokens", label: "Max output tokens", min: 1, max: 65536, step: 1),
     ]
 
     static func nanoThinkingLevels(_ model: String) -> [Choice]? {
@@ -230,15 +200,6 @@ enum ChatParameters {
     static let omniTasks: [Choice] = [
         Choice("auto", "Авто"), Choice("text_to_video", "Из текста"), Choice("image_to_video", "Из картинки"),
         Choice("reference_to_video", "По образцам"), Choice("edit", "Правка видео"), Choice("extend", "Продление видео"),
-    ]
-
-    static let omniTaskHints: [String: String] = [
-        "auto": "Модель выбирает задачу по вашему сообщению.",
-        "text_to_video": "Опишите сцену, движение и звук.",
-        "image_to_video": "Добавьте картинку и опишите, как её оживить.",
-        "reference_to_video": "Добавьте изображения или MP4 как образцы и опишите новую сцену.",
-        "edit": "Добавьте MP4 или используйте ролик из прошлого ответа. Размер и длительность сохраняются.",
-        "extend": "Добавьте MP4 или используйте ролик из прошлого ответа. Опишите, что произойдёт дальше.",
     ]
 
     /// Какие числовые параметры AI Studio даёт менять у модели картинок.

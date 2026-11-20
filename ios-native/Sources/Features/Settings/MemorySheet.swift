@@ -72,13 +72,12 @@ struct MemorySheet: View {
     @ViewBuilder
     private func content(_ snapshot: MemorySnapshot) -> some View {
         SettingsCard {
-            ToggleRow(title: "Память включена", hint: "Модель видит сохранённые факты в каждой сессии",
+            ToggleRow(title: "Память включена",
                       isOn: snapshot.enabled) { value in
                 Task { await saveSettings(enabled: value, autoSave: snapshot.autoSave) }
             }
             CardDivider()
             ToggleRow(title: "Запоминать автоматически",
-                      hint: "Модель сама сохраняет устойчивые факты о вас. Иначе — только по просьбе «запомни»",
                       isOn: snapshot.autoSave) { value in
                 Task { await saveSettings(enabled: snapshot.enabled, autoSave: value) }
             }
@@ -89,7 +88,7 @@ struct MemorySheet: View {
         SectionCaption(text: "Добавить")
         SettingsCard {
             HStack(alignment: .bottom, spacing: 8) {
-                TextField("Например: живу в Казани", text: $draft, axis: .vertical)
+                TextField("Новый факт", text: $draft, axis: .vertical)
                     .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1...4)
@@ -116,7 +115,7 @@ struct MemorySheet: View {
 
         SectionCaption(text: "Сохранённое")
         if snapshot.facts.isEmpty {
-            SettingsNote(text: "Пока пусто. Скажите модели «запомни, что…» или добавьте факт здесь.")
+            SettingsNote(text: "Пока пусто.")
         } else {
             SettingsCard {
                 ForEach(Array(snapshot.facts.enumerated()), id: \.element.id) { index, fact in
@@ -124,9 +123,6 @@ struct MemorySheet: View {
                     row(fact)
                 }
             }
-        }
-        if !snapshot.enabled {
-            SettingsNote(text: "Память выключена: факты сохранены, но модель их не видит.")
         }
     }
 

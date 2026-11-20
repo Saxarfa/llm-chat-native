@@ -199,7 +199,6 @@ struct RowIcon: View {
 
 struct ToggleRow: View {
     let title: String
-    var hint: String?
     /// Значок слева, как у строк меню «+» в Claude; без него — прежняя строка.
     var symbol: String?
     let isOn: Bool
@@ -218,12 +217,6 @@ struct ToggleRow: View {
                     Text(title)
                         .font(.system(size: RowMetrics.text))
                         .foregroundStyle(Theme.ink)
-                    if let hint {
-                        Text(hint)
-                            .font(.system(size: 13))
-                            .foregroundStyle(Theme.subtle)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
                 }
             }
         }
@@ -331,17 +324,14 @@ struct SegmentRow: View {
 struct ParameterRow: View {
     let spec: ParameterSpec
     let value: Double
-    /// `nil` — строку источника не показывать.
+    /// `true` — значение своё: строка с подписью и кнопкой сброса.
     var changed: Bool?
-    /// Подписи источника значения.
     var changedLabel = "Изменено в этой сессии"
-    var sourceLabel = "Из профиля модели"
     let onCommit: (Double) -> Void
     var onReset: (() -> Void)?
 
     @State private var draft: Double = 0
     @State private var text = ""
-    @State private var help = false
     @FocusState private var typing: Bool
 
     private var isLength: Bool { spec.key == "max_tokens" || spec.key == "nano_max_output_tokens" }
@@ -356,20 +346,6 @@ struct ParameterRow: View {
                 Text(spec.label)
                     .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
-                Button {
-                    withAnimation(Theme.spring) { help.toggle() }
-                } label: {
-                    Image(systemName: "info.circle")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.subtle)
-                        .frame(width: 34, height: 34)
-                        // Зона нажатия 44, а место в строке прежнее.
-                        .padding(5)
-                        .contentShape(Rectangle())
-                        .padding(-5)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Описание: \(spec.label)")
                 Spacer(minLength: 8)
                 if unlimited {
                     Text("Максимум")
@@ -415,14 +391,6 @@ struct ParameterRow: View {
                 }
             }
 
-            if help {
-                Text(spec.hint + (isLength ? "" : " От \(Self.format(spec.min, spec: spec)) до \(Self.format(spec.max, spec: spec))."))
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .transition(.opacity)
-            }
-
             if isLength {
                 Toggle(isOn: Binding(get: { unlimited }, set: { on in
                     Haptics.tap()
@@ -451,23 +419,13 @@ struct ParameterRow: View {
                     .accessibilityIdentifier("param.\(spec.key).slider")
                     stepButton(symbol: "plus", delta: buttonStep)
                 }
-                if spec.key == "temperature" || spec.key == "nano_temperature" {
-                    HStack {
-                        Text("Предсказуемее")
-                        Spacer()
-                        Text("Разнообразнее")
-                    }
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.subtle)
-                    .padding(.horizontal, 40)
-                }
             }
 
-            if let changed {
+            if changed == true {
                 HStack(spacing: 8) {
-                    Text(changed ? changedLabel : sourceLabel)
+                    Text(changedLabel)
                     Spacer(minLength: 8)
-                    if changed, let onReset {
+                    if let onReset {
                         Button {
                             Haptics.tap()
                             onReset()

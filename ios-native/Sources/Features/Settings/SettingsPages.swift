@@ -43,7 +43,6 @@ struct ProfilePage: View {
                         .frame(minHeight: RowMetrics.height)
                         .accessibilityIdentifier("profile.name")
                 }
-                SettingsNote(text: "Так модель и приложение обращаются к вам.")
 
                 SectionCaption(text: "Аккаунт")
                 SettingsCard {
@@ -363,7 +362,6 @@ struct ModelsPage: View {
                         .accessibilityIdentifier("models.row")
                     }
                 }
-                SettingsNote(text: "Название, фото и описание видны в выборе модели и в сессиях — и здесь, и на сайте.")
             }
             .padding(.horizontal, RowMetrics.cardInset)
             .padding(.bottom, 32)
@@ -421,15 +419,14 @@ struct ModelProfilePage: View {
                 SettingsCard {
                     field("Название", text: $alias, prompt: defaultName, which: .alias)
                     CardDivider()
-                    field("Описание", text: $tagline, prompt: "Для чего эта модель", which: .tagline)
+                    field("Описание", text: $tagline, prompt: "", which: .tagline)
                 }
-                SettingsNote(text: "Название и фото видны в выборе модели и в сессиях.")
 
                 // У моделей картинок своя инструкция — она среди их параметров ниже.
                 if !ChatParameters.isNano(modelID) {
                     SectionCaption(text: "Системный промпт")
                     SettingsCard {
-                        InstructionEditor(placeholder: "Как этой модели отвечать",
+                        InstructionEditor(placeholder: "Системный промпт",
                                           saved: ChatConfig.text(model.modelConfig(modelID)["systemPrompt"])
                                               ?? ChatConfig.text(profile["systemPrompt"]) ?? "") { text in
                             await model.saveModelInstruction(text, model: modelID)
@@ -518,12 +515,6 @@ struct ModelProfileSheet: View {
 struct SearchPage: View {
     @Environment(AppModel.self) private var model
 
-    private static let hints: [String: String] = [
-        "disabled": "Модель отвечает без интернета",
-        "auto": "Модель сама решает, когда искать",
-        "forced": "Перед ответом ищет и читает до трёх источников",
-    ]
-
     var body: some View {
         let shared = model.settings.shared
         let mode = ChatConfig.text(shared["searchMode"]) ?? "auto"
@@ -539,14 +530,9 @@ struct SearchPage: View {
                             Task { _ = await model.saveShared(["searchMode": choice.value]) }
                         } label: {
                             HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(choice.label)
-                                        .font(.system(size: RowMetrics.text))
-                                        .foregroundStyle(Theme.ink)
-                                    Text(Self.hints[choice.value] ?? "")
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(Theme.subtle)
-                                }
+                                Text(choice.label)
+                                    .font(.system(size: RowMetrics.text))
+                                    .foregroundStyle(Theme.ink)
                                 Spacer()
                                 if choice.value == mode {
                                     Image(systemName: "checkmark")
@@ -555,14 +541,13 @@ struct SearchPage: View {
                                 }
                             }
                             .padding(.horizontal, RowMetrics.plainLeading)
-                            .frame(minHeight: 60)
+                            .frame(minHeight: RowMetrics.height)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(RowPressStyle())
                         .accessibilityAddTraits(choice.value == mode ? .isSelected : [])
                     }
                 }
-                SettingsNote(text: "В открытой сессии поиск переключается в меню «+» у поля ввода.")
 
                 SectionCaption(text: "Результаты")
                 SettingsCard {

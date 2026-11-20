@@ -47,7 +47,7 @@ struct SettingsSheet: View {
         .alert("LLM Chat", isPresented: $showAbout) {
             Button("Понятно", role: .cancel) {}
         } message: {
-            Text("Версия \(version). Нативный клиент для вашего компьютера: сессии, студия картинок и модели на iPhone.")
+            Text("Версия \(version)")
         }
         .confirmationDialog("Выйти из аккаунта?", isPresented: $confirmLogout, titleVisibility: .visible) {
             Button("Выйти", role: .destructive) {

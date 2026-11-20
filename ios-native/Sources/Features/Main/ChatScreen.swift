@@ -918,11 +918,6 @@ private struct ContextDetails: View {
             }
             .font(.system(size: 13))
             .foregroundStyle(Theme.muted)
-            Text(usage.estimated ? "Оценка по длине переписки и инструкции."
-                                 : "Токены запроса по токенизатору модели, включая инструкции и инструменты.")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.subtle)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .frame(width: 280, alignment: .leading)

@@ -15,10 +15,7 @@ struct LoginView: View {
     }
 
     var body: some View {
-        OnboardingFrame(
-            title: "Вход",
-            subtitle: "Тот же логин и пароль, что на сайте LLM Chat."
-        ) {
+        OnboardingFrame(title: "Вход") {
             LabeledField(title: "Логин") {
                 TextField("", text: $username)
                     .textContentType(.username)

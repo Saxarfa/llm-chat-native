@@ -88,9 +88,7 @@ struct ModelPickerSheet: View {
                     }
                     if let reasoning = reasoningSummary {
                         SettingsCard {
-                            navRow(title: "Рассуждения", value: reasoning.label,
-                                   badge: reasoning.recommended ? "Рекомендуется" : nil,
-                                   identifier: "picker.reasoning") {
+                            navRow(title: "Рассуждения", value: reasoning, identifier: "picker.reasoning") {
                                 path.append(.reasoning)
                             }
                         }
@@ -119,21 +117,19 @@ struct ModelPickerSheet: View {
     }
 
     /// Что стоит в строке «Рассуждения»: уровень, «Вкл.»/«Выкл.» или ничего (модель не рассуждает).
-    /// `recommended` — выбран уровень по умолчанию: у Claude рядом стоит отметка «Рекомендуется».
-    private var reasoningSummary: (label: String, recommended: Bool)? {
+    private var reasoningSummary: String? {
         let id = model.activeModelID
         let config = model.modelConfig(id)
         if PhoneModelID.isPhone(id) {
             guard model.phone.infos[PhoneModelID.file(of: id)]?.thinking.canToggle == true else { return nil }
-            return ((config["thinking"] as? Bool) == true ? "Вкл." : "Выкл.", false)
+            return (config["thinking"] as? Bool) == true ? "Вкл." : "Выкл."
         }
         switch ChatParameters.reasoning(id) {
         case .toggle:
-            return ((config["thinking"] as? Bool) ?? true ? "Вкл." : "Выкл.", false)
+            return (config["thinking"] as? Bool) ?? true ? "Вкл." : "Выкл."
         case .levels(let levels):
             let value = ChatConfig.text(config["reasoning_strength"]) ?? "high"
-            return (levels.first { $0.value == value }?.label ?? value,
-                    value == ChatParameters.recommendedLevel(id))
+            return levels.first { $0.value == value }?.label ?? value
         case nil:
             return nil
         }
@@ -190,7 +186,7 @@ struct ModelPickerSheet: View {
         .toolbar(.hidden, for: .navigationBar)
     }
 
-    private func navRow(title: String, value: String?, badge: String? = nil, identifier: String,
+    private func navRow(title: String, value: String?, identifier: String,
                         action: @escaping () -> Void) -> some View {
         Button {
             Haptics.tap()
@@ -201,9 +197,6 @@ struct ModelPickerSheet: View {
                     .font(.system(size: RowMetrics.text))
                     .foregroundStyle(Theme.ink)
                 Spacer(minLength: 8)
-                if let badge {
-                    RecommendedBadge(text: badge)
-                }
                 if let value {
                     Text(value)
                         .font(.system(size: RowMetrics.text))
@@ -374,21 +367,6 @@ private struct SectionLabel: View {
     }
 }
 
-/// Серая капсула «Рекомендуется» у уровня рассуждений по умолчанию, как у Claude.
-struct RecommendedBadge: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(Theme.muted)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Theme.fillActive, in: Capsule())
-            .fixedSize()
-    }
-}
-
 /// «Рассуждения» выбранной модели — как «Усилия» в Claude: уровни списком с галочкой
 /// или выключатель. Значение общее для всех чатов с этой моделью (как в настройках модели).
 private struct ReasoningPage: View {
@@ -409,23 +387,17 @@ private struct ReasoningPage: View {
                         switch reasoning {
                         case .levels(let levels)?:
                             let value = picked ?? ChatConfig.text(config["reasoning_strength"]) ?? "high"
-                            let recommended = ChatParameters.recommendedLevel(modelID)
                             ForEach(Array(levels.enumerated()), id: \.element.id) { index, level in
                                 if index > 0 { CardDivider() }
-                                levelRow(level, selected: level.value == value, recommended: level.value == recommended)
+                                levelRow(level, selected: level.value == value)
                             }
                         case .toggle?, nil:
-                            ToggleRow(title: "Рассуждения", hint: "Больше времени на обдумывание ответа",
+                            ToggleRow(title: "Рассуждения",
                                       isOn: (config["thinking"] as? Bool) ?? !PhoneModelID.isPhone(modelID)) { on in
                                 Task { await model.setModelValue("thinking", on, model: modelID) }
                             }
                         }
                     }
-                    Text("Чем выше уровень, тем дольше модель думает перед ответом и тем точнее ответ. Действует во всех сессиях с \(model.activeModelName).")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 20)
                 }
                 .padding(.horizontal, RowMetrics.cardInset)
                 .padding(.top, 6)
@@ -441,7 +413,7 @@ private struct ReasoningPage: View {
         PhoneModelID.isPhone(modelID) ? .toggle : ChatParameters.reasoning(modelID)
     }
 
-    private func levelRow(_ level: Choice, selected: Bool, recommended: Bool) -> some View {
+    private func levelRow(_ level: Choice, selected: Bool) -> some View {
         Button {
             guard picked == nil else { return }
             guard !selected else { back(); return }
@@ -457,9 +429,6 @@ private struct ReasoningPage: View {
                 Text(level.label)
                     .font(.system(size: 17))
                     .foregroundStyle(Theme.ink)
-                if recommended {
-                    RecommendedBadge(text: "Рекомендуется")
-                }
                 Spacer()
                 if selected {
                     Image(systemName: "checkmark")

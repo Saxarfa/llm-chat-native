@@ -24,7 +24,6 @@ struct PhoneModelsSheet: View {
                     downloadsSection
                     searchSection
                     toolsSection
-                    SettingsNote(text: "Ответ считает сам телефон — llama.cpp на Metal. Переписка сохраняется на ПК, как у других сессий. Быстрее всего работают модели до 4 млрд параметров в квантовании Q4_K_M.")
                 }
                 .padding(.horizontal, RowMetrics.cardInset)
                 .padding(.top, 4)
@@ -60,8 +59,6 @@ struct PhoneModelsSheet: View {
                 Button("Удалить токен", role: .destructive) { phone.setToken(nil) }
             }
             Button("Отмена", role: .cancel) {}
-        } message: {
-            Text("Нужен только для закрытых моделей (Llama, Gemma и других с условиями). Хранится в связке ключей телефона и уходит только на huggingface.co.")
         }
         .confirmationDialog("Удалить модель с телефона?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
                             titleVisibility: .visible, presenting: removing) { item in
@@ -69,8 +66,6 @@ struct PhoneModelsSheet: View {
                 Task { await phone.delete(item) }
             }
             Button("Отмена", role: .cancel) {}
-        } message: { item in
-            Text("«\(item.name)» освободит место. Сессии с ней на ПК останутся.")
         }
         .sheet(item: $configuring) { item in
             ModelProfileSheet(modelID: item.chatID)
@@ -94,7 +89,7 @@ struct PhoneModelsSheet: View {
     @ViewBuilder private var installedSection: some View {
         SectionCaption(text: "На телефоне")
         if phone.installed.isEmpty {
-            SettingsNote(text: "Пока нет ни одной модели. Найдите GGUF на Hugging Face ниже или добавьте файл из «Файлов».")
+            SettingsNote(text: "Пока нет моделей.")
         } else {
             SettingsCard {
                 ForEach(Array(phone.installed.enumerated()), id: \.element.id) { index, item in
@@ -215,7 +210,6 @@ struct PhoneModelsSheet: View {
                     DownloadRow(item: item)
                 }
             }
-            SettingsNote(text: "Загрузка продолжается, даже если свернуть приложение.")
         }
     }
 
@@ -227,7 +221,7 @@ struct PhoneModelsSheet: View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(Theme.subtle)
-            TextField("Название модели, например qwen3 4b", text: $search.query)
+            TextField("Название модели", text: $search.query)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
@@ -464,7 +458,6 @@ struct PhoneRepoView: View {
                     if let error = phone.filesError[repo] {
                         SettingsNote(text: error, symbol: "exclamationmark.triangle")
                     }
-                    SettingsNote(text: "Q4_K_M — хороший баланс качества и размера. Q8_0 и F16 точнее, но в 2–4 раза тяжелее и медленнее.")
                 } else if let error = phone.filesError[repo] {
                     SettingsNote(text: error, symbol: "exclamationmark.triangle")
                 } else {

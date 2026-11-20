@@ -100,7 +100,7 @@ private struct TextParameters: View {
             SectionCaption(text: "Рассуждения")
             SettingsCard {
                 if phoneThinking?.canToggle == true {
-                    ToggleRow(title: "Рассуждения", hint: "Модель сначала думает, потом отвечает. Дольше, но точнее",
+                    ToggleRow(title: "Рассуждения",
                               isOn: thinkingOn) { value in
                         set("thinking", value)
                     }
@@ -121,7 +121,7 @@ private struct TextParameters: View {
             SettingsCard {
                 switch reasoning {
                 case .toggle:
-                    ToggleRow(title: "Рассуждения", hint: "Больше времени на обдумывание ответа",
+                    ToggleRow(title: "Рассуждения",
                               isOn: thinkingOn) { value in
                         set("thinking", value)
                     }
@@ -163,7 +163,7 @@ private struct TextParameters: View {
         }
         if showsInstruction && instruction {
             SettingsCard {
-                InstructionEditor(placeholder: "Например: отвечай кратко и по делу",
+                InstructionEditor(placeholder: "Системный промпт",
                                   saved: ChatConfig.text(config["systemPrompt"]) ?? "") { text in
                     await model.saveModelInstruction(text, model: modelID)
                 }
@@ -188,8 +188,6 @@ private struct TextParameters: View {
                     Task { await model.resetModelValues(specs.map(\.key), model: modelID) }
                 }
                 Button("Отмена", role: .cancel) {}
-            } message: {
-                Text("Temperature, Max tokens и остальные параметры снова будут как у модели по умолчанию. Рассуждения и инструкция не изменятся.")
             }
         }
     }
@@ -197,7 +195,7 @@ private struct TextParameters: View {
     private func row(_ spec: ParameterSpec, config: [String: Any], saved: [String: Any]) -> some View {
         ParameterRow(spec: spec, value: ChatParameters.number(config[spec.key]) ?? spec.fallback ?? spec.min,
                      changed: saved[spec.key] != nil,
-                     changedLabel: "Своё значение", sourceLabel: "По умолчанию",
+                     changedLabel: "Своё значение",
                      onCommit: { value in set(spec.key, ChatParameters.stored(value, spec: spec)) },
                      onReset: { set(spec.key, nil) })
     }
@@ -258,7 +256,6 @@ private struct PhoneAbilitiesSection: View {
         SettingsCard {
             if hasMTP {
                 ToggleRow(title: "Ускорение MTP",
-                          hint: "Модель угадывает несколько слов наперёд и проверяет их разом — ответ идёт быстрее",
                           isOn: (model.modelConfig(modelID)["mtp"] as? Bool) ?? true) { value in
                     Task { await model.setModelValue("mtp", value, model: modelID) }
                 }
@@ -291,9 +288,6 @@ private struct PhoneAbilitiesSection: View {
             }
             .padding(.horizontal, RowMetrics.plainLeading)
             .frame(minHeight: 58)
-        }
-        if !hasMTP {
-            SettingsNote(text: "Ускорение MTP появится у моделей, в файле которых есть голова MTP (например, Qwen 3.5 и 3.6).")
         }
     }
 }
@@ -407,24 +401,17 @@ private struct NanoParameters: View {
             }
         }
 
-        if tasks, let hint = ChatParameters.omniTaskHints[task] {
-            SettingsNote(text: hint)
-        }
-        if video && task != "edit" {
-            SettingsNote(text: "Длительность задаётся для первого ролика. При продолжении её определяет модель.")
-        }
-
         if googleSearch || imageSearch {
             SettingsCard {
                 if googleSearch {
-                    ToggleRow(title: "Google Search", hint: "Сверяться с поиском перед рисованием",
+                    ToggleRow(title: "Google Search",
                               isOn: (config["nano_google_search"] as? Bool) != false) { value in
                         set("nano_google_search", value)
                     }
                 }
                 if googleSearch && imageSearch { CardDivider() }
                 if imageSearch {
-                    ToggleRow(title: "Поиск по картинкам", hint: "Брать найденные изображения как образцы",
+                    ToggleRow(title: "Поиск по картинкам",
                               isOn: (config["nano_image_search"] as? Bool) == true) { value in
                         set("nano_image_search", value)
                     }
@@ -445,8 +432,7 @@ private struct NanoParameters: View {
         if (features["system_instruction"] as? Bool) != false {
             SectionCaption(text: "Инструкции для модели")
             SettingsCard {
-                InstructionEditor(placeholder: video ? "Например: плавное движение камеры, естественный свет"
-                                                     : "Например: стиль акварели, без текста на изображении",
+                InstructionEditor(placeholder: "Системная инструкция",
                                   saved: (config["nano_system_instruction"] as? String) ?? "") { text in
                     await model.setModelValue("nano_system_instruction", text, model: modelID)
                     return model.settingsNotice == nil

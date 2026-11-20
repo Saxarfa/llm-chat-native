@@ -45,8 +45,6 @@ struct KnowledgeSheet: View {
             TextField("Название", text: $newName)
             Button("Создать") { Task { await create() } }
             Button("Отмена", role: .cancel) {}
-        } message: {
-            Text("Например: «Документы по работе» или «Лор мира».")
         }
         .alert("Не получилось", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
             Button("Понятно", role: .cancel) { notice = nil }
@@ -61,7 +59,6 @@ struct KnowledgeSheet: View {
             SheetHeader(title: "Базы знаний", subtitle: loaded ? libraryCount(libraries.count) : nil, busy: !loaded)
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    SettingsNote(text: "Чтобы модель искала в базе, включите её в «Параметрах чата → Базы знаний».")
                     if failed && libraries.isEmpty {
                         SettingsNote(text: "Не удалось загрузить базы знаний.", symbol: "exclamationmark.circle")
                     }
@@ -100,7 +97,7 @@ struct KnowledgeSheet: View {
                             }
                         }
                     } else if loaded && !failed {
-                        SettingsNote(text: "Баз пока нет. Создайте базу и добавьте в неё документы или заметки.")
+                        SettingsNote(text: "Баз пока нет.")
                     }
                     WideButton(title: "Новая база", symbol: "plus") {
                         newName = ""
@@ -206,7 +203,6 @@ private struct LibraryView: View {
                         WideButton(title: "Заметка", symbol: "square.and.pencil") { writingNote = true }
                     }
                     .disabled(busy)
-                    SettingsNote(text: "PDF, DOCX, TXT или Markdown до 20 МБ. Документ обрабатывается на компьютере — это может занять несколько минут.")
 
                     if let documents {
                         if documents.isEmpty {
@@ -262,8 +258,6 @@ private struct LibraryView: View {
                 }
             }
             Button("Отмена", role: .cancel) {}
-        } message: {
-            Text("Сессии перестанут искать в ней. Вернуть базу можно на сайте.")
         }
         .confirmationDialog("Удалить документ?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
                             titleVisibility: .visible) {
@@ -439,7 +433,7 @@ private struct NoteEditor: View {
 
             ZStack(alignment: .topLeading) {
                 if text.isEmpty {
-                    Text("Текст заметки. Поддерживается Markdown.")
+                    Text("Текст")
                         .font(.system(size: RowMetrics.text))
                         .foregroundStyle(Theme.subtle)
                         .padding(.horizontal, 14)

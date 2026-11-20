@@ -30,10 +30,6 @@ struct ComposerToolsSheet: View {
                     PhotoStrip(enabled: !onPhone || seesImages, chosen: $chosen,
                                room: max(0, AttachmentPrep.limit - model.draftAttachments.count),
                                onLibrary: { pick(.photo) })
-                    if onPhone {
-                        SettingsNote(text: seesImages ? "Модель на телефоне видит картинки, но не файлы."
-                                     : "Модель на телефоне понимает только текст. Чтобы она видела картинки, добавьте ей файл зрения в «Моделях на телефоне».")
-                    }
                     // Первая группа, как у Claude: «Камера» и «Добавить файлы» одной карточкой.
                     SettingsCard {
                         if UIImagePickerController.isSourceTypeAvailable(.camera) || model.preview != nil {
@@ -465,7 +461,7 @@ struct KnowledgePicker: View {
         let missing = selection.collections.filter { id in !libraries.contains { $0.id == id } }
 
         SettingsCard {
-            ToggleRow(title: "Использовать базу знаний", hint: "Модель ищет в выбранных документах",
+            ToggleRow(title: "Использовать базу знаний",
                       isOn: selection.enabled) { value in
                 var next = selection
                 next.enabled = value
@@ -509,7 +505,6 @@ struct KnowledgePicker: View {
                 }
                 CardDivider()
                 ToggleRow(title: "Отвечать только по базе",
-                          hint: "Поиск обязателен, веб-поиск отключён. Если подтверждения нет, модель скажет об этом",
                           isOn: selection.strict) { value in
                     var next = selection
                     next.strict = value
@@ -519,7 +514,7 @@ struct KnowledgePicker: View {
         }
         if selection.enabled {
             if loaded && libraries.isEmpty {
-                SettingsNote(text: "Баз пока нет. Создайте базу и добавьте материалы.")
+                SettingsNote(text: "Баз пока нет.")
             } else if selection.collections.isEmpty {
                 SettingsNote(text: "Выберите хотя бы одну базу.", symbol: "exclamationmark.circle")
             }
@@ -529,7 +524,7 @@ struct KnowledgePicker: View {
                     next.collections.removeAll { missing.contains($0) }
                     save(next)
                 } label: {
-                    SettingsNote(text: "Одна из выбранных баз недоступна. Нажмите, чтобы убрать её из выбора.",
+                    SettingsNote(text: "Одна из выбранных баз недоступна. Убрать из выбора",
                                  symbol: "exclamationmark.triangle")
                 }
                 .buttonStyle(.plain)

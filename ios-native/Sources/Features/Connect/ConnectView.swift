@@ -3,7 +3,7 @@ import SwiftUI
 /// Общая рамка экранов до входа: логотип сверху, форма по центру.
 struct OnboardingFrame<Content: View>: View {
     let title: String
-    let subtitle: String
+    var subtitle: String? = nil
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -15,11 +15,13 @@ struct OnboardingFrame<Content: View>: View {
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 40)
-                Text(subtitle)
-                    .font(.system(size: 16))
-                    .foregroundStyle(Theme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 8)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 16))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 8)
+                }
                 VStack(alignment: .leading, spacing: 16) {
                     content
                 }
@@ -55,10 +57,7 @@ struct ConnectView: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        OnboardingFrame(
-            title: "Адрес компьютера",
-            subtitle: "Модели и история остаются на вашем ПК. Телефон должен быть с ним в одной сети или в Tailscale."
-        ) {
+        OnboardingFrame(title: "Адрес компьютера") {
             LabeledField(title: "Адрес и порт") {
                 TextField("", text: $address, prompt: Text("192.168.1.5:8000").foregroundStyle(Theme.subtle))
                     .keyboardType(.URL)

@@ -35,12 +35,6 @@ final class ClaudeParityTests: XCTestCase {
         XCTAssertEqual(on["thinking"] as? Bool, true)
     }
 
-    func testRecommendedReasoningLevel() {
-        XCTAssertEqual(ChatParameters.recommendedLevel("aistudio/gemini-4-hydrogen"), "high")
-        XCTAssertEqual(ChatParameters.recommendedLevel("aistudio/gemini-4-argon"), "medium")
-        XCTAssertEqual(ChatParameters.recommendedLevel("muse-glimmer-30b"), "high")
-    }
-
     func testSourcesLikeSite() {
         let raw: [[String: Any]] = [
             ["title": "Release", "url": "https://www.sqlite.org/releaselog/3_50_0.html"],

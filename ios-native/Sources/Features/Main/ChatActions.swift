@@ -34,7 +34,7 @@ struct ChatActions: ViewModifier {
                 }
                 Button("Отмена", role: .cancel) { deleting = nil }
             } message: {
-                Text("«\(deleting?.title ?? "")» переместится в корзину. Вернуть сессию можно на сайте.")
+                Text("«\(deleting?.title ?? "")» переместится в корзину.")
             }
     }
 }

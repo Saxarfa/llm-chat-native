@@ -153,6 +153,7 @@ enum ChatConfig {
         "aistudio/gemini-2.5-flash-image": "Nano Banana",
         "aistudio/gemma-4-31b-it": "Gemma 4 31B",
         "aistudio/gemma-4-26b-a4b-it": "Gemma 4 26B A4B",
+        "aistudio/gemini-4-neon": "Gemini 4 Neon",
         "aistudio/gemini-4-hydrogen": "Gemini 4 Hydrogen",
         "aistudio/gemini-3.5-flash-lite": "Gemini 3.5 Flash-Lite",
         "aistudio/gemini-4-argon": "Gemini 4 Argon",
@@ -162,6 +163,7 @@ enum ChatConfig {
     private static let studioLevels: [String: [String]] = [
         "aistudio/gemma-4-31b-it": ["minimal", "high"],
         "aistudio/gemma-4-26b-a4b-it": ["minimal", "high"],
+        "aistudio/gemini-4-neon": ["low", "medium", "high", "xhigh"],
         "aistudio/gemini-4-hydrogen": ["low", "medium", "high", "xhigh"],
         "aistudio/gemini-3.5-flash-lite": ["minimal", "low", "medium", "high"],
         "aistudio/gemini-4-argon": ["low", "medium", "high"],
@@ -169,6 +171,7 @@ enum ChatConfig {
     ]
 
     private static let studioDefaultStrength: [String: String] = [
+        "aistudio/gemini-4-neon": "high",
         "aistudio/gemini-4-hydrogen": "high",
         "aistudio/gemini-3.5-flash-lite": "minimal",
         "aistudio/gemini-4-argon": "medium",
@@ -293,7 +296,7 @@ enum ChatConfig {
             strength = "high"
         }
         guard let levels, !levels.contains(strength) else { return strength }
-        let lowFloor: Set<String> = ["aistudio/gemini-4-hydrogen", "aistudio/gemini-4-argon", "aistudio/gemini-4-carbon"]
+        let lowFloor: Set<String> = ["aistudio/gemini-4-neon", "aistudio/gemini-4-hydrogen", "aistudio/gemini-4-argon", "aistudio/gemini-4-carbon"]
         if lowFloor.contains(model), strength == "minimal" { strength = "low" }
         else if model.hasPrefix("aistudio/gemma-4-"), strength == "low" { strength = "minimal" }
         else { strength = "high" }
