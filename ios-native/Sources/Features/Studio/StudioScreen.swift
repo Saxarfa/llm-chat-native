@@ -44,6 +44,12 @@ struct StudioScreen: View {
                 .frame(maxHeight: typing ? .infinity : nil, alignment: .top)
         }
         .animation(.easeOut(duration: 0.2), value: typing)
+        // Фокус в промпте — курсор в конец, кто бы ни поставил фокус: в этот момент поле прыгает вверх (сцена
+        // убирается), и UIKit оставлял курсор в начале — набранное вставало перед прежним промптом
+        // (снимки ui-03-typing 0.16.4 и 0.16.5 (46); нажатие поле обрабатывает раньше нашего жеста).
+        .onChange(of: typing) { _, focused in
+            if focused { Keyboard.caretToEnd() }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .background(Theme.canvas.ignoresSafeArea())
@@ -696,13 +702,12 @@ private struct StudioComposer: View {
             .frame(maxWidth: .infinity, maxHeight: typing.wrappedValue ? .infinity : nil, alignment: .topLeading)
             .background(Theme.surface, in: shape)
             .overlay(shape.strokeBorder(typing.wrappedValue ? Theme.capsuleLine : Theme.line))
-            // Касание в любом месте рамки (и под текстом) ставит курсор — в конец промпта: фокус ставим сами,
-            // и UIKit оставлял курсор в начале (набранное вставало перед прежним промптом, снимок ui-03-typing 0.16.4).
+            // Касание в любом месте рамки (и под текстом) ставит курсор; в конец промпта его переносит
+            // `StudioScreen` при получении фокуса.
             .contentShape(shape)
             .onTapGesture {
                 guard !typing.wrappedValue else { return }
                 typing.wrappedValue = true
-                Keyboard.caretToEnd()
             }
             .overlay(alignment: .topTrailing) {
                 // Длинный промпт с телефона не стереть — одна кнопка очищает поле.

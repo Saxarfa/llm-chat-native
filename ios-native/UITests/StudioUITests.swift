@@ -98,6 +98,9 @@ final class StudioUITests: XCTestCase {
         prompt.tap()
         app.skipKeyboardTip()
         prompt.typeText(", дракон в облаках")
+        // Набранное — в конце промпта: курсор при фокусе уходит в конец (до 0.16.5 вставал в начало).
+        XCTAssertTrue((prompt.value as? String ?? "").hasSuffix(", дракон в облаках"),
+                      "набранное в конце промпта: \(prompt.value as? String ?? "")")
         // Пока набирается промпт, сцены нет, а последний арт — миниатюрой в строке чипов (как на сайте).
         XCTAssertTrue(element(app, "studio.thumb").waitForExistence(timeout: 3))
         sleep(1)
