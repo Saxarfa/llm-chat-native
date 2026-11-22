@@ -312,9 +312,7 @@ private struct NanoParameters: View {
         if sampling.topP, let spec = ChatParameters.nanoSpecs["nano_top_p"] {
             result.append(Sample(spec: spec, fallback: 0.95))
         }
-        if sampling.textLimits, let spec = ChatParameters.nanoSpecs["nano_max_output_tokens"] {
-            result.append(Sample(spec: spec, fallback: -1))
-        }
+        // «Max output tokens» больше не показывается (как на сайте, `NanoSampling`): длина текста всегда наибольшая.
         return result
     }
 

@@ -108,6 +108,7 @@ struct PhoneModelsSheet: View {
         let info = phone.infos[item.file]
         return HStack(spacing: 12) {
             Button {
+                Haptics.selection()
                 onChoose(item.chatID)
             } label: {
                 HStack(spacing: 12) {

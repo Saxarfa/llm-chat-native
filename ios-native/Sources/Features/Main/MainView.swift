@@ -103,7 +103,9 @@ struct MainView: View {
                     if axis != nil {
                         axis = nil
                         DrawerSwipe.swiping = false
-                        setOpen(isOpen)
+                        let target: CGFloat = isOpen ? width : 0
+                        let current = min(max(target + dragX, 0), width)
+                        setOpen(isOpen, remaining: width > 0 ? abs(target - current) / width : 1)
                     }
                 }
             }
@@ -118,10 +120,14 @@ struct MainView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { settling = false }
     }
 
-    private func setOpen(_ open: Bool) {
+    /// Открыть или закрыть меню. `remaining` — какая доля пути (0…1) осталась до места: после свайпа она меньше,
+    /// и карточка доезжает быстрее. Без пружины (просьба пользователя 22.11.2026: «убери пружинность»):
+    /// плавное замедление без перелёта, 0,12–0,28 с.
+    private func setOpen(_ open: Bool, remaining: CGFloat = 1) {
         if open { Keyboard.hide() }
         if open != isOpen { Haptics.tap() }
-        withAnimation(Theme.spring) {
+        let duration = 0.12 + 0.16 * Double(min(max(remaining, 0), 1))
+        withAnimation(.easeOut(duration: duration)) {
             isOpen = open
             dragX = 0
         }
@@ -161,7 +167,9 @@ struct MainView: View {
                 // (`lastMove`) её уже закрывает, а флаг снимаем только после него.
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { DrawerSwipe.swiping = false }
                 let projected = (isOpen ? width : 0) + value.predictedEndTranslation.width
-                setOpen(projected > width / 2)
+                let open = projected > width / 2
+                let current = min(max((isOpen ? width : 0) + value.translation.width, 0), width)
+                setOpen(open, remaining: width > 0 ? abs((open ? width : 0) - current) / width : 1)
             }
     }
 }

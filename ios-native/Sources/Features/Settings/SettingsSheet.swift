@@ -121,6 +121,13 @@ struct SettingsSheet: View {
                     CardDivider(inset: RowMetrics.textInset)
                     IconToggleRow(title: "Тактильный отклик", symbol: "iphone.radiowaves.left.and.right",
                                   isOn: model.haptics) { model.haptics = $0 }
+                    // Лёгкие толчки, пока выводится ответ (как в ChatGPT); без общего отклика их нет.
+                    if model.haptics {
+                        CardDivider(inset: RowMetrics.textInset)
+                        IconToggleRow(title: "Отклик при ответе", symbol: "text.bubble",
+                                      isOn: model.streamHaptics) { model.streamHaptics = $0 }
+                            .accessibilityIdentifier("settings.streamHaptics")
+                    }
                 }
 
                 SectionCaption(text: "Внешний вид")

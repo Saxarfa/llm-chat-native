@@ -142,6 +142,8 @@ struct DrawerFreeZone: ViewModifier {
 /// Ответ модели: блоки Markdown один под другим.
 struct MarkdownView: View {
     let blocks: [MarkdownBlock]
+    /// Ответ ещё пишется: последние знаки последнего абзаца проступают из прозрачности (`StreamTail`).
+    var streaming = false
     /// Шрифт ответов из настроек (по умолчанию — с засечками, как у Claude). Читается здесь, один раз на ответ;
     /// блоки получают готовый `AnswerStyle`.
     @AppStorage(AnswerFont.key) private var font = AnswerFont.serif
@@ -149,9 +151,10 @@ struct MarkdownView: View {
 
     var body: some View {
         let style = AnswerStyle(font: font, size: size)
+        let last = blocks.last?.id
         VStack(alignment: .leading, spacing: 14) {
             ForEach(blocks) { block in
-                MarkdownBlockView(block: block, style: style)
+                MarkdownBlockView(block: block, style: style, tail: streaming && block.id == last)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -161,6 +164,8 @@ struct MarkdownView: View {
 private struct MarkdownBlockView: View {
     let block: MarkdownBlock
     let style: AnswerStyle
+    /// Последний блок выводимого ответа: у его текста мягкий край.
+    var tail = false
 
     var body: some View {
         switch block.kind {
@@ -172,7 +177,7 @@ private struct MarkdownBlockView: View {
                 .padding(.top, level <= 2 ? 6 : 2)
                 .accessibilityAddTraits(.isHeader)
         case .paragraph(let text):
-            BodyText(text: text, style: style)
+            BodyText(text: text, style: style, tail: tail)
         case .code(let language, let text):
             CodeBlockView(language: language, code: text)
         case .list(let items):
@@ -183,13 +188,13 @@ private struct MarkdownBlockView: View {
                             .font(.system(size: style.textSize, design: style.design).monospacedDigit())
                             .foregroundStyle(Theme.muted)
                             .frame(minWidth: 16, alignment: .trailing)
-                        BodyText(text: item.text, style: style)
+                        BodyText(text: item.text, style: style, tail: tail && item.id == items.last?.id)
                     }
                     .padding(.leading, CGFloat(item.indent) * 20)
                 }
             }
         case .quote(let text):
-            BodyText(text: text, style: style, color: Theme.muted)
+            BodyText(text: text, style: style, color: Theme.muted, tail: tail)
                 .padding(.leading, 14)
                 .overlay(alignment: .leading) {
                     Capsule().fill(Theme.fillActive).frame(width: 3)
@@ -206,6 +211,8 @@ private struct BodyText: View {
     let text: String
     let style: AnswerStyle
     var color: Color = Theme.ink
+    /// Мягкий край выводимого ответа (`StreamTail`).
+    var tail = false
 
     var body: some View {
         // Текст ответа — шрифтом из настроек; по умолчанию с засечками, как в приложении Claude.
@@ -214,8 +221,76 @@ private struct BodyText: View {
             .font(.system(size: points, design: style.design))
             .foregroundStyle(color)
             .lineSpacing(5)
+            .modifier(StreamTail(active: tail))
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Мягкий край выводимого ответа: последние знаки проступают из прозрачности, пока ответ пишется, — новые
+/// слова не выскакивают, а проявляются (как у Claude и ChatGPT). Край движется вместе с выводом (`revealStep`),
+/// поэтому отдельного таймера нет; после конца ответа он за 0,35 с становится обычным текстом.
+/// iOS 18+ (`TextRenderer`); на iOS 17 текст выводится без края.
+private struct StreamTail: ViewModifier {
+    let active: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            // Край появляется сразу (вместе с первыми новыми словами), а гаснет плавно.
+            content
+                .textRenderer(TailRenderer(strength: active ? 1 : 0))
+                .animation(active ? nil : .easeOut(duration: 0.35), value: active)
+        } else {
+            content
+        }
+    }
+}
+
+@available(iOS 18.0, *)
+private struct TailRenderer: TextRenderer {
+    /// 1 — край виден, 0 — обычный текст (анимируется при конце ответа).
+    var strength: Double
+    /// Сколько последних знаков проступает.
+    static let span = 28
+
+    var animatableData: Double {
+        get { strength }
+        set { strength = newValue }
+    }
+
+    func draw(layout: Text.Layout, in context: inout GraphicsContext) {
+        guard strength > 0.01 else {
+            for line in layout { context.draw(line) }
+            return
+        }
+        let lines = Array(layout)
+        let counts = lines.map { line in line.reduce(0) { $0 + $1.count } }
+        let total = counts.reduce(0, +)
+        var start = 0
+        for (number, line) in lines.enumerated() {
+            let end = start + counts[number]
+            if total - end >= Self.span {
+                // Строка целиком до края — рисуется как обычно.
+                context.draw(line)
+            } else {
+                var index = start
+                for run in line {
+                    for glyph in run {
+                        let fromEnd = total - 1 - index
+                        if fromEnd < Self.span {
+                            var copy = context
+                            let reached = Double(fromEnd + 1) / Double(Self.span + 1)
+                            copy.opacity = 1 - strength * (0.85 - 0.85 * reached)
+                            copy.draw(glyph)
+                        } else {
+                            context.draw(glyph)
+                        }
+                        index += 1
+                    }
+                }
+            }
+            start = end
+        }
     }
 }
 
@@ -238,11 +313,19 @@ struct CopyButton: View {
                 copied = false
             }
         } label: {
-            Image(systemName: copied ? "checkmark" : (compact ? "square.on.square" : "doc.on.doc"))
-                .font(.system(size: compact ? 13.5 : 14, weight: compact ? .regular : .medium))
-                .foregroundStyle(copied ? Theme.ink : Theme.muted.opacity(compact ? 0.85 : 1))
-                .frame(width: compact ? 32 : 44, height: compact ? 44 : 40)
-                .contentShape(Rectangle())
+            Group {
+                if compact {
+                    // В ряду под ответом — тот же рисованный значок, что и соседние (`AnswerGlyph`): одна сетка,
+                    // один штрих и цвет; системный символ был мельче и бледнее и сидел выше соседей.
+                    AnswerGlyphView(glyph: copied ? .check : .copy, color: copied ? Theme.ink : Theme.muted)
+                } else {
+                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(copied ? Theme.ink : Theme.muted)
+                }
+            }
+            .frame(width: compact ? 32 : 44, height: compact ? 44 : 40)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel(copied ? "Скопировано" : label)

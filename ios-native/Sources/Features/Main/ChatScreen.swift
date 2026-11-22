@@ -16,6 +16,9 @@ struct ChatScreen: View {
     @State private var capsuleArrived = true
     @State private var showParameters = false
     @State private var showBranches = false
+    /// Сессия, стоимость которой открыта: id запоминается при открытии, и окно не пустеет, если сессию тем
+    /// временем закрыли (например, удалили на сайте).
+    @State private var costChat: CostChat?
     @State private var renaming: ChatSummary?
     @State private var deleting: ChatSummary?
 
@@ -47,7 +50,7 @@ struct ChatScreen: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.26), value: model.activeChatID)
+        .animation(.easeOut(duration: 0.18), value: model.activeChatID)
         // Закрытие клавиатуры привязано только к содержимому, не к контейнеру панелей.
         .softEdgeBar(edge: .top, tint: Theme.canvas, hasScrollContent: model.activeChatID != nil) {
             VStack(spacing: 0) {
@@ -105,6 +108,9 @@ struct ChatScreen: View {
         .sheet(isPresented: $showBranches) {
             BranchesSheet()
         }
+        .sheet(item: $costChat) { chat in
+            ChatCostSheet(chatID: chat.id)
+        }
         .chatActions(renaming: $renaming, deleting: $deleting)
         .confirmationDialog(model.pendingDelete?.isUser == true ? "Удалить сообщение?" : "Удалить ответ?",
                             isPresented: Binding(get: { model.pendingDelete != nil },
@@ -121,6 +127,7 @@ struct ChatScreen: View {
         .onAppear {
             if [.parameters, .nano, .omni, .phoneParameters].contains(model.preview) { showParameters = true }
             if model.preview == .branches { showBranches = true }
+            if model.preview == .cost, let id = model.activeChatID { costChat = CostChat(id: id) }
         }
     }
 
@@ -179,6 +186,13 @@ struct ChatScreen: View {
                     showBranches = true
                 } label: {
                     Label("Ветки сессии", systemImage: "arrow.triangle.branch")
+                }
+                // Как «Стоимость» в меню чата на сайте: журнал токенов облачных моделей по ценам с сайта.
+                Button {
+                    Keyboard.hide()
+                    costChat = CostChat(id: chat.id)
+                } label: {
+                    Label("Стоимость", systemImage: "dollarsign.circle")
                 }
                 Divider()
                 ChatMenuItems(chat: chat, onRename: { renaming = chat }, onDelete: { deleting = chat })
@@ -319,6 +333,11 @@ struct ChatScreen: View {
     }
 }
 
+/// Сессия для окна «Стоимость» (`sheet(item:)`).
+struct CostChat: Identifiable {
+    let id: String
+}
+
 /// Появление нового чата при запуске уже сыграно (см. `ChatScreen.playArrival`).
 enum Arrival {
     static var played = false
@@ -375,9 +394,6 @@ struct ComposerBar: View {
     /// Окно моделей открыли при клавиатуре: карточка не складывается в строку, пока оно открыто,
     /// а с его закрытием клавиатура возвращается (просьба пользователя 18.11.2026).
     @State private var returnFocus = false
-    /// Что стояло на чипе, когда открыли окно моделей; изменилось — чип вздрагивает.
-    @State private var chipBefore = ""
-    @State private var chipPulse = 0
 
     private static let fileTypes: [UTType] = {
         var types: [UTType] = [.pdf, .png, .jpeg, .webP, .heic, .mpeg4Movie]
@@ -403,7 +419,8 @@ struct ComposerBar: View {
             || model.attachmentsBusy || dictation.active || returnFocus
     }
 
-    /// Подпись чипа целиком — по ней видно, поменяли ли модель или уровень рассуждений.
+    /// Подпись чипа целиком: модель и уровень рассуждений. Её смена не анимируется (просьба пользователя
+    /// 22.11.2026) — новая подпись встаёт сразу, без вздрагивания и перетекания ширины.
     private var chipText: String { model.activeModelName + "·" + (reasoningLabel ?? "") }
 
     var body: some View {
@@ -435,7 +452,6 @@ struct ComposerBar: View {
         .animation(.easeOut(duration: 0.18), value: model.activeQueue)
         .sheet(isPresented: $showModels, onDismiss: {
             returnFocus = false
-            if chipText != chipBefore { chipPulse += 1 }
         }) {
             ModelPickerSheet()
         }
@@ -563,13 +579,9 @@ struct ComposerBar: View {
             // жалоба пользователя 18.11.2026).
             if expanded {
                 modelButton
-                    // Модель или уровень поменяли в окне — чип вздрагивает («Скользящая отметка»).
-                    .phaseAnimator([1.0, 1.12], trigger: chipPulse) { chip, scale in
-                        chip.scaleEffect(scale)
-                    } animation: { _ in .spring(response: 0.3, dampingFraction: 0.55) }
                     // Приоритет ширины — снаружи всей цепочки: изнутри `modelButton` его не видно ряду.
                     .layoutPriority(1)
-                    .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .leading)))
+                    .transition(.opacity)
             }
             Spacer(minLength: 4)
             if model.editing == nil {
@@ -757,7 +769,6 @@ struct ComposerBar: View {
             // значит, это касание по тающему чипу, и оно должно открыть клавиатуру.
             guard self.expanded else { focused = true; return }
             returnFocus = focused
-            chipBefore = chipText
             Keyboard.hide()
             Haptics.tap()
             showModels = true
@@ -768,6 +779,8 @@ struct ComposerBar: View {
                 chip(level: level).fixedSize()
                 chip(level: level)
             }
+            // Смена модели или уровня — без анимации: подпись и ширина чипа встают сразу.
+            .animation(nil, value: chipText)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
             .padding(.vertical, -7)

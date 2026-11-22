@@ -68,10 +68,10 @@ enum ChatParameters {
                       fallback: -1),
     ]
 
-    /// Все параметры генерации, которые есть у модели в приложении.
+    /// Все параметры генерации, которые есть у модели в приложении. У моделей телефона — все (их выборкой
+    /// управляет `LlamaRunner`, в том числе длиной ответа); у остальных — только те, что принимает сервер.
     static func allSpecs(for model: String, onPhone: Bool) -> [ParameterSpec] {
-        let shared = specs.filter { supported(model, $0.key) }
-        return onPhone ? shared + phoneSpecs : shared
+        onPhone ? specs + phoneSpecs : specs.filter { supported(model, $0.key) }
     }
 
     /// Главные параметры показываются сразу, остальные — в «Расширенных».
@@ -99,17 +99,19 @@ enum ChatParameters {
         model.hasPrefix("aistudio/")
     }
 
+    /// Перенос `parameterSupported` сайта. Длины ответа (`max_tokens`) нет ни у одной модели ПК и облака —
+    /// сайт всегда шлёт −1; у Nano Banana, Gemini 4 Argon и Carbon параметров выборки нет вовсе, у Claude тоже
+    /// (текущие модели отвергают temperature/top_p, остаются только уровни рассуждений).
     static func supported(_ model: String, _ key: String) -> Bool {
-        if isNano(model) { return false }
-        if (model == "aistudio/gemini-4-argon" || model == "aistudio/gemini-4-carbon") && key != "max_tokens" {
-            return false
-        }
-        // Облачные сервисы (`parameterSupported` сайта): Groq не принимает штрафы.
-        if model.hasPrefix("groq/") { return ["temperature", "top_p", "max_tokens"].contains(key) }
+        if key == "max_tokens" || isNano(model) { return false }
+        if model == "aistudio/gemini-4-argon" || model == "aistudio/gemini-4-carbon" { return false }
+        // Облачные сервисы: Groq не принимает штрафы, Claude — ничего.
+        if model.hasPrefix("groq/") { return ["temperature", "top_p"].contains(key) }
+        if model.hasPrefix("claude/") { return false }
         if HostedService.of(model) != nil {
-            return ["temperature", "top_p", "presence_penalty", "frequency_penalty", "max_tokens"].contains(key)
+            return ["temperature", "top_p", "presence_penalty", "frequency_penalty"].contains(key)
         }
-        return !model.hasPrefix("aistudio/") || ["temperature", "top_p", "top_k", "max_tokens"].contains(key)
+        return !model.hasPrefix("aistudio/") || ["temperature", "top_p", "top_k"].contains(key)
     }
 
     static func studioOutputLimit(_ model: String) -> Int {
@@ -145,8 +147,16 @@ enum ChatParameters {
         "gemma-4-e4b-uncensored", "qwen-3.8-27b-it", "qwen-3.6-35b-a3b-mtp",
     ]
 
+    /// Усилия Claude (`output_config.effort`, `claudeLevels` сайта). Каталог у моделей разный — уровень, которого
+    /// у модели нет, сервер опускает до ближайшего ниже, поэтому список один для всех.
+    static let claudeLevels: [Choice] = [
+        Choice("low", "Низкий"), Choice("medium", "Средний"), Choice("high", "Высокий"),
+        Choice("xhigh", "Очень высокий"), Choice("max", "Максимальный"),
+    ]
+
     static func reasoning(_ model: String) -> Reasoning? {
         if let levels = studioLevels[model] { return .levels(levels) }
+        if model.hasPrefix("claude/") { return .levels(claudeLevels) }
         if toggleModels.contains(model) || HostedService.of(model) != nil { return .toggle }
         if model == "muse-glimmer-30b" {
             return .levels([Choice("low", "Минимальные"), Choice("medium", "Средние"), Choice("high", "Высокие"), Choice("xhigh", "Максимальные")])

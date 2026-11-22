@@ -80,7 +80,8 @@ struct ChatBranch: Identifiable, Equatable {
 
 struct ModelOption: Identifiable, Equatable {
     enum Group: Int, CaseIterable {
-        case local, phone, studio, hosted
+        /// `claude` — модели Claude по API (с 0.17): в окне выбора они первые, как у приложения Claude.
+        case local, phone, studio, hosted, claude
 
         var title: String {
             switch self {
@@ -88,6 +89,7 @@ struct ModelOption: Identifiable, Equatable {
             case .phone: return "На телефоне"
             case .studio: return "AI Studio"
             case .hosted: return "API"
+            case .claude: return "Claude"
             }
         }
     }
@@ -99,17 +101,19 @@ struct ModelOption: Identifiable, Equatable {
     let loaded: Bool
 }
 
-/// Бесплатные OpenAI-совместимые сервисы (`hosted_providers.py`, на сайте — вкладка «API» и
-/// `hostedProviders`/`hostedName` в `domain.ts`): модель — `<сервис>/<id каталога>`.
+/// Облачные сервисы по API: бесплатные OpenAI-совместимые (`hosted_providers.py`) и Claude (только Rust:
+/// `server-rs/src/hosted.rs` + `claude.rs`, Messages API). На сайте — вкладка «API» и
+/// `hostedProviders`/`hostedName` в `domain.ts`; модель — `<сервис>/<id каталога>`.
 /// Ключи и выбор моделей настраиваются на сайте; приложение только показывает включённые модели.
 enum HostedService: String, CaseIterable {
-    case nvidia, openrouter, groq
+    case nvidia, openrouter, groq, claude
 
     var title: String {
         switch self {
         case .nvidia: return "NVIDIA"
         case .openrouter: return "OpenRouter"
         case .groq: return "Groq"
+        case .claude: return "Claude"
         }
     }
 
@@ -118,8 +122,13 @@ enum HostedService: String, CaseIterable {
     }
 
     /// Как `hosted_providers.display_name`: «openrouter/nvidia/nemotron-3-ultra-550b-a55b:free» →
-    /// «Nemotron 3 Ultra 550B A55B».
+    /// «Nemotron 3 Ultra 550B A55B»; Claude — как `hostedName` сайта и `claude_name` в Rust:
+    /// «claude/claude-opus-5-5» → «Claude Opus 5.5».
     static func name(_ id: String) -> String {
+        if let slash = id.firstIndex(of: "/") {
+            let rest = id[id.index(after: slash)...]
+            if rest.hasPrefix("claude-") { return claudeName(String(rest.dropFirst("claude-".count))) }
+        }
         let last = id.split(separator: "/").last.map(String.init) ?? id
         var name = String(last.split(separator: ":", maxSplits: 1).first ?? Substring(last))
         name = name.replacingOccurrences(of: "-", with: " ").replacingOccurrences(of: "_", with: " ")
@@ -131,6 +140,41 @@ enum HostedService: String, CaseIterable {
             upper.contains(word.lowercased()) ? word.uppercased() : word.prefix(1).uppercased() + word.dropFirst()
         }.joined(separator: " ")
     }
+
+    /// «opus-5-5» → «Claude Opus 5.5»: числа до двух знаков — версия через точку, дата снимка
+    /// («-20251001») отбрасывается (`claudeName` в `domain.ts`).
+    static func claudeName(_ rest: String) -> String {
+        var words = ["Claude"]
+        var version: [String] = []
+        for part in rest.split(separator: "-") {
+            let piece = String(part)
+            if piece.allSatisfy({ $0.isASCII && $0.isNumber }) {
+                if piece.count <= 2 { version.append(piece) }
+                continue
+            }
+            if !version.isEmpty {
+                words.append(version.joined(separator: "."))
+                version = []
+            }
+            words.append(piece.prefix(1).uppercased() + piece.dropFirst())
+        }
+        if !version.isEmpty { words.append(version.joined(separator: ".")) }
+        return words.joined(separator: " ")
+    }
+
+    /// Порядок моделей Claude в окне выбора, как у приложения Claude: Fable, Mythos, Opus, Sonnet, Haiku,
+    /// внутри семейства — новые выше.
+    static func claudeOrder(_ id: String) -> (family: Int, version: [Int]) {
+        let rest = id.split(separator: "/", maxSplits: 1).last.map(String.init) ?? id
+        let parts = rest.split(separator: "-").map(String.init)
+        let families = ["fable", "mythos", "opus", "sonnet", "haiku"]
+        let family = parts.compactMap { families.firstIndex(of: $0.lowercased()) }.first ?? families.count
+        let version = parts.compactMap { part -> Int? in
+            guard part.count <= 2, part.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
+            return Int(part)
+        }
+        return (family, version)
+    }
 }
 
 /// Перенос логики сайта (`frontend/src/domain.ts`, `store.ts: inferencePayload`):
@@ -138,7 +182,7 @@ enum HostedService: String, CaseIterable {
 enum ChatConfig {
     static let fallbackModel = "muse-glimmer-30b"
 
-    static let defaultPrompt = "You are a helpful, knowledgeable, and precise AI assistant. Provide concise, high-quality answers formatted in Markdown. When writing code, specify the language and follow modern best practices."
+    static let defaultPrompt = ""
 
     /// Модели, скрытые в списке выбора. С этапа 6 (видео Omni) пусто: показываются все.
     static let mediaModels: Set<String> = []
@@ -178,12 +222,6 @@ enum ChatConfig {
         "aistudio/gemini-4-carbon": "medium",
     ]
 
-    /// Модели с выключателем размышлений (у остальных `thinking` всегда true).
-    private static let toggleModels: Set<String> = [
-        "gemma-31b-iq3", "gemma-26b-uncensored", "gemma-26b-qat", "gemma-12b-uncensored",
-        "gemma-4-e4b-uncensored", "qwen-3.8-27b-it", "qwen-3.6-35b-a3b-mtp",
-    ]
-
     private static let localNames: [String: String] = [
         "qwen-3.6-35b-a3b-mtp": "Qwen 3.6 35B-A3B MTP",
         "gemma-4-e4b-uncensored": "Gemma 4 E4B Uncensored",
@@ -217,6 +255,7 @@ enum ChatConfig {
     static func group(of id: String) -> ModelOption.Group {
         if PhoneModelID.isPhone(id) { return .phone }
         if id.hasPrefix("aistudio/") { return .studio }
+        if HostedService.of(id) == .claude { return .claude }
         if HostedService.of(id) != nil { return .hosted }
         return .local
     }
@@ -256,6 +295,10 @@ enum ChatConfig {
     private static func modelDefaults(_ model: String) -> [String: Any] {
         if model.hasPrefix("aistudio/") {
             return ["temperature": 1, "top_p": 0.95, "top_k": 64, "thinking": true, "max_tokens": -1]
+        }
+        // Claude (Messages API, `claude.rs`): параметров выборки нет — текущие модели их отвергают.
+        if model.hasPrefix("claude/") {
+            return ["thinking": true, "max_tokens": -1]
         }
         // Облачные сервисы, как `modelDefaults` в `domain.ts`: Groq — без штрафов (отвергает лишние поля).
         if model.hasPrefix("groq/") {
@@ -303,6 +346,13 @@ enum ChatConfig {
         return strength
     }
 
+    /// Усилия Claude (`reasoningStrength` сайта): выбранный уровень, иначе «Средний», а при выключенных
+    /// рассуждениях — «Низкий». Уровень, которого у модели нет, сервер опускает до ближайшего ниже (`claude::clamp`).
+    private static func claudeStrength(saved: [String: Any]) -> String {
+        let chosen = text(saved["reasoning_strength"]) ?? ((saved["thinking"] as? Bool) == false ? "low" : "medium")
+        return ChatParameters.claudeLevels.contains { $0.value == chosen } ? chosen : "medium"
+    }
+
     /// Итоговые параметры модели: общие умолчания ← умолчания модели ← профиль ← параметры чата.
     static func config(model: String, settings: ServerSettings, overrides: [String: Any]) -> [String: Any] {
         var config: [String: Any] = [
@@ -319,9 +369,19 @@ enum ChatConfig {
             .filter { !($0.value is NSNull) }
         config.merge(saved) { _, new in new }
 
-
         if studioLevels[model] != nil {
             config["reasoning_strength"] = reasoningStrength(model, saved: saved)
+        } else if model.hasPrefix("claude/") {
+            config["reasoning_strength"] = claudeStrength(saved: saved)
+        }
+        // Длина ответа не ограничивается, как на сайте (`configFor` всегда ставит −1): сохранённый предел
+        // из прежних версий приложения больше не уходит серверу. Предел есть только у моделей телефона.
+        if !PhoneModelID.isPhone(model) { config["max_tokens"] = -1 }
+        // У Nano Banana 2.1 и Omni 1.2 длина текста — всегда наибольшая (на сайте ползунка нет), у остальных поля нет.
+        if ChatParameters.nanoSampling(model).textLimits {
+            config["nano_max_output_tokens"] = -1
+        } else {
+            config.removeValue(forKey: "nano_max_output_tokens")
         }
         for retired in ["mirostat", "mirostat_tau", "mirostat_eta"] {
             config.removeValue(forKey: retired)
@@ -364,8 +424,10 @@ enum ChatConfig {
         values["apiKey"] = (shared["apiKey"] as? String) ?? ""
 
         let mode = text(over["searchMode"]) ?? text(shared["searchMode"]) ?? "auto"
+        // Как `inferencePayload`: выключатель решает только у моделей с выключателем (`reasoningKind == 'toggle'`);
+        // у моделей с уровнями (AI Studio, Claude) рассуждения включены, глубину задаёт `reasoning_strength`.
         var thinking = true
-        if toggleModels.contains(model) || HostedService.of(model) != nil {
+        if case .toggle? = ChatParameters.reasoning(model) {
             thinking = (values["thinking"] as? Bool) ?? (over["thinking"] as? Bool) ?? true
         }
 

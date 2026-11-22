@@ -209,6 +209,89 @@ final class ClaudeLookUITests: XCTestCase {
         snap("ui-l6-header-menu")
     }
 
+    /// Капсула и выбор модели как у Claude (просьба пользователя 22.11.2026): касание капсулы — клавиатура и карточка
+    /// с моделью и уровнем; чип — окно выбора на половину экрана, клавиатура уходит; потянули вверх — во весь экран;
+    /// выбрали модель — окно закрывается, клавиатура и карточка возвращаются; уровень — так же; отправка — капсула вниз.
+    func testCapsuleModelFlow() {
+        let app = launch("thread")
+        let input = element(app, "chat.input")
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        input.tap()
+        app.skipKeyboardTip()
+        let keyboard = app.keyboards.firstMatch
+        let chip = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Модель:'")).firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 5), "с клавиатурой — карточка с моделью")
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+        sleep(1)
+        snap("ui-f1-card")
+
+        chip.tap()
+        let title = app.staticTexts["Выбор модели"].firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        let hidden = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: keyboard)
+        wait(for: [hidden], timeout: 5)
+        sleep(1)
+        snap("ui-f2-picker-half")
+        let height = app.windows.firstMatch.frame.height
+        XCTAssertGreaterThan(title.frame.minY, height * 0.3, "окно открылось на половину экрана")
+
+        // Потянули за шапку окна вверх — окно во весь экран.
+        let start = title.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -height * 0.45)))
+        sleep(1)
+        snap("ui-f3-picker-full")
+        XCTAssertLessThan(title.frame.minY, height * 0.3, "потянули вверх — окно во весь экран")
+
+        // Модель выбрана — окно закрылось, клавиатура и карточка с новой моделью вернулись.
+        let opus = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Claude Opus 5.5'")).firstMatch
+        XCTAssertTrue(opus.waitForExistence(timeout: 5), "модели Claude — в главной карточке")
+        opus.tap()
+        let closed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: title)
+        wait(for: [closed], timeout: 5)
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5), "после выбора клавиатура вернулась")
+        let claude = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Модель: Claude Opus 5.5'")).firstMatch
+        XCTAssertTrue(claude.waitForExistence(timeout: 5), "в карточке — выбранная модель")
+        XCTAssertTrue(claude.label.contains("Средний"), "уровень Claude по умолчанию — «Средний»")
+        sleep(1)
+        snap("ui-f4-picked")
+
+        // Уровень рассуждений: та же логика — окно, клавиатура уходит; закрыли — вернулась, на чипе новый уровень.
+        claude.tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        let reasoning = element(app, "picker.reasoning")
+        XCTAssertTrue(reasoning.waitForExistence(timeout: 5))
+        if !reasoning.isHittable {
+            let top = title.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            top.press(forDuration: 0.1, thenDragTo: top.withOffset(CGVector(dx: 0, dy: -height * 0.45)))
+            sleep(1)
+        }
+        reasoning.tap()
+        let high = app.buttons["Высокий"].firstMatch
+        XCTAssertTrue(high.waitForExistence(timeout: 5))
+        snap("ui-f5-levels")
+        high.tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 5), "после выбора уровня — снова главная страница окна")
+        sleep(1)
+        app.buttons["Закрыть"].firstMatch.tap()
+        let closedAgain = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: title)
+        wait(for: [closedAgain], timeout: 5)
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5), "клавиатура вернулась")
+        let level = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Модель: Claude Opus 5.5' AND label CONTAINS 'Высокий'")).firstMatch
+        XCTAssertTrue(level.waitForExistence(timeout: 5), "на чипе — новый уровень")
+        snap("ui-f6-level")
+
+        // Набор после возврата клавиатуры доходит до поля целиком; отправка — клавиатура уходит, капсула опускается.
+        sleep(1)
+        input.typeText("Привет")
+        XCTAssertEqual(input.value as? String, "Привет", "набор после возврата клавиатуры")
+        XCTAssertTrue(app.buttons["Отправить"].firstMatch.isEnabled)
+        app.buttons["Отправить"].firstMatch.tap()
+        let down = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: keyboard)
+        wait(for: [down], timeout: 5)
+        sleep(1)
+        snap("ui-f7-sent")
+    }
+
     /// Выбор модели как у Claude: аватарки и главная карточка, «Другие модели» отдельной страницей.
     func testModelPickerPages() {
         let app = launch("models")

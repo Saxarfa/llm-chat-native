@@ -145,6 +145,13 @@ final class AppModel {
             UserDefaults.standard.set(haptics, forKey: Haptics.key)
         }
     }
+    /// Отклик при выводе ответа (Настройки → Приложение): лёгкие толчки по мере появления текста.
+    var streamHaptics = true {
+        didSet {
+            guard preview == nil else { return }
+            UserDefaults.standard.set(streamHaptics, forKey: Haptics.streamKey)
+        }
+    }
     /// Студия картинок; своё наблюдаемое состояние.
     @ObservationIgnored let studio = StudioModel()
     /// Модели на самом iPhone (этап 8); своё наблюдаемое состояние.
@@ -201,6 +208,7 @@ final class AppModel {
         phone.app = self
         appearance = preview?.appearance ?? Appearance.saved
         haptics = preview == nil ? Haptics.enabled : true
+        streamHaptics = preview == nil ? Haptics.streamSetting : true
     }
 
     /// Модели для выбора: с ПК и с самого телефона.
@@ -406,7 +414,7 @@ final class AppModel {
         case .chat, .sidebar, .thread, .threadTop, .streaming, .models, .media, .parameters, .nano, .settings,
              .branches, .memory, .knowledge, .omni, .studio, .studioSettings, .studioHistory, .studioArt,
              .phoneModels, .phoneChat, .phoneSettings, .phoneParameters, .tools, .queue,
-             .recents, .light, .settingsLight, .computer, .modelProfile, .incognito, .sources:
+             .recents, .light, .settingsLight, .computer, .modelProfile, .incognito, .sources, .cost:
             user = PreviewScene.user
             chats = PreviewScene.chats
             models = PreviewScene.modelOptions
@@ -441,7 +449,7 @@ final class AppModel {
                 threadChatID = "7"
                 chatMeta["7"] = ChatMeta(overrides: ["searchMode": "auto"], branch: "main")
             }
-            if [.thread, .threadTop, .streaming, .tools, .queue, .light].contains(scene) {
+            if [.thread, .threadTop, .streaming, .tools, .queue, .light, .cost].contains(scene) {
                 activeChatID = "7"
                 thread = scene == .streaming || scene == .queue ? Array(PreviewScene.feed.prefix(3)) : PreviewScene.feed
                 threadState = .loaded
@@ -510,6 +518,11 @@ final class LiveText {
     var text = ""
     var blocks: [MarkdownBlock] = []
     var reasoning = ""
+    /// Слова сейчас выводятся: у конца ответа мягкий край (`StreamTail`). Гаснет, если новых слов нет ~0,4 с
+    /// (`AppModel.settleFlow`), — при паузе модели конец ответа не остаётся бледным.
+    var flowing = false
+    /// Когда вывод последний раз показал новые знаки.
+    @ObservationIgnored var lastReveal = Date.distantPast
     /// Сколько символов (`Character`) в `text`; −1 — ещё не посчитано. Вывод по шагам не пересчитывает
     /// длину всего текста на каждом шаге.
     @ObservationIgnored var shownCount = -1

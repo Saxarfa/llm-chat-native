@@ -27,6 +27,8 @@ enum PreviewScene: String, CaseIterable {
     case recents, light, settingsLight, computer, modelProfile
     /// 0.16: новая сессия в режиме «Инкогнито»; ответ с источниками и вариантами продолжения.
     case incognito, sources
+    /// 0.17: «Стоимость» сессии (меню «⋯»).
+    case cost
 
     /// Тема снимка: светлая — у сцен `light…`, у остальных тёмная.
     var appearance: Appearance {
@@ -242,6 +244,13 @@ enum PreviewScene: String, CaseIterable {
     }()
 
     static let modelOptions: [ModelOption] = [
+        // Claude по API (0.17) — в окне выбора первыми, как у приложения Claude.
+        ModelOption(id: "claude/claude-sonnet-5-5", name: HostedService.name("claude/claude-sonnet-5-5"),
+                    group: .claude, loaded: false),
+        ModelOption(id: "claude/claude-opus-5-5", name: HostedService.name("claude/claude-opus-5-5"),
+                    group: .claude, loaded: false),
+        ModelOption(id: "claude/claude-haiku-5-5", name: HostedService.name("claude/claude-haiku-5-5"),
+                    group: .claude, loaded: false),
         ModelOption(id: "gemma-26b-qat", name: "Gemma 26B QAT", group: .local, loaded: true),
         ModelOption(id: "qwen-3.8-27b-it", name: "Qwen 3.8 27B It", group: .local, loaded: false),
         ModelOption(id: "muse-glimmer-30b", name: "Muse Glimmer 30B", group: .local, loaded: false),

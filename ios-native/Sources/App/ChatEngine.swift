@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 /// Работа чата: загрузка ленты, отправка, живой ответ по потоку событий, остановка, выбор модели.
 /// Сервер ведёт генерацию сам; клиент отправляет вопрос и слушает `/api/sync/events`.
@@ -123,7 +124,7 @@ extension AppModel {
 
     func selectModel(_ id: String) async {
         guard id != activeModelID else { return }
-        Haptics.tap()
+        // Отклик даёт само место выбора (строка списка — `Haptics.selection`): второй подряд не нужен.
         guard let chatID = activeChatID, let index = chats.firstIndex(where: { $0.id == chatID }) else {
             draftModel = id
             UserDefaults.standard.set(id, forKey: AppModel.draftModelKey)
@@ -745,6 +746,20 @@ extension AppModel {
                 try? await Task.sleep(nanoseconds: 33_000_000)
             }
             liveFlushScheduled = false
+            settleFlow()
+        }
+    }
+
+    /// Вывод догнал полученный текст. Если за ~0,4 с новых слов не пришло, мягкий край у конца ответа гаснет;
+    /// пришли — край остаётся (следующий конец вывода проверит снова).
+    private func settleFlow() {
+        let flowing = lives.values.map(\.content).filter(\.flowing)
+        guard !flowing.isEmpty else { return }
+        Task {
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            for content in flowing where content.flowing && Date().timeIntervalSince(content.lastReveal) >= 0.4 {
+                content.flowing = false
+            }
         }
     }
 
@@ -771,9 +786,18 @@ extension AppModel {
                     // Чем больше накопилось, тем быстрее догоняем; после конца ответа — ещё быстрее.
                     let closing = pendingFinish[id] != nil
                     let share = Double(total - shown) * (closing ? 0.25 : 0.1)
-                    let next = min(total, shown + max(closing ? 6 : 2, Int(share.rounded(.up))))
+                    var next = min(total, shown + max(closing ? 6 : 2, Int(share.rounded(.up))))
+                    // Текст выходит словами, а не буквами: край показа не останавливается посреди слова
+                    // (так выводят Claude и ChatGPT; полслова мигало и читалось как набор на клавиатуре).
+                    if next < total { next = Self.wordEnd(raw.text, from: next, total: total) }
                     content.show(next == total ? raw.text : String(raw.text.prefix(next)), count: next, parse: true)
                     if next < total { more = true }
+                    if next > shown {
+                        content.lastReveal = Date()
+                        if !content.flowing { content.flowing = true }
+                        // Лёгкий толчок вместе с новыми словами (как в ChatGPT); первый кусок отмечен нажатием ниже.
+                        if !firstText, screen == .chat, UIApplication.shared.applicationState == .active { Haptics.stream() }
+                    }
                 } else {
                     // Разметку разбираем только для чата на экране.
                     content.show(raw.text, parse: false)
@@ -790,6 +814,21 @@ extension AppModel {
             finish(id, chat: done.chat, error: nil, notify: done.notify)
         }
         return more
+    }
+
+    /// Конец слова, на котором остановился вывод (`offset` — в символах `Character`): показ доходит до пробела или
+    /// перевода строки. Длинное «слово» (ссылка, код без пробелов) дальше `limit` знаков не ждём — тогда край
+    /// остаётся где был. Слово, которое ещё не дописано сервером, показывается целиком до конца полученного.
+    nonisolated static func wordEnd(_ text: String, from offset: Int, total: Int, limit: Int = 24) -> Int {
+        guard offset > 0, offset < total else { return offset }
+        var index = text.index(text.startIndex, offsetBy: offset)
+        var position = offset
+        while position < total, position - offset < limit {
+            if text[index].isWhitespace { return position }
+            index = text.index(after: index)
+            position += 1
+        }
+        return position == total ? total : offset
     }
 
     /// Открыли чат с идущим ответом, разметка которого не разбиралась в фоне.

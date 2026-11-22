@@ -145,10 +145,17 @@ extension Color {
 
 enum Haptics {
     static let key = "haptics"
+    /// «Настройки → Отклик при ответе».
+    static let streamKey = "haptics_stream"
 
     /// «Настройки → Тактильный отклик».
     static var enabled: Bool {
         UserDefaults.standard.object(forKey: key) as? Bool ?? true
+    }
+
+    /// Сохранённый выключатель «Отклик при ответе» (по умолчанию включён, как в ChatGPT).
+    static var streamSetting: Bool {
+        UserDefaults.standard.object(forKey: streamKey) as? Bool ?? true
     }
 
     /// Генераторы живут всё время работы приложения и после каждого отклика готовятся к следующему (`prepare`):
@@ -157,6 +164,21 @@ enum Haptics {
     private static let impact = UIImpactFeedbackGenerator(style: .light)
     private static let notice = UINotificationFeedbackGenerator()
     private static let picker = UISelectionFeedbackGenerator()
+    /// Мягкие толчки вывода ответа.
+    private static let soft = UIImpactFeedbackGenerator(style: .soft)
+    private static var lastStream = Date.distantPast
+
+    /// Толчок, пока на экране появляется текст ответа (как в ChatGPT): мягкий и слабее нажатия кнопки, не чаще
+    /// ~11 раз в секунду, только вместе с новыми словами. По правилам Apple отклик привязан к видимому изменению;
+    /// в режиме энергосбережения не играет (ChatGPT так же выключает его при низком заряде).
+    static func stream() {
+        guard enabled, streamSetting, !ProcessInfo.processInfo.isLowPowerModeEnabled else { return }
+        let now = Date()
+        guard now.timeIntervalSince(lastStream) >= 0.09 else { return }
+        lastStream = now
+        soft.impactOccurred(intensity: 0.55)
+        soft.prepare()
+    }
 
     static func tap() {
         guard enabled else { return }

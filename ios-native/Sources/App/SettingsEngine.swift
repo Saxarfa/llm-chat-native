@@ -53,8 +53,10 @@ extension AppModel {
     func setModelValue(_ key: String, _ value: Any?, model chosen: String? = nil) async {
         let model = chosen ?? activeModelID
         var patch: [String: Any] = [key: value ?? NSNull()]
-        // У AI Studio выбор уровня включает рассуждения.
-        if value != nil, model.hasPrefix("aistudio/"), key == "reasoning_strength" { patch["thinking"] = true }
+        // У AI Studio и Claude выбор уровня включает рассуждения (как `ComposerTools.tsx` и `Settings.tsx` сайта).
+        if value != nil, model.hasPrefix("aistudio/") || model.hasPrefix("claude/"), key == "reasoning_strength" {
+            patch["thinking"] = true
+        }
         await saveModelConfig(model: model, patch: patch)
         await dropChatValues(Array(patch.keys), model: model)
     }

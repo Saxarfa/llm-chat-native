@@ -272,17 +272,21 @@ struct MessageFeed: View {
                                         .transition(.asymmetric(insertion: .opacity, removal: .identity))
                                 } else if let last = items.last, !last.isUser {
                                     // Варианты продолжения — как на сайте, если они не выключены в его настройках.
-                                    if !last.suggestions.isEmpty, (model.settings.shared["chatSuggestions"] as? Bool) != false,
-                                       model.activeChat?.temporary != true {
+                                    // Ряд значков ответа заходит в промежуток на `AnswerRow.overlap` — подсказки и
+                                    // полоса ниже стоят от значков там же, где и до этого.
+                                    let suggestions = !last.suggestions.isEmpty
+                                        && (model.settings.shared["chatSuggestions"] as? Bool) != false
+                                        && model.activeChat?.temporary != true
+                                    if suggestions {
                                         SuggestionsView(messageID: last.rawID, items: last.suggestions)
-                                            .padding(.top, -8)
+                                            .padding(.top, AnswerRow.overlap - 8)
                                             .transition(.opacity)
                                     }
                                     // Место прежней подписи «…может ошибаться» (убрана 20.11.2026): пустая полоса держит
                                     // тот же отступ до поля ввода, и касание по ней, как по всей ленте, убирает клавиатуру.
                                     Color.clear
                                         .frame(height: 16)
-                                        .padding(.top, -10)
+                                        .padding(.top, (suggestions ? 0 : AnswerRow.overlap) - 10)
                                         .transition(.identity)
                                 }
                                 Color.clear
@@ -373,6 +377,9 @@ enum FeedEntry {
 /// Въезд сообщения при входе в готовый чат: сбоку на своё место, с задержкой по очереди `order`.
 /// До входа скрыты все сообщения (очерёдность ещё не посчитана); `order == nil` — сообщение выше
 /// экрана и встаёт на место сразу, без движения.
+///
+/// Быстро (просьба пользователя 22.11.2026 «ускорь появление текста»): без начальной паузы, шаг 0,02 с,
+/// 0,2 с на сообщение и сдвиг 14 pt — последнее сообщение стоит на месте через ~0,3 с (было ~0,9 с с пружиной).
 private struct FeedEntrance: ViewModifier {
     let entered: Bool
     let animated: Bool
@@ -382,9 +389,9 @@ private struct FeedEntrance: ViewModifier {
     func body(content: Content) -> some View {
         content
             .opacity(entered ? 1 : 0)
-            .offset(x: entered ? 0 : (fromRight ? 28 : -28))
+            .offset(x: entered ? 0 : (fromRight ? 14 : -14))
             .animation(animated && order != nil
-                       ? .spring(response: 0.5, dampingFraction: 0.86).delay(0.12 + Double(order ?? 0) * 0.05)
+                       ? .easeOut(duration: 0.2).delay(Double(order ?? 0) * 0.02)
                        : nil,
                        value: entered)
     }
@@ -577,7 +584,8 @@ private struct LiveAnswerView: View {
                     .transition(.identity)
             }
             if !live.blocks.isEmpty {
-                MarkdownView(blocks: live.blocks)
+                // Пока слова выводятся, новые проступают мягким краем; при паузе и в дописанном ответе — обычный текст.
+                MarkdownView(blocks: live.blocks, streaming: !done && !live.stopping && live.content.flowing)
             }
             ForEach(live.arts) { art in
                 ArtView(art: art)
@@ -884,7 +892,7 @@ private struct AssistantMessageView: View {
                             Haptics.tap()
                             ChatShare.present(message.text)
                         } label: {
-                            AnswerIcon(symbol: "square.and.arrow.up")
+                            AnswerIcon(glyph: .share)
                         }
                         .buttonStyle(PressScaleStyle())
                         .accessibilityLabel("Поделиться")
@@ -895,7 +903,7 @@ private struct AssistantMessageView: View {
                             guard !DrawerSwipe.blocksTaps else { return }
                             Task { await model.regenerate(message) }
                         } label: {
-                            AnswerIcon(symbol: "arrow.clockwise")
+                            AnswerIcon(glyph: .regenerate)
                         }
                         .buttonStyle(PressScaleStyle())
                         .disabled(model.branchBusy)
@@ -908,25 +916,32 @@ private struct AssistantMessageView: View {
                         AnswerMoreMenu(message: message)
                     }
                 }
+                // Левый край первого значка — на 2 pt правее текста, как у Claude (видимая часть 9…23 из 32 pt).
                 .padding(.leading, -7)
-                .padding(.top, -8)
+                // Замер Claude (22.11.2026): от середины последней строки до значков ~39 pt, от значков до
+                // следующего вопроса ~34 pt. Ряд 44 pt (зона нажатия) заходит под зазор до вопроса.
+                .padding(.top, -6)
+                .padding(.bottom, -AnswerRow.overlap)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-/// Значок в ряду под ответом.
+/// Ряд значков под ответом.
+enum AnswerRow {
+    /// На сколько ряд (44 pt зоны нажатия) заходит в промежуток до следующего сообщения: значки ближе к
+    /// следующему вопросу, чем к ответу над ними не по смыслу, — до вопроса ~34 pt от их середины, как у Claude.
+    static let overlap: CGFloat = 14
+}
+
+/// Значок в ряду под ответом: свой глиф (`AnswerGlyph`) вторичным цветом, шаг 32 pt, зона нажатия 32 × 44.
 private struct AnswerIcon: View {
-    let symbol: String
+    let glyph: AnswerGlyph
     var active = false
 
     var body: some View {
-        // Как у Claude: глиф ~15 pt вторичным цветом #96958D, шаг 32 pt.
-        Image(systemName: symbol)
-            .font(.system(size: 14.5, weight: .regular))
-            .foregroundStyle(active ? Theme.accent : Theme.muted)
-            // Зона нажатия 32×44 (было 29×38 — мимо легко промахнуться, аудит 13.11.2026).
+        AnswerGlyphView(glyph: glyph, color: active ? Theme.accent : Theme.muted)
             .frame(width: 32, height: 44)
             .contentShape(Rectangle())
     }
@@ -944,7 +959,7 @@ private struct ReadAloudButton: View {
             Haptics.tap()
             reader.toggle(id: id, text: text)
         } label: {
-            AnswerIcon(symbol: speaking ? "stop.circle" : "play", active: speaking)
+            AnswerIcon(glyph: speaking ? .stop : .play, active: speaking)
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel(speaking ? "Остановить чтение" : "Прочитать вслух")
@@ -1057,7 +1072,7 @@ private struct AnswerMoreMenu: View {
                 Label("Удалить ответ", systemImage: "trash")
             }
         } label: {
-            AnswerIcon(symbol: "ellipsis")
+            AnswerIcon(glyph: .more)
         }
         // Меню открывается системой на отрыве пальца, без действия, где проверить свайп, — поэтому
         // пока шторку ведут или она доезжает, «⋯» выключено.
@@ -1102,7 +1117,16 @@ private struct ReasoningView: View {
             Button {
                 guard !text.isEmpty, !DrawerSwipe.blocksTaps else { return }
                 Haptics.tap()
-                withAnimation(Theme.spring) { open.toggle() }
+                if open {
+                    // Сворачивание — сразу, без анимации раскладки: длинные размышления уходили пружиной, и текст
+                    // ответа под ними пролетал вверх через весь экран (замечание пользователя 22.11.2026).
+                    var instant = Transaction()
+                    instant.disablesAnimations = true
+                    withTransaction(instant) { open = false }
+                } else {
+                    // Раскрытие — коротко и без отскока; шаги проявляются сами (`ReasoningTimeline`).
+                    withAnimation(.easeOut(duration: 0.2)) { open = true }
+                }
                 if let memoryKey {
                     if open { ReasoningOpen.keys.insert(memoryKey) } else { ReasoningOpen.keys.remove(memoryKey) }
                 }
@@ -1120,10 +1144,12 @@ private struct ReasoningView: View {
                         }
                     }
                     if !text.isEmpty {
-                        Image(systemName: "chevron.right")
+                        // Шеврон встаёт сразу, не поворачивается (значки не анимируются, как на сайте).
+                        Image(systemName: open ? "chevron.down" : "chevron.right")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(Theme.subtle)
-                            .rotationEffect(.degrees(open ? 90 : 0))
+                            .frame(width: 12)
+                            .transaction { $0.animation = nil }
                             .accessibilityHidden(true)
                     }
                 }
@@ -1139,12 +1165,15 @@ private struct ReasoningView: View {
 
             if open && !text.isEmpty {
                 ReasoningTimeline(text: text, live: spark)
-                    .transition(.opacity)
+                    .transition(.asymmetric(insertion: .opacity, removal: .identity))
             }
         }
-        // Строка — шапка ответа: прижата к тексту под ней (зона нажатия 44 pt остаётся).
-        .padding(.top, -20)
-        .padding(.bottom, open && !text.isEmpty ? 4 : -12)
+        // Строка — шапка ответа. Замер Claude (22.11.2026): от низа вопроса до середины строки ~43 pt, от неё до
+        // середины первой строки ответа ~48 pt (было 28 и 33 — вопрос лип к следующему ответу).
+        // Пока размышлений нет (строка лишь показывает этап «Думаю» и исчезнет с первым текстом), она остаётся
+        // прижатой, как раньше, — иначе текст ответа при её уходе прыгал бы вверх на ~54 pt.
+        .padding(.top, text.isEmpty ? -20 : -5)
+        .padding(.bottom, text.isEmpty ? -12 : (open ? 8 : 3))
         .task(id: spark) {
             if spark {
                 thinkingLabel = true
@@ -1325,7 +1354,10 @@ private struct ReasoningTimeline: View {
     @State private var appeared = false
 
     /// Задержка появления шага; дальние шаги не ждут дольше седьмого.
-    private func delay(_ index: Int) -> Double { Double(min(index, 7)) * 0.07 }
+    private func delay(_ index: Int) -> Double { Double(min(index, 7)) * 0.04 }
+
+    /// Появление при раскрытии — коротко и без отскока.
+    private static let reveal = Animation.easeOut(duration: 0.22)
 
     var body: some View {
         content
@@ -1349,7 +1381,7 @@ private struct ReasoningTimeline: View {
                 }
                 // Полоса — под центром «Атома» (20 pt) в строке выше.
                 .padding(.leading, 8.5)
-                .animation(Theme.spring, value: appeared)
+                .animation(Self.reveal, value: appeared)
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(steps) { step in
@@ -1391,12 +1423,12 @@ private struct ReasoningTimeline: View {
                         }
                         .frame(width: 14)
                     }
-                    .animation(.spring(response: 0.4, dampingFraction: 0.72).delay(delay(step.id)), value: appeared)
+                    .animation(Self.reveal.delay(delay(step.id)), value: appeared)
                 }
             }
             // Точки — под центром «Атома» (20 pt) в строке выше.
             .padding(.leading, 3)
-            .animation(Theme.spring, value: steps.count)
+            .animation(Self.reveal, value: steps.count)
         }
     }
 

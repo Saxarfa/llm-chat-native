@@ -20,9 +20,28 @@ struct ModelPickerSheet: View {
         ChatParameters.isNano(id) || id.localizedCaseInsensitiveContains("omni")
     }
 
+    /// Главная карточка: сначала Claude (как в приложении Claude: Fable, Opus, Sonnet, Haiku, новые выше),
+    /// затем AI Studio, затем модели ПК; внутри группы — порядок сервера.
     private var mainModels: [ModelOption] {
-        model.models.filter { [.studio, .local].contains($0.group) && !Self.isImageModel($0.id) }
-            .sorted { $0.group.rawValue > $1.group.rawValue }   // сначала AI Studio, затем ПК
+        let list = model.models.filter { [.claude, .studio, .local].contains($0.group) && !Self.isImageModel($0.id) }
+        return list.enumerated().sorted { left, right in
+            let a = Self.rank(left.element.group), b = Self.rank(right.element.group)
+            if a != b { return a < b }
+            if left.element.group == .claude {
+                let x = HostedService.claudeOrder(left.element.id), y = HostedService.claudeOrder(right.element.id)
+                if x.family != y.family { return x.family < y.family }
+                if x.version != y.version { return y.version.lexicographicallyPrecedes(x.version) }
+            }
+            return left.offset < right.offset
+        }.map(\.element)
+    }
+
+    private static func rank(_ group: ModelOption.Group) -> Int {
+        switch group {
+        case .claude: return 0
+        case .studio: return 1
+        default: return 2
+        }
     }
 
     /// Модели телефона, картинок и облачных сервисов (NVIDIA, OpenRouter, Groq).
@@ -277,6 +296,7 @@ struct ModelPickerSheet: View {
         case .phone: return "На телефоне"
         case .studio: return Self.isImageModel(item.id) ? "AI Studio · создаёт изображения" : "AI Studio"
         case .hosted: return "\(HostedService.of(item.id)?.title ?? "API") · бесплатный API"
+        case .claude: return "Claude API"
         }
     }
 
