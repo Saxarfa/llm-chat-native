@@ -244,13 +244,6 @@ enum PreviewScene: String, CaseIterable {
     }()
 
     static let modelOptions: [ModelOption] = [
-        // Claude по API (0.17) — в окне выбора первыми, как у приложения Claude.
-        ModelOption(id: "claude/claude-sonnet-5-5", name: HostedService.name("claude/claude-sonnet-5-5"),
-                    group: .claude, loaded: false),
-        ModelOption(id: "claude/claude-opus-5-5", name: HostedService.name("claude/claude-opus-5-5"),
-                    group: .claude, loaded: false),
-        ModelOption(id: "claude/claude-haiku-5-5", name: HostedService.name("claude/claude-haiku-5-5"),
-                    group: .claude, loaded: false),
         ModelOption(id: "gemma-26b-qat", name: "Gemma 26B QAT", group: .local, loaded: true),
         ModelOption(id: "qwen-3.8-27b-it", name: "Qwen 3.8 27B It", group: .local, loaded: false),
         ModelOption(id: "muse-glimmer-30b", name: "Muse Glimmer 30B", group: .local, loaded: false),
@@ -263,6 +256,13 @@ enum PreviewScene: String, CaseIterable {
                     name: HostedService.name("openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"), group: .hosted, loaded: false),
         ModelOption(id: "groq/openai/gpt-oss-120b", name: HostedService.name("groq/openai/gpt-oss-120b"),
                     group: .hosted, loaded: false),
+        // Claude по API (0.17) — сервер отдаёт их последними (облачные сервисы); окно выбора само ставит их первыми.
+        ModelOption(id: "claude/claude-sonnet-5-5", name: HostedService.name("claude/claude-sonnet-5-5"),
+                    group: .claude, loaded: false),
+        ModelOption(id: "claude/claude-opus-5-5", name: HostedService.name("claude/claude-opus-5-5"),
+                    group: .claude, loaded: false),
+        ModelOption(id: "claude/claude-haiku-5-5", name: HostedService.name("claude/claude-haiku-5-5"),
+                    group: .claude, loaded: false),
     ]
 
     /// Ответ с веб-поиском: источники (обычные сайты, переадресация Google Search, база знаний)
