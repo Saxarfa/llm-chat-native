@@ -238,10 +238,32 @@ private struct StreamTail: ViewModifier {
     /// Длина текста в знаках: по её росту видно, какие слова новые.
     let length: Int
     @State private var marks = RevealMarks()
+    /// Абзац только что перестал выводиться: проявление ещё гаснет (`RevealMark.settle`).
+    @State private var lingering = false
     /// Шторка открыта — кадры не идут.
     @Environment(\.motionPaused) private var motionPaused
 
     func body(content: Content) -> some View {
+        // Свой рисовальщик и таймлайн — только у выводимого абзаца и пока гаснет его проявление.
+        // У всей ленты они делали медленной каждую перерисовку: в 0.17.1 набор в капсуле терял
+        // буквы (UI-тест `testCardWithoutContextLine`, CI 45089805176).
+        Group {
+            if active || lingering {
+                revealing(content)
+            } else {
+                content
+            }
+        }
+        .task(id: active) {
+            if active { lingering = true; return }
+            guard lingering else { return }
+            try? await Task.sleep(for: RevealMark.settle)
+            if !Task.isCancelled { lingering = false }
+        }
+    }
+
+    @ViewBuilder
+    private func revealing(_ content: Content) -> some View {
         if #available(iOS 18.0, *) {
             let _ = note()
             let items = marks.items, settled = marks.settled, shown = marks.length, strength: Double = active ? 1 : 0
@@ -270,6 +292,8 @@ private struct RevealMark: Sendable {
 
     /// За сколько секунд слово проступает целиком.
     static let fade = 0.3
+    /// Сколько после конца вывода абзац ещё рисуется с проявлением: оно гаснет за 0,35 с.
+    static let settle: Duration = .milliseconds(400)
 }
 
 /// Когда появлялись знаки выводимого абзаца. Класс, а не состояние: отметки не перерисовывают абзац.

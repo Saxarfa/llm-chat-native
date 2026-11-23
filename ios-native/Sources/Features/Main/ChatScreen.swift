@@ -774,14 +774,14 @@ struct ComposerBar: View {
     }
 
     private var modelButton: some View {
-        let level = reasoningLabel
-        let shown = heldChip ?? liveChip
+        let live = liveChip
+        let shown = heldChip ?? live
         return Button {
             // Состояние читается текущее (не снятое при отрисовке): капсула уже свернулась —
             // значит, это касание по тающему чипу, и оно должно открыть клавиатуру.
             guard self.expanded else { focused = true; return }
             returnFocus = focused
-            heldChip = liveChip
+            heldChip = live
             Keyboard.hide()
             Haptics.tap()
             showModels = true
@@ -803,7 +803,7 @@ struct ComposerBar: View {
         // Ряд кнопок отдаёт чипу всё свободное место; без этого HStack делил ширину
         // пополам с распоркой, и уровень рассуждений никогда не помещался.
         .layoutPriority(1)
-        .accessibilityLabel("Модель: \(model.activeModelName)" + (level.map { ", \($0)" } ?? ""))
+        .accessibilityLabel("Модель: \(live.name)" + (live.level.map { ", \($0)" } ?? ""))
         .accessibilityHint("Выбрать модель")
     }
 
