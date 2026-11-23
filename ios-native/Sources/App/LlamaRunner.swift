@@ -806,6 +806,7 @@ final class LlamaRunner: @unchecked Sendable {
     private(set) var contextSize = 0
     private(set) var hasVision = false
     private(set) var hasMTP = false
+    private(set) var compactCache = false
 
     private static let unavailable = PhoneEngineError(message: "В симуляторе движка llama.cpp нет — модели на телефоне работают только на iPhone.")
 
