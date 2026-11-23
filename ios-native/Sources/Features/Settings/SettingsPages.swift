@@ -554,7 +554,7 @@ struct SearchPage: View {
                     Stepper(value: Binding(get: { count }, set: { value in
                         Haptics.selection()
                         Task { _ = await model.saveShared(["searchMaxResults": value]) }
-                    }), in: 1...10) {
+                    }), in: 1...20) {
                         HStack {
                             Text("Количество результатов")
                                 .font(.system(size: RowMetrics.text))

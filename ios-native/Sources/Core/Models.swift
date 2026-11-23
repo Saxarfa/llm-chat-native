@@ -89,6 +89,8 @@ struct ChatMessage {
     var sources: [FeedSource] = []
     /// Варианты продолжения разговора (`suggestions`, сервер пишет их последнему ответу).
     var suggestions: [String] = []
+    /// Ошибка генерации (`metrics.error`): одна красная строка под ответом, как `inline-error` на сайте.
+    var error = ""
 
     init(id: String, role: String, content: String, model: String? = nil, reasoning: String? = nil,
          attachments: [FeedAttachment] = [], arts: [FeedArt] = []) {
@@ -129,6 +131,8 @@ struct ChatMessage {
             guard let text = (item as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
             return text
         }
+        let metrics = (json["metrics"] as? [String: Any]) ?? [:]
+        error = ((metrics["error"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static func attachmentKey(message: String, index: Int) -> String {
@@ -152,6 +156,7 @@ struct FeedMessage: Identifiable, Equatable {
     var variantIndex = 0
     var sources: [FeedSource] = []
     var suggestions: [String] = []
+    var error = ""
 
     static func build(from messages: [ChatMessage]) -> [FeedMessage] {
         var result: [FeedMessage] = []
@@ -172,7 +177,8 @@ struct FeedMessage: Identifiable, Equatable {
                 variantCount: message.variantCount,
                 variantIndex: message.variantIndex,
                 sources: isUser ? [] : message.sources,
-                suggestions: isUser ? [] : message.suggestions
+                suggestions: isUser ? [] : message.suggestions,
+                error: isUser ? "" : message.error
             ))
         }
         return result

@@ -18,6 +18,8 @@ struct PhoneRunStats: Equatable {
     var stoppedByLimit = false
     /// Сколько токенов головы MTP модель приняла (0 — MTP не работал).
     var draftedAccepted = 0
+    /// Сколько первых токенов переписки модель не читала: они остались в памяти с прошлого ответа.
+    var reusedTokens = 0
 
     var tokensPerSecond: Double { seconds > 0 ? Double(tokens) / seconds : 0 }
 }
@@ -67,12 +69,19 @@ final class LlamaRunner: @unchecked Sendable {
     private var pending: [Float] = []
     /// Строки скрытых состояний последнего пакета модели — по одной на токен.
     private var rows: [Float] = []
+    /// Токены, которые лежат в памяти модели с позиции 0: следующий ответ дочитывает только то, что после
+    /// совпавшего начала (`reuse`). Пусто — память модели пуста или в ней картинки.
+    private var cached: [llama_token] = []
+    /// Сколько первых позиций голова MTP прочитала вместе с моделью: её память совпадает с `cached` до этого места.
+    private var draftCached = 0
 
     private(set) var loadedPath: String?
     private(set) var loadedVision: String?
     private(set) var contextSize = 0
     private(set) var hasVision = false
     private(set) var hasMTP = false
+    /// Кэш ключей и значений сжат до q8_0 (вдвое меньше f16). Не создался со сжатым — обычный f16.
+    private(set) var compactCache = false
 
     /// Сколько токенов черновика проверять за раз и с какой уверенностью головы их брать.
     private static let draftMax = 3
@@ -131,18 +140,21 @@ final class LlamaRunner: @unchecked Sendable {
         }
         let trained = Int(llama_model_n_ctx_train(loaded))
         let size = max(512, min(wanted, trained > 0 ? trained : wanted))
-        var contextParams = llama_context_default_params()
-        contextParams.n_ctx = UInt32(size)
-        contextParams.n_batch = 512
-        contextParams.n_ubatch = 512
-        contextParams.n_threads = threads
-        contextParams.n_threads_batch = threads
-        guard let created = llama_init_from_model(loaded, contextParams) else {
+        // Сначала со сжатым кэшем; сжатые значения требуют flash attention, и если Metal её для этой модели
+        // не умеет, llama.cpp контекст не создаёт — тогда обычный кэш f16.
+        var compact = true
+        var attempt = llama_init_from_model(loaded, contextParams(size: size, compact: true))
+        if attempt == nil {
+            compact = false
+            attempt = llama_init_from_model(loaded, contextParams(size: size, compact: false))
+        }
+        guard let created = attempt else {
             llama_model_free(loaded)
             throw PhoneEngineError(message: "Не хватило памяти для контекста модели. Закройте другие приложения или выберите модель поменьше.")
         }
         model = loaded
         context = created
+        compactCache = compact
         vocab = llama_model_get_vocab(loaded)
         template = llama_model_chat_template(loaded, nil).map { String(cString: $0) }
         loadedPath = path
@@ -153,6 +165,24 @@ final class LlamaRunner: @unchecked Sendable {
         }
         if modelParams.load_mtp { attachDraft() }
         return contextSize
+    }
+
+    /// Параметры контекста модели. `compact` — кэш ключей и значений в q8_0: вдвое меньше памяти, чем f16,
+    /// почти без потери качества; flash attention — «авто»: llama.cpp включает её, где Metal её умеет
+    /// (на длинном контексте она ещё и быстрее).
+    private func contextParams(size: Int, compact: Bool) -> llama_context_params {
+        var params = llama_context_default_params()
+        params.n_ctx = UInt32(size)
+        params.n_batch = 512
+        params.n_ubatch = 512
+        params.n_threads = threads
+        params.n_threads_batch = threads
+        params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO
+        if compact {
+            params.type_k = GGML_TYPE_Q8_0
+            params.type_v = GGML_TYPE_Q8_0
+        }
+        return params
     }
 
     /// Проектор картинок. Не подошёл к модели — модель работает без зрения.
@@ -221,9 +251,68 @@ final class LlamaRunner: @unchecked Sendable {
         contextSize = 0
         hasVision = false
         hasMTP = false
+        compactCache = false
         embd = 0
         pending = []
         rows = []
+        cached = []
+        draftCached = 0
+    }
+
+    /// Очищает память модели и головы MTP: следующий ответ читает переписку целиком.
+    private func forget() {
+        if let context { llama_memory_clear(llama_get_memory(context), true) }
+        if let draft { llama_memory_clear(llama_get_memory(draft), true) }
+        cached = []
+        draftCached = 0
+    }
+
+    /// Сколько первых токенов промпта уже лежит в памяти с прошлого ответа — модель их не читает заново,
+    /// а всё, что в памяти после совпавшего начала, убирается. Последний токен промпта читается всегда:
+    /// от него модель начинает ответ. С головой MTP (`drafting`) последний совпавший токен модель читает ещё
+    /// раз — его скрытое состояние нужно голове для первого нового токена (`pending`).
+    /// Откатить нельзя (рекуррентные слои не откатываются, окно SWA уже ушло дальше) — память очищается
+    /// и промпт читается целиком, как раньше.
+    private func reuse(_ tokens: [llama_token], drafting: Bool) -> Int {
+        guard let context, let model, !tokens.isEmpty else { return 0 }
+        let memory = llama_get_memory(context)
+        let limit = min(cached.count, tokens.count - 1)
+        var keep = 0
+        while keep < limit, cached[keep] == tokens[keep] { keep += 1 }
+        if drafting { keep = min(keep, draftCached) }
+        let from = drafting ? keep - 1 : keep
+        guard from > 0 else {
+            forget()
+            return 0
+        }
+        if from < cached.count {
+            // Слои со скользящим окном помнят только его ширину: откат возможен, пока окно перед `from` цело.
+            let window = Int(llama_model_n_swa(model))
+            let oldest = Int(llama_memory_seq_pos_min(memory, 0))
+            guard oldest <= max(0, from - window), llama_memory_seq_rm(memory, 0, llama_pos(from), -1) else {
+                forget()
+                return 0
+            }
+            cached.removeSubrange(from...)
+        }
+        if let draft {
+            guard llama_memory_seq_rm(llama_get_memory(draft), 0, llama_pos(keep), -1) else {
+                forget()
+                return 0
+            }
+            draftCached = min(draftCached, keep)
+        }
+        if drafting {
+            var token = tokens[from]
+            guard llama_decode(context, llama_batch_get_one(&token, 1)) == 0, embd > 0,
+                  let row = NextN.all?(context) else {
+                forget()
+                return 0
+            }
+            pending = Array(UnsafeBufferPointer(start: row, count: embd))
+            cached.append(token)
+        }
+        return keep
     }
 
     // MARK: - Ответ
@@ -273,9 +362,7 @@ final class LlamaRunner: @unchecked Sendable {
         // Ответу оставляем не меньше четверти контекста; старые сообщения уходят первыми.
         let reserve = sampling.maxTokens > 0 ? min(sampling.maxTokens, contextSize / 2) : max(256, contextSize / 4)
         let memory = llama_get_memory(context)
-        llama_memory_clear(memory, true)
         let useDraft = draft != nil && sampling.mtp && images.isEmpty
-        if let draft { llama_memory_clear(llama_get_memory(draft), true) }
         pending = [Float](repeating: 0, count: embd)
 
         var result = PhoneRunStats()
@@ -284,6 +371,8 @@ final class LlamaRunner: @unchecked Sendable {
             guard vision != nil, hasVision else {
                 throw PhoneEngineError(message: "Эта модель на телефоне не видит картинки: нет файла зрения (mmproj). Добавьте его в «Модели на телефоне».")
             }
+            // Картинки в `cached` не записать: переписка с ними читается целиком, и следующий ответ — тоже.
+            forget()
             used = try readWithImages(messages, images: images, thinking: sampling.thinking, reserve: reserve)
             result.promptTokens = used
         } else {
@@ -298,8 +387,10 @@ final class LlamaRunner: @unchecked Sendable {
                 tokens = try tokenize(prompt(history, thinking: sampling.thinking))
             }
             result.promptTokens = tokens.count
+            // Совпавшее с прошлым ответом начало переписки уже в памяти — читается только остальное.
+            var position = reuse(tokens, drafting: useDraft)
+            result.reusedTokens = position
             // Промпт — кусками по размеру пакета; голова MTP читает те же куски.
-            var position = 0
             var drafting = useDraft
             while position < tokens.count {
                 if isCancelled { return result }
@@ -308,10 +399,13 @@ final class LlamaRunner: @unchecked Sendable {
                     llama_decode(context, llama_batch_get_one(buffer.baseAddress! + position, Int32(count)))
                 }
                 guard status == 0 else {
+                    forget()
                     throw PhoneEngineError(message: "Модель не смогла прочитать переписку (код \(status)).")
                 }
+                cached += tokens[position..<(position + count)]
                 if drafting {
                     drafting = feedDraft(Array(tokens[position..<(position + count)]), start: position)
+                    if drafting { draftCached = position + count }
                 }
                 position += count
             }
@@ -358,6 +452,10 @@ final class LlamaRunner: @unchecked Sendable {
         }
 
         var token = llama_sampler_sample(sampler, context, -1)
+        // Память модели разошлась с `cached` (не убрались отвергнутые догадки, отказ Metal) — после ответа
+        // она очищается, следующий читает переписку целиком.
+        var stale = false
+        defer { if stale { forget() } }
         if useDraft && !pending.isEmpty {
             // MTP: голова угадывает до трёх токенов вперёд, модель проверяет их одним пакетом;
             // совпавшие принимаются, первый несовпавший токен модели идёт дальше.
@@ -375,7 +473,10 @@ final class LlamaRunner: @unchecked Sendable {
                     batch.seq_id[index]![0] = 0
                     batch.logits[index] = 1
                 }
-                guard llama_decode(context, batch) == 0 else { break }
+                guard llama_decode(context, batch) == 0 else {
+                    stale = true
+                    break
+                }
                 let fed = !pending.isEmpty && feedDraft(sequence, start: used)
                 var accepted = 0
                 var next = llama_sampler_sample(sampler, context, 0)
@@ -389,10 +490,14 @@ final class LlamaRunner: @unchecked Sendable {
                     next = llama_sampler_sample(sampler, context, Int32(accepted))
                 }
                 result.draftedAccepted += accepted
+                let start = used
                 used += 1 + accepted
+                cached += sequence.prefix(1 + accepted)
                 // Отвергнутые догадки — из кэша модели и головы.
-                llama_memory_seq_rm(memory, 0, llama_pos(used), -1)
+                if !llama_memory_seq_rm(memory, 0, llama_pos(used), -1) { stale = true }
                 if let draft { llama_memory_seq_rm(llama_get_memory(draft), 0, llama_pos(used), -1) }
+                // Голова прочитала этот шаг вместе с моделью — её память по-прежнему совпадает с `cached`.
+                if fed, draftCached == start { draftCached = used }
                 if fed, rows.count >= (accepted + 1) * embd {
                     pending = Array(rows[(accepted * embd)..<((accepted + 1) * embd)])
                 } else {
@@ -406,8 +511,10 @@ final class LlamaRunner: @unchecked Sendable {
                 var single = token
                 guard llama_decode(context, llama_batch_get_one(&single, 1)) == 0 else {
                     // Например, приложение ушло в фон и Metal отказал — что успели, остаётся.
+                    stale = true
                     break
                 }
+                cached.append(single)
                 used += 1
                 token = llama_sampler_sample(sampler, context, -1)
             }

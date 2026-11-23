@@ -143,6 +143,8 @@ extension AppModel {
                 var metrics: [String: Any] = ["device": "iphone", "prompt_tokens": stats.promptTokens, "tokens": stats.tokens,
                                               "tokens_per_second": (stats.tokensPerSecond * 10).rounded() / 10]
                 if stats.draftedAccepted > 0 { metrics["mtp_accepted"] = stats.draftedAccepted }
+                // Сколько токенов переписки модель взяла из памяти, не читая заново (для проверки на iPhone).
+                if stats.reusedTokens > 0 { metrics["prompt_cached"] = stats.reusedTokens }
                 answer["metrics"] = metrics
             }
             rawChats[id]?.messages.append(answer)

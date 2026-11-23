@@ -185,9 +185,11 @@ final class PhoneModels {
         PhoneMemory.needed(fileSize: size, context: context, kv: kv(file, context: context))
     }
 
+    /// Кэш считается сжатым (q8_0), кроме уже загруженной модели, у которой сжатый кэш не создался.
     private func kv(_ file: String?, context: Int) -> Int64? {
         guard let file else { return nil }
-        return infos[file]?.kvBytes(context: context)
+        let compact = loadedFile != file || runner.compactCache
+        return infos[file]?.kvBytes(context: context, compact: compact)
     }
 
     // MARK: - Сведения о модели

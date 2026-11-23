@@ -9,9 +9,6 @@ struct ModelPickerSheet: View {
     @State private var path: [Page] = []
     @State private var showPhone = false
     @State private var showSettings = false
-    /// Только что нажатая модель: отметка уже переехала на неё, окно закроется через `SlidingMark.hold`.
-    @State private var picked: String?
-    @Namespace private var mark
 
     enum Page: Hashable { case reasoning, other }
 
@@ -302,21 +299,16 @@ struct ModelPickerSheet: View {
 
     /// Строка модели, как у Claude (замер 16.11.2026): шаг 71 pt, название 17, описание 15, текст в 20 pt
     /// от края карточки, синяя галочка у выбранной.
-    /// Выбор — «Скользящая отметка» (выбрано пользователем 18.11.2026): подсветка с галочкой переезжает
-    /// на нажатую строку с отскоком, и только потом окно закрывается.
+    /// Выбор сразу закрывает окно (просьба пользователя 23.11.2026): смену видно в чипе капсулы,
+    /// а не в списке. Окно не ждёт ответа сервера: модель в чате меняется сразу, ещё до запроса.
     private func row(_ item: ModelOption) -> some View {
-        let selected = item.id == (picked ?? model.activeModelID)
+        let selected = item.id == model.activeModelID
         return Button {
-            guard picked == nil else { return }
-            guard item.id != model.activeModelID else { dismiss(); return }
-            Haptics.selection()
-            withAnimation(SlidingMark.spring) { picked = item.id }
-            // Окно закрывается по времени, а не по ответу сервера: при медленной сети оно не зависает.
-            Task { await model.selectModel(item.id) }
-            Task {
-                try? await Task.sleep(nanoseconds: SlidingMark.hold)
-                dismiss()
+            if !selected {
+                Haptics.selection()
+                Task { await model.selectModel(item.id) }
             }
+            dismiss()
         } label: {
             HStack(spacing: 12) {
                 // Как у Claude: название и описание без аватарки (фото модели видно на её странице в настройках).
@@ -335,20 +327,11 @@ struct ModelPickerSheet: View {
                     Image(systemName: "checkmark")
                         .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(Theme.accent)
-                        .matchedGeometryEffect(id: SlidingMark.check, in: mark)
                 }
             }
             .padding(.leading, RowMetrics.plainLeading)
             .padding(.trailing, RowMetrics.trailing)
             .frame(minHeight: 71)
-            .background {
-                // Подсветка видна только во время переезда: в покое у выбранной строки одна галочка, как у Claude.
-                if selected {
-                    SlidingMark.highlight
-                        .opacity(picked == nil ? 0 : 1)
-                        .matchedGeometryEffect(id: SlidingMark.fill, in: mark)
-                }
-            }
             .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())
@@ -356,7 +339,7 @@ struct ModelPickerSheet: View {
     }
 }
 
-/// Общие части «скользящей отметки» в списках выбора (модели и уровни рассуждений).
+/// Части «скользящей отметки» в списке уровней рассуждений.
 enum SlidingMark {
     static let check = "check"
     static let fill = "fill"

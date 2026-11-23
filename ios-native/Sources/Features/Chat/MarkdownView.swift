@@ -142,7 +142,7 @@ struct DrawerFreeZone: ViewModifier {
 /// Ответ модели: блоки Markdown один под другим.
 struct MarkdownView: View {
     let blocks: [MarkdownBlock]
-    /// Ответ ещё пишется: последние знаки последнего абзаца проступают из прозрачности (`StreamTail`).
+    /// Ответ ещё пишется: новые слова последнего абзаца проступают из прозрачности (`StreamTail`).
     var streaming = false
     /// Шрифт ответов из настроек (по умолчанию — с засечками, как у Claude). Читается здесь, один раз на ответ;
     /// блоки получают готовый `AnswerStyle`.
@@ -217,41 +217,98 @@ private struct BodyText: View {
     var body: some View {
         // Текст ответа — шрифтом из настроек; по умолчанию с засечками, как в приложении Claude.
         let points = style.textSize
-        Text(InlineMarkdown.render(text, size: points))
+        let rendered = InlineMarkdown.render(text, size: points)
+        Text(rendered)
             .font(.system(size: points, design: style.design))
             .foregroundStyle(color)
             .lineSpacing(5)
-            .modifier(StreamTail(active: tail))
+            // Длина считается только у выводимого абзаца.
+            .modifier(StreamTail(active: tail, length: tail ? rendered.characters.count : 0))
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-/// Мягкий край выводимого ответа: последние знаки проступают из прозрачности, пока ответ пишется, — новые
-/// слова не выскакивают, а проявляются (как у Claude и ChatGPT). Край движется вместе с выводом (`revealStep`),
-/// поэтому отдельного таймера нет; после конца ответа он за 0,35 с становится обычным текстом.
-/// iOS 18+ (`TextRenderer`); на iOS 17 текст выводится без края.
+/// Проявление выводимого ответа: каждое новое слово проступает из прозрачности за `RevealMark.fade` со своего
+/// появления (выбор пользователя 23.11.2026). Раньше прозрачность зависела от расстояния до конца, и уже
+/// показанные слова светлели скачками вместе с приходом новых. После конца ответа или паузы ~0,4 с
+/// недопроявленное за 0,35 с становится обычным текстом. iOS 18+ (`TextRenderer`); на iOS 17 — без проявления.
 private struct StreamTail: ViewModifier {
     let active: Bool
+    /// Длина текста в знаках: по её росту видно, какие слова новые.
+    let length: Int
+    @State private var marks = RevealMarks()
+    /// Шторка открыта — кадры не идут.
+    @Environment(\.motionPaused) private var motionPaused
 
     func body(content: Content) -> some View {
         if #available(iOS 18.0, *) {
-            // Край появляется сразу (вместе с первыми новыми словами), а гаснет плавно.
-            content
-                .textRenderer(TailRenderer(strength: active ? 1 : 0))
-                .animation(active ? nil : .easeOut(duration: 0.35), value: active)
+            let _ = note()
+            let items = marks.items, settled = marks.settled, shown = marks.length, strength: Double = active ? 1 : 0
+            // 30 кадров в секунду хватает проявлению за 0,3 с; текст при этом не раскладывается заново.
+            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !active || motionPaused)) { context in
+                content.textRenderer(TailRenderer(strength: strength, marks: items, settled: settled, length: shown,
+                                                  now: context.date.timeIntervalSinceReferenceDate))
+            }
+            // Проявление включается сразу (вместе с первыми новыми словами), а гаснет плавно.
+            .animation(active ? nil : .easeOut(duration: 0.35), value: active)
         } else {
             content
+        }
+    }
+
+    /// Отметка о новых словах — в момент, когда они впервые попадают в разметку.
+    private func note() {
+        if active { marks.note(length, at: Date().timeIntervalSinceReferenceDate) }
+    }
+}
+
+/// Сколько знаков было показано к моменту `time` (секунды от отсчёта `Date`).
+private struct RevealMark: Sendable {
+    let end: Int
+    let time: Double
+
+    /// За сколько секунд слово проступает целиком.
+    static let fade = 0.3
+}
+
+/// Когда появлялись знаки выводимого абзаца. Класс, а не состояние: отметки не перерисовывают абзац.
+@MainActor
+private final class RevealMarks {
+    private(set) var items: [RevealMark] = []
+    /// Знаки до этого места уже проявились полностью.
+    private(set) var settled = 0
+    /// Длина абзаца на последней отметке.
+    private(set) var length = 0
+
+    func note(_ value: Int, at time: Double) {
+        if value < length {
+            // Текст заменён (разметка разобрана иначе) — он уже на экране, отсчёт заново.
+            items.removeAll()
+            settled = value
+            length = value
+            return
+        }
+        guard value > length else { return }
+        items.append(RevealMark(end: value, time: time))
+        length = value
+        // Проявившиеся отметки больше не нужны: всё до их конца — обычный текст.
+        while items.count > 1, let first = items.first, time - first.time > RevealMark.fade {
+            settled = first.end
+            items.removeFirst()
         }
     }
 }
 
 @available(iOS 18.0, *)
 private struct TailRenderer: TextRenderer {
-    /// 1 — край виден, 0 — обычный текст (анимируется при конце ответа).
+    /// 1 — проявление идёт, 0 — обычный текст (анимируется при конце ответа).
     var strength: Double
-    /// Сколько последних знаков проступает.
-    static let span = 28
+    let marks: [RevealMark]
+    let settled: Int
+    /// Длина текста в знаках на последней отметке.
+    let length: Int
+    let now: Double
 
     var animatableData: Double {
         get { strength }
@@ -259,38 +316,44 @@ private struct TailRenderer: TextRenderer {
     }
 
     func draw(layout: Text.Layout, in context: inout GraphicsContext) {
-        guard strength > 0.01 else {
+        guard strength > 0.01, !marks.isEmpty else {
             for line in layout { context.draw(line) }
             return
         }
-        let lines = Array(layout)
-        let counts = lines.map { line in line.reduce(0) { $0 + $1.count } }
-        let total = counts.reduce(0, +)
-        var start = 0
-        for (number, line) in lines.enumerated() {
-            let end = start + counts[number]
-            if total - end >= Self.span {
-                // Строка целиком до края — рисуется как обычно.
+        let counts = layout.map { line in line.reduce(0) { $0 + $1.count } }
+        // Знаки текста и глифы раскладки сверяются от конца: расхождения (переводы строк) бывают раньше края.
+        let shift = length - counts.reduce(0, +)
+        var index = 0
+        for (number, line) in layout.enumerated() {
+            if index + counts[number] + shift <= settled {
+                // Строка целиком проявилась — рисуется как обычно.
                 context.draw(line)
-            } else {
-                var index = start
-                for run in line {
-                    for glyph in run {
-                        let fromEnd = total - 1 - index
-                        if fromEnd < Self.span {
-                            var copy = context
-                            let reached = Double(fromEnd + 1) / Double(Self.span + 1)
-                            copy.opacity = 1 - strength * (0.85 - 0.85 * reached)
-                            copy.draw(glyph)
-                        } else {
-                            context.draw(glyph)
-                        }
-                        index += 1
+                index += counts[number]
+                continue
+            }
+            for run in line {
+                for glyph in run {
+                    let shown = visibility(index + shift)
+                    if shown > 0.999 {
+                        context.draw(glyph)
+                    } else {
+                        var copy = context
+                        copy.opacity = shown
+                        copy.draw(glyph)
                     }
+                    index += 1
                 }
             }
-            start = end
         }
+    }
+
+    /// Непрозрачность знака `position`: от его появления — плавный подъём к 1 за `RevealMark.fade`.
+    private func visibility(_ position: Int) -> Double {
+        guard position >= settled, let last = marks.last else { return 1 }
+        let time = marks.first { $0.end > position }?.time ?? last.time
+        let progress = min(max((now - time) / RevealMark.fade, 0), 1)
+        let eased = 1 - (1 - progress) * (1 - progress)
+        return 1 - strength * (1 - eased)
     }
 }
 

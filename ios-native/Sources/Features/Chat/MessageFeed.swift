@@ -31,22 +31,16 @@ struct MessageFeed: View {
     @State private var shown = MessageFeed.page
     @State private var touch = TouchClock()
     @State private var scroll = ScrollHolder()
-    /// Вход в готовый чат («Навстречу», выбран пользователем 18.11.2026): последние сообщения въезжают
-    /// сверху вниз — вопросы справа, ответы слева. `entered` — въезд начат, `enterAnimated` — с движением
-    /// (без него, если чат открылся прямо с идущим ответом: там вопрос поднимается от поля ввода).
+    /// Вход в готовый чат («Проявление ленты», `FeedEntrance`). `entered` — вход начат, `enterAnimated` — с
+    /// движением (без него, если чат открылся прямо с идущим ответом: там вопрос поднимается от поля ввода).
     @State private var entered = false
     @State private var enterAnimated = false
-    /// Очерёдность въезда: номер сообщения среди последних, сверху вниз. Считается один раз при входе.
-    @State private var enterOrder: [String: Int] = [:]
-
-    /// Сколько последних сообщений въезжает; остальные выше экрана и стоят на месте сразу.
-    private static let enterCount = 6
 
     private static let bottomID = "feed-bottom"
     private static let space = "feed-space"
     private static let page = 30
-    /// Отступы столбца ленты: между сообщениями, сверху (под шапкой) и снизу.
-    private static let spacing: CGFloat = 26
+    /// Отступы столбца ленты: между сообщениями (`FeedMetrics`), сверху (под шапкой) и снизу.
+    private static let spacing = FeedMetrics.messageGap
     private static let topPad: CGFloat = 20 + Theme.headerOverhang
     private static let bottomPad: CGFloat = 14
 
@@ -252,16 +246,12 @@ struct MessageFeed: View {
                                             .transition(.asymmetric(
                                                 insertion: .opacity.combined(with: .offset(y: 220)),
                                                 removal: .identity))
-                                            .modifier(FeedEntrance(entered: entered, animated: enterAnimated,
-                                                                   order: enterOrder[message.id], fromRight: true))
                                             .modifier(PinMark(active: message.id == pinBaseID, space: Self.space))
                                     } else if message.rawID != shownLive?.replacingID {
                                         // Перегенерируемый ответ на время заменяет живая строка.
                                         AssistantMessageView(message: message, canRegenerate: live == nil)
                                             .id(message.id)
                                             .transition(.identity)
-                                            .modifier(FeedEntrance(entered: entered, animated: enterAnimated,
-                                                                   order: enterOrder[message.id], fromRight: false))
                                             .modifier(PinMark(active: message.id == pinBaseID, space: Self.space))
                                     }
                                 }
@@ -272,21 +262,21 @@ struct MessageFeed: View {
                                         .transition(.asymmetric(insertion: .opacity, removal: .identity))
                                 } else if let last = items.last, !last.isUser {
                                     // Варианты продолжения — как на сайте, если они не выключены в его настройках.
-                                    // Ряд значков ответа заходит в промежуток на `AnswerRow.overlap` — подсказки и
-                                    // полоса ниже стоят от значков там же, где и до этого.
+                                    // Ряд значков ответа заходит в промежуток на `FeedMetrics.actionsOverlap` — подсказки
+                                    // и полоса ниже отсчитываются от самих значков.
                                     let suggestions = !last.suggestions.isEmpty
                                         && (model.settings.shared["chatSuggestions"] as? Bool) != false
                                         && model.activeChat?.temporary != true
                                     if suggestions {
                                         SuggestionsView(messageID: last.rawID, items: last.suggestions)
-                                            .padding(.top, AnswerRow.overlap - 8)
+                                            .padding(.top, FeedMetrics.actionsOverlap - 8)
                                             .transition(.opacity)
                                     }
                                     // Место прежней подписи «…может ошибаться» (убрана 20.11.2026): пустая полоса держит
                                     // тот же отступ до поля ввода, и касание по ней, как по всей ленте, убирает клавиатуру.
                                     Color.clear
                                         .frame(height: 16)
-                                        .padding(.top, (suggestions ? 0 : AnswerRow.overlap) - 10)
+                                        .padding(.top, (suggestions ? 0 : FeedMetrics.actionsOverlap) - 10)
                                         .transition(.identity)
                                 }
                                 Color.clear
@@ -297,6 +287,7 @@ struct MessageFeed: View {
                                     })
                                     .id(Self.bottomID)
                             }
+                            .modifier(FeedEntrance(entered: entered, animated: enterAnimated))
                             .padding(.horizontal, 15)
                             .padding(.top, Self.topPad)
                             // Под ответом — место, чтобы свой вопрос мог встать к верху экрана (`room`).
@@ -313,9 +304,6 @@ struct MessageFeed: View {
                                 let fresh = FeedEntry.lastChat != model.activeChatID
                                 FeedEntry.lastChat = model.activeChatID
                                 enterAnimated = fresh && live == nil && model.preview == nil
-                                enterOrder = Dictionary(
-                                    visible.suffix(Self.enterCount).enumerated().map { ($0.element.id, $0.offset) },
-                                    uniquingKeysWith: { first, _ in first })
                                 entered = true
                                 if model.preview == .threadTop { following = false }
                             }
@@ -374,26 +362,21 @@ enum FeedEntry {
     static var lastChat: String?
 }
 
-/// Въезд сообщения при входе в готовый чат: сбоку на своё место, с задержкой по очереди `order`.
-/// До входа скрыты все сообщения (очерёдность ещё не посчитана); `order == nil` — сообщение выше
-/// экрана и встаёт на место сразу, без движения.
-///
-/// Быстро (просьба пользователя 22.11.2026 «ускорь появление текста»): без начальной паузы, шаг 0,02 с,
-/// 0,2 с на сообщение и сдвиг 14 pt — последнее сообщение стоит на месте через ~0,3 с (было ~0,9 с с пружиной).
+/// Вход в готовый чат — «Проявление ленты» (выбор пользователя 23.11.2026 из четырёх вариантов на макете):
+/// вся лента одним блоком проступает и поднимается на 6 pt за 0,22 с, без очереди по сообщениям. Прежний
+/// въезд «Навстречу» (вопросы справа, ответы слева, каждое со своей задержкой) не возвращать.
+/// До входа лента скрыта; без `animated` встаёт сразу.
 private struct FeedEntrance: ViewModifier {
     let entered: Bool
     let animated: Bool
-    let order: Int?
-    let fromRight: Bool
 
     func body(content: Content) -> some View {
+        let lift: CGFloat = entered ? 0 : 6
         content
             .opacity(entered ? 1 : 0)
-            .offset(x: entered ? 0 : (fromRight ? 14 : -14))
-            .animation(animated && order != nil
-                       ? .easeOut(duration: 0.2).delay(Double(order ?? 0) * 0.02)
-                       : nil,
-                       value: entered)
+            // Сдвиг только при отрисовке: замеры низа ленты и места под вопросом (`PinMark`) не съезжают.
+            .visualEffect { view, _ in view.offset(y: lift) }
+            .animation(animated ? .smooth(duration: 0.22) : nil, value: entered)
     }
 }
 
@@ -577,7 +560,8 @@ private struct LiveAnswerView: View {
         let phase = !done && !working && (live.text.isEmpty || live.stopping)
             ? (live.stopping ? "Останавливаю" : live.phase) : nil
         let headerPhase = live.reasoning.isEmpty && live.text.isEmpty ? phase : nil
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: FeedMetrics.partGap) {
+            // Шапка: статус до первых рассуждений и сами рассуждения — одна строка на одном месте, без сдвига.
             if headerPhase != nil || !live.reasoning.isEmpty {
                 ReasoningView(text: live.reasoning, modelName: model.activeModelName, spark: working, phase: headerPhase,
                               memoryKey: model.activeChatID.map(ReasoningOpen.liveKey))
@@ -594,13 +578,8 @@ private struct LiveAnswerView: View {
             // (например, поиск или остановка) по-прежнему видны под содержимым.
             if let phase, headerPhase == nil,
                live.reasoning.isEmpty || LiveStatus.label(phase) != LiveStatus.fallback {
-                HStack(spacing: 7) {
-                    AtomIndicator(size: 20, orbits: true)
-                    LivePhaseLabel(phase: phase)
-                }
-                .frame(minHeight: 28)
-                .accessibilityElement(children: .combine)
-                .transition(.asymmetric(insertion: .opacity, removal: .identity))
+                StatusLine(phase: phase)
+                    .transition(.asymmetric(insertion: .opacity, removal: .identity))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -609,6 +588,31 @@ private struct LiveAnswerView: View {
 
     /// Модель сейчас рассуждает, и текст рассуждений уже идёт (его строка несёт «Атом»).
     private var working: Bool { live.isThinking && !live.reasoning.isEmpty && !live.stopping }
+}
+
+/// Статус под содержимым ответа — та же строка, что шапка ответа: «Атом» 20 + подпись, высотой
+/// `FeedMetrics.statusLine`. Встаёт туда, где появится следующая строка текста: после шапки — на место первой
+/// строки ответа, так что текст сменяет статус без сдвига.
+private struct StatusLine: View {
+    let phase: String
+
+    var body: some View {
+        HStack(spacing: FeedMetrics.statusSpacing) {
+            AtomIndicator(size: FeedMetrics.statusLine, orbits: true)
+            LivePhaseLabel(phase: phase)
+        }
+        .foregroundStyle(Theme.muted)
+        .frame(height: FeedMetrics.statusLine)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Смена подписи статуса — одна для всех строк: новая въезжает снизу, прежняя уходит вверх, без отскока.
+@MainActor
+enum StatusSwap {
+    static let transition = AnyTransition.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
+                                                     removal: .move(edge: .top).combined(with: .opacity))
+    static let animation = Animation.smooth(duration: 0.3)
 }
 
 /// Серверные этапы сменяются с выдержкой. При появлении рассуждений подпись меняется в тот же кадр.
@@ -628,13 +632,16 @@ private struct LivePhaseLabel: View {
 
     var body: some View {
         let label = phase == nil ? "Размышляет" : shown
-        WaveText(text: label)
-            .id(label)
-            .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .identity))
-            .clipped()
-            .animation(phase == nil ? nil : .spring(response: 0.35, dampingFraction: 0.85), value: label)
-            .onChange(of: phase) { _, new in update(new) }
-            .onDisappear { task?.cancel() }
+        // Прежняя и новая подписи на время смены лежат друг на друге в одной строке.
+        ZStack(alignment: .leading) {
+            WaveText(text: label)
+                .id(label)
+                .transition(StatusSwap.transition)
+        }
+        .clipped()
+        .animation(phase == nil ? nil : StatusSwap.animation, value: label)
+        .onChange(of: phase) { _, new in update(new) }
+        .onDisappear { task?.cancel() }
     }
 
     /// Новая подпись ждёт, пока прежняя не продержится `minDwell`; из нескольких быстрых остаётся последняя.
@@ -863,7 +870,7 @@ private struct AssistantMessageView: View {
     let canRegenerate: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: FeedMetrics.partGap) {
             if !message.reasoning.isEmpty {
                 ReasoningView(text: message.reasoning,
                               modelName: message.model.isEmpty ? nil : ChatConfig.modelName(message.model, profiles: model.settings.modelProfiles),
@@ -878,7 +885,18 @@ private struct AssistantMessageView: View {
             if !message.sources.isEmpty {
                 SourcesButton(sources: message.sources)
             }
-            if !message.text.isEmpty || !message.arts.isEmpty {
+            if !message.error.isEmpty {
+                // Ошибка генерации — только здесь (в тексте ответа её больше нет), как `inline-error` на сайте.
+                Text(message.error)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.danger)
+                    .padding(.leading, 12)
+                    .overlay(alignment: .leading) {
+                        Rectangle().fill(Theme.danger.opacity(0.6)).frame(width: 2)
+                    }
+                    .textSelection(.enabled)
+            }
+            if !message.text.isEmpty || !message.arts.isEmpty || !message.error.isEmpty {
                 // Как под ответом у Claude: скопировать, поделиться, прочитать вслух, ответить заново.
                 // Лента едет за пальцем вместе со шторкой, и палец, начавший свайп на кнопке, отпускается
                 // на ней же — поэтому каждая кнопка ряда спрашивает `DrawerSwipe.blocksTaps`
@@ -918,21 +936,41 @@ private struct AssistantMessageView: View {
                 }
                 // Левый край первого значка — на 2 pt правее текста, как у Claude (видимая часть 9…23 из 32 pt).
                 .padding(.leading, -7)
-                // Замер Claude (22.11.2026): от середины последней строки до значков ~39 pt, от значков до
-                // следующего вопроса ~34 pt. Ряд 44 pt (зона нажатия) заходит под зазор до вопроса.
-                .padding(.top, -6)
-                .padding(.bottom, -AnswerRow.overlap)
+                .padding(.top, FeedMetrics.actionsTop)
+                .padding(.bottom, -FeedMetrics.actionsOverlap)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-/// Ряд значков под ответом.
-enum AnswerRow {
-    /// На сколько ряд (44 pt зоны нажатия) заходит в промежуток до следующего сообщения: значки ближе к
-    /// следующему вопросу, чем к ответу над ними не по смыслу, — до вопроса ~34 pt от их середины, как у Claude.
-    static let overlap: CGFloat = 14
+/// Отступы ленты — в одном месте, по замеру Claude (скриншоты 22.11.2026, 1,176 px/pt).
+/// Строки статусов видны высотой `statusLine`, а нажимаются на 44 pt: разница уходит в отрицательные поля,
+/// поэтому видимые промежутки ниже не зависят от зоны нажатия.
+enum FeedMetrics {
+    /// Между сообщениями.
+    static let messageGap: CGFloat = 26
+    /// Между частями ответа: шапка, текст, арты, статус, ряд значков.
+    static let partGap: CGFloat = 12
+    /// Видимая высота строки статуса: «Атом» 20 pt и подпись 15 pt.
+    static let statusLine: CGFloat = 20
+    /// От «Атома» до подписи.
+    static let statusSpacing: CGFloat = 7
+    /// Зона нажатия строк и значков.
+    static let hitHeight: CGFloat = 44
+    /// На сколько зона нажатия выступает за строку статуса сверху и снизу.
+    static var hitOverhang: CGFloat { (hitHeight - statusLine) / 2 }
+    /// Шапка ответа (статус или размышления) стоит ниже обычного промежутка на 7 pt: от низа вопроса до её
+    /// середины ~43 pt. Одно место и до первых рассуждений, и с ними — строка не прыгает, когда они пошли.
+    static let headerExtra: CGFloat = 7
+    /// От строки шапки до текста ответа: середина первой строки в ~48 pt от середины шапки.
+    static let headerBelow: CGFloat = 27
+    /// От раскрытых размышлений до текста ответа.
+    static let timelineBelow: CGFloat = 20
+    /// Ряд значков (44 pt) поднят к тексту: от середины последней строки до значков ~39 pt.
+    static let actionsTop: CGFloat = -6
+    /// На сколько ряд значков заходит в промежуток до следующего сообщения: до вопроса ~34 pt от их середины.
+    static let actionsOverlap: CGFloat = 14
 }
 
 /// Значок в ряду под ответом: свой глиф (`AnswerGlyph`) вторичным цветом, шаг 32 pt, зона нажатия 32 × 44.
@@ -1097,6 +1135,14 @@ private struct ReasoningView: View {
     /// Ключ в `ReasoningOpen`: раскрытая строка остаётся раскрытой, когда живой ответ сменяется сообщением.
     var memoryKey: String?
     @State private var open: Bool
+    /// Блок размышлений построен: на время сворачивания он ещё в ленте.
+    @State private var mounted: Bool
+    /// Высота окна, через которое видно блок; `nil` — раскрыт целиком и растёт вместе с текстом.
+    @State private var mask: CGFloat?
+    /// Номер нажатия: окончание прежней анимации не трогает новую.
+    @State private var turn = 0
+    @State private var reveal = RevealState()
+    @State private var probe = FrameProbe()
     /// Подпись «Размышляет» держится, пока электроны стягиваются, и сменяется на вспышке.
     @State private var thinkingLabel: Bool
     /// Рассуждение закончилось на глазах — итоговая подпись собирается по буквам.
@@ -1108,7 +1154,9 @@ private struct ReasoningView: View {
         self.spark = spark
         self.phase = phase
         self.memoryKey = memoryKey
-        _open = State(initialValue: memoryKey.map { ReasoningOpen.keys.contains($0) } ?? false)
+        let remembered = memoryKey.map { ReasoningOpen.keys.contains($0) } ?? false
+        _open = State(initialValue: remembered)
+        _mounted = State(initialValue: remembered)
         _thinkingLabel = State(initialValue: spark)
     }
 
@@ -1117,30 +1165,22 @@ private struct ReasoningView: View {
             Button {
                 guard !text.isEmpty, !DrawerSwipe.blocksTaps else { return }
                 Haptics.tap()
-                if open {
-                    // Сворачивание — сразу, без анимации раскладки: длинные размышления уходили пружиной, и текст
-                    // ответа под ними пролетал вверх через весь экран (замечание пользователя 22.11.2026).
-                    var instant = Transaction()
-                    instant.disablesAnimations = true
-                    withTransaction(instant) { open = false }
-                } else {
-                    // Раскрытие — коротко и без отскока; шаги проявляются сами (`ReasoningTimeline`).
-                    withAnimation(.easeOut(duration: 0.2)) { open = true }
-                }
+                let opening = !open
+                if opening { expand() } else { collapse() }
                 if let memoryKey {
-                    if open { ReasoningOpen.keys.insert(memoryKey) } else { ReasoningOpen.keys.remove(memoryKey) }
+                    if opening { ReasoningOpen.keys.insert(memoryKey) } else { ReasoningOpen.keys.remove(memoryKey) }
                 }
             } label: {
-                HStack(spacing: 7) {
-                    AtomIndicator(size: 20, active: phase != nil || spark, orbits: true)
+                HStack(spacing: FeedMetrics.statusSpacing) {
+                    AtomIndicator(size: FeedMetrics.statusLine, active: phase != nil || spark, orbits: true)
                     Group {
                         if phase != nil || spark || thinkingLabel {
                             LivePhaseLabel(phase: phase)
-                                .transition(Self.swap)
+                                .transition(StatusSwap.transition)
                         } else {
                             ReasoningTitle(modelName: modelName, byLetter: celebrate)
                                 .accessibilityLabel("Размышления")
-                                .transition(Self.swap)
+                                .transition(StatusSwap.transition)
                         }
                     }
                     if !text.isEmpty {
@@ -1155,7 +1195,7 @@ private struct ReasoningView: View {
                 }
                 .foregroundStyle(Theme.muted)
                 .clipped()
-                .frame(minHeight: 44)
+                .frame(minHeight: FeedMetrics.hitHeight)
                 .contentShape(Rectangle())
             }
             .buttonStyle(PressScaleStyle())
@@ -1163,17 +1203,41 @@ private struct ReasoningView: View {
             .accessibilityRemoveTraits(text.isEmpty ? .isButton : [])
             .accessibilityHint(text.isEmpty ? "" : (open ? "Свернуть" : "Развернуть"))
 
-            if open && !text.isEmpty {
+            if mounted && !text.isEmpty {
+                // Раскрытие и сворачивание — окном маски: текст внутри стоит на месте, движется только край окна
+                // и ответ под ним (выбор пользователя 23.11.2026). Шаги проявляются сами (`ReasoningTimeline`).
                 ReasoningTimeline(text: text, live: spark)
-                    .transition(.asymmetric(insertion: .opacity, removal: .identity))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frameProbe(probe)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                        reveal.height = height
+                        if reveal.pendingOpen, height > 0 {
+                            reveal.pendingOpen = false
+                            unfold()
+                        }
+                    }
+                    // Текст гаснет быстрее, чем закрывается окно.
+                    .animation(.easeOut(duration: 0.12)) { $0.opacity(open ? 1 : 0) }
+                    .frame(height: mask, alignment: .top)
+                    .clipped()
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                        reveal.window = height
+                        if reveal.pendingCollapse {
+                            reveal.pendingCollapse = false
+                            fold()
+                        }
+                    }
+                    .transition(.identity)
             }
         }
-        // Строка — шапка ответа. Замер Claude (22.11.2026): от низа вопроса до середины строки ~43 pt, от неё до
-        // середины первой строки ответа ~48 pt (было 28 и 33 — вопрос лип к следующему ответу).
-        // Пока размышлений нет (строка лишь показывает этап «Думаю» и исчезнет с первым текстом), она остаётся
-        // прижатой, как раньше, — иначе текст ответа при её уходе прыгал бы вверх на ~54 pt.
-        .padding(.top, text.isEmpty ? -20 : -5)
-        .padding(.bottom, text.isEmpty ? -12 : (open ? 8 : 3))
+        // Строка — шапка ответа, всегда на одном месте (`FeedMetrics.headerExtra`): и пока это лишь статус
+        // («Думаю», «Ищу в интернете»), и когда пошли размышления. Раньше статус стоял на 15 pt выше и съезжал
+        // вниз с первыми размышлениями. Пока размышлений нет, раскладка кончается по низу видимой строки:
+        // её уход с первым текстом меняет высоту ленты лишь на несколько pt, лента за ним не дёргается.
+        .padding(.top, FeedMetrics.headerExtra - FeedMetrics.hitOverhang)
+        .padding(.bottom, text.isEmpty
+                 ? -FeedMetrics.hitOverhang
+                 : (open ? FeedMetrics.timelineBelow : FeedMetrics.headerBelow - FeedMetrics.hitOverhang) - FeedMetrics.partGap)
         .task(id: spark) {
             if spark {
                 thinkingLabel = true
@@ -1182,14 +1246,88 @@ private struct ReasoningView: View {
                 try? await Task.sleep(nanoseconds: UInt64(AtomIndicator.collapse * 1_000_000_000))
                 guard !Task.isCancelled else { return }
                 celebrate = true
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { thinkingLabel = false }
+                withAnimation(StatusSwap.animation) { thinkingLabel = false }
             }
         }
     }
 
-    /// Рассуждение закончилось: появляется итоговая подпись.
-    private static let swap = AnyTransition.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
-                                                       removal: .move(edge: .top).combined(with: .opacity))
+    /// Раскрытие и сворачивание — без отскока: пружина с отскоком на длинном пути и давала «пролёт» ответа.
+    private static let opening = Animation.smooth(duration: 0.32)
+    private static let closing = Animation.smooth(duration: 0.28)
+
+    private func expand() {
+        turn += 1
+        reveal.pendingCollapse = false
+        if mounted {
+            // Нажали во время сворачивания — раскрываться от текущего края окна.
+            unfold()
+        } else {
+            mask = 0
+            mounted = true
+            // Высота блока известна после первой раскладки — раскрытие начинается с неё.
+            reveal.pendingOpen = true
+        }
+    }
+
+    private func unfold() {
+        let current = turn
+        withAnimation(Self.opening) {
+            open = true
+            mask = reveal.height
+        } completion: {
+            // Раскрыт целиком: дальше блок растёт вместе с текстом, без окна.
+            guard turn == current else { return }
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) { mask = nil }
+        }
+    }
+
+    /// Ниже края экрана блок и так не виден: эта часть убирается сразу, а плавно закрывается только видимая.
+    /// Так ответ под длинными размышлениями едет не дальше одного экрана (замечание пользователя 22.11.2026).
+    private func collapse() {
+        turn += 1
+        reveal.pendingOpen = false
+        let visible = probe.visibleHeight
+        if mask == nil, visible < reveal.window - 0.5 {
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) { mask = visible }
+            // Анимация пойдёт от сжатого окна, когда оно попадёт в раскладку.
+            reveal.pendingCollapse = true
+        } else {
+            fold()
+        }
+    }
+
+    private func fold() {
+        let current = turn
+        withAnimation(Self.closing) {
+            open = false
+            mask = 0
+        } completion: {
+            guard turn == current else { return }
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) {
+                mounted = false
+                mask = nil
+            }
+        }
+    }
+}
+
+/// Замеры раскрытого блока размышлений для окна маски. Класс, а не состояние: замеры не перерисовывают строку.
+@MainActor
+private final class RevealState {
+    /// Полная высота блока.
+    var height: CGFloat = 0
+    /// Высота окна маски.
+    var window: CGFloat = 0
+    /// Блок построен и ждёт первого замера, чтобы раскрыться.
+    var pendingOpen = false
+    /// Окно мгновенно сжато до видимой части и ждёт раскладки, чтобы свернуться.
+    var pendingCollapse = false
 }
 
 /// Слово с волной по буквам: каждая буква по очереди светлеет и чуть приподнимается.

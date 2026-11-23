@@ -61,6 +61,16 @@ final class FrameProbe {
         guard let view, view.window != nil else { return .zero }
         return view.convert(view.bounds, to: nil)
     }
+
+    /// Сколько вида видно от его верха до низа прокрутки, которая его держит; вся высота, если прокрутки нет.
+    var visibleHeight: CGFloat {
+        guard let view, view.window != nil else { return 0 }
+        var parent = view.superview
+        while let current = parent, !(current is UIScrollView) { parent = current.superview }
+        guard let scroll = parent else { return view.bounds.height }
+        let bottom = scroll.convert(scroll.bounds, to: view).maxY
+        return min(max(bottom, 0), view.bounds.height)
+    }
 }
 
 /// Пустой UIView под видом — по нему `FrameProbe` узнаёт место вида.

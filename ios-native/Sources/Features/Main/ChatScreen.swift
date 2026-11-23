@@ -283,32 +283,23 @@ struct ChatScreen: View {
                 .accessibilityIdentifier("chat.incognitoWelcome")
                 .transition(.opacity.combined(with: .scale(scale: 0.97)))
             } else {
-                // С клавиатурой («В поле ввода», выбрано пользователем 18.11.2026) логотип гаснет, а приветствие
-                // опускается к карточке ввода, уменьшаясь до её шрифта и тая; в самом поле в это время
-                // сверху въезжает та же фраза подсказкой (`ComposerBar.placeholder`). Это два разных
-                // текста в разных панелях, движение согласовано по времени (`Theme.keyboardMorph`).
-                GeometryReader { geo in
-                    VStack(spacing: 12) {
-                        Wordmark(size: 30, shown: arrived)
-                            .opacity(typing ? 0 : 1)
-                            .offset(y: typing ? -14 : 0)
-                        GreetingLine(text: Self.greeting(model), shown: arrived)
-                            .scaleEffect(typing ? 16.0 / 21.0 : 1, anchor: .leading)
-                            .frame(maxWidth: .infinity, alignment: typing ? .leading : .center)
-                            // Низ свободного места — верх карточки ввода; её первая строка чуть ниже.
-                            .offset(y: typing ? geo.size.height / 2 + 6 : 0)
-                            .opacity(typing ? 0 : 1)
-                    }
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .animation(Theme.keyboardMorph, value: typing)
+                // С клавиатурой («Вместе с клавиатурой», выбрано пользователем 23.11.2026) логотип и приветствие
+                // остаются: стоят по центру свободного места, поднимаются с ним и чуть уменьшаются. Ничего не гаснет
+                // и не подменяется — прежний переезд приветствия в поле ввода требовал совпадения двух текстов.
+                VStack(spacing: 12) {
+                    Wordmark(size: 30, shown: arrived)
+                    GreetingLine(text: Self.greeting(model), shown: arrived)
                 }
+                .scaleEffect(typing ? 0.92 : 1)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .animation(Theme.keyboardMorph, value: typing)
                 .transition(.opacity)
             }
         }
         .animation(.easeOut(duration: 0.22), value: model.incognito)
     }
 
-    /// Печатают в новой сессии: приветствие переезжает в поле ввода.
+    /// Печатают в новой сессии: приветствие чуть уменьшается.
     private var typing: Bool { composerFocused && !model.incognito }
 
     /// Появление нового чата «Слэш» (выбрано пользователем 18.11.2026): косая черта, из-за неё «llm» и
@@ -394,6 +385,15 @@ struct ComposerBar: View {
     /// Окно моделей открыли при клавиатуре: карточка не складывается в строку, пока оно открыто,
     /// а с его закрытием клавиатура возвращается (просьба пользователя 18.11.2026).
     @State private var returnFocus = false
+    /// Подпись чипа, замороженная на время окна выбора: под окном смену не видно, поэтому новая
+    /// подпись встаёт после его закрытия, с анимацией (`chipMotion`).
+    @State private var heldChip: ChipLabel?
+
+    /// Смена модели из окна выбора — «счётчик уровня» (выбор пользователя 23.11.2026): название
+    /// перетекает через размытие, уровень прокручивается, ширина чипа идёт той же пружиной.
+    private static let chipMotion = Animation.spring(response: 0.42, dampingFraction: 0.72)
+    /// Пауза после начала закрытия окна, чтобы смена пришлась на уже открывшийся чип.
+    private static let chipDelay: Duration = .milliseconds(180)
 
     private static let fileTypes: [UTType] = {
         var types: [UTType] = [.pdf, .png, .jpeg, .webP, .heic, .mpeg4Movie]
@@ -419,9 +419,20 @@ struct ComposerBar: View {
             || model.attachmentsBusy || dictation.active || returnFocus
     }
 
-    /// Подпись чипа целиком: модель и уровень рассуждений. Её смена не анимируется (просьба пользователя
-    /// 22.11.2026) — новая подпись встаёт сразу, без вздрагивания и перетекания ширины.
+    /// Подпись чипа целиком: модель и уровень рассуждений. Смена не из окна выбора (другая сессия)
+    /// не анимируется — новая подпись встаёт сразу (просьба пользователя 22.11.2026).
     private var chipText: String { model.activeModelName + "·" + (reasoningLabel ?? "") }
+
+    private var liveChip: ChipLabel { ChipLabel(name: model.activeModelName, level: reasoningLabel) }
+
+    /// Окно выбора закрывается — замороженная подпись отпускается с анимацией.
+    private func releaseChip() {
+        Task {
+            try? await Task.sleep(for: Self.chipDelay)
+            guard !showModels else { return }
+            withAnimation(Self.chipMotion) { heldChip = nil }
+        }
+    }
 
     var body: some View {
         let live = model.activeLive
@@ -457,7 +468,9 @@ struct ComposerBar: View {
         }
         // Окно начало закрываться — клавиатура возвращается сразу, вместе с его уходом.
         .onChange(of: showModels) { _, open in
-            if !open, returnFocus { focused = true }
+            guard !open else { return }
+            if returnFocus { focused = true }
+            releaseChip()
         }
         .sheet(isPresented: $showTools, onDismiss: openPending) {
             ComposerToolsSheet { source in pendingSource = source }
@@ -538,8 +551,7 @@ struct ComposerBar: View {
                                 .lineLimit(1)
                                 .allowsHitTesting(false)
                                 .accessibilityHidden(true)
-                                // Новая подсказка въезжает сверху: в новой сессии это приветствие,
-                                // которое в тот же момент опускается из центра экрана.
+                                // Новая подсказка (правка сообщения, открытая сессия) въезжает сверху.
                                 .id(placeholder)
                                 .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: -16)),
                                                         removal: .opacity))
@@ -740,8 +752,7 @@ struct ComposerBar: View {
     private var placeholder: String {
         if model.editing != nil { return "Исправьте сообщение" }
         guard model.activeChatID == nil else { return "Напишите сообщение" }
-        // С клавиатурой в новой сессии подсказкой становится приветствие («В поле ввода», 18.11.2026).
-        return focused && !model.incognito ? ChatScreen.greeting(model) : "Спросите что-нибудь"
+        return "Спросите что-нибудь"
     }
 
     /// Уровень рассуждений рядом с названием модели: «Средний», «Рассуждения» или ничего.
@@ -764,11 +775,13 @@ struct ComposerBar: View {
 
     private var modelButton: some View {
         let level = reasoningLabel
+        let shown = heldChip ?? liveChip
         return Button {
             // Состояние читается текущее (не снятое при отрисовке): капсула уже свернулась —
             // значит, это касание по тающему чипу, и оно должно открыть клавиатуру.
             guard self.expanded else { focused = true; return }
             returnFocus = focused
+            heldChip = liveChip
             Keyboard.hide()
             Haptics.tap()
             showModels = true
@@ -776,10 +789,11 @@ struct ComposerBar: View {
             // Как у Claude: рядом с моделью — уровень рассуждений. Если целиком не влезает,
             // сокращается название модели, а уровень остаётся виден.
             ViewThatFits(in: .horizontal) {
-                chip(level: level).fixedSize()
-                chip(level: level)
+                chip(shown).fixedSize()
+                chip(shown)
             }
-            // Смена модели или уровня — без анимации: подпись и ширина чипа встают сразу.
+            // Смена не из окна выбора — без анимации: подпись и ширина чипа встают сразу.
+            // Из окна выбора подпись отпускает `releaseChip`, когда `chipText` уже не меняется.
             .animation(nil, value: chipText)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
@@ -793,19 +807,21 @@ struct ComposerBar: View {
         .accessibilityHint("Выбрать модель")
     }
 
-    private func chip(level: String?) -> some View {
+    private func chip(_ label: ChipLabel) -> some View {
         HStack(spacing: 6) {
-            Text(model.activeModelName)
+            Text(label.name)
                 .fontWeight(.medium)
                 .foregroundStyle(Theme.ink)
                 .lineLimit(1)
                 .truncationMode(.tail)
-            if let level {
+                .contentTransition(.interpolate)
+            if let level = label.level {
                 Text(level)
                     .foregroundStyle(Theme.muted)
                     .lineLimit(1)
                     .fixedSize()
                     .layoutPriority(1)
+                    .contentTransition(.numericText())
             }
         }
         .font(.system(size: 14))
@@ -953,4 +969,10 @@ private struct ContextDetails: View {
         formatter.groupingSeparator = "\u{00A0}"
         return formatter.string(from: NSNumber(value: value)) ?? String(value)
     }
+}
+
+/// Подпись чипа модели в капсуле: название и уровень рассуждений.
+private struct ChipLabel: Equatable {
+    var name: String
+    var level: String?
 }

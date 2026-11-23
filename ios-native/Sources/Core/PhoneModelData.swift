@@ -150,9 +150,10 @@ enum PhoneModelNames {
 
 enum PhoneMemory {
     /// Сколько памяти нужно модели: веса целиком, кэш контекста и буферы Metal.
-    /// `kv` — точный размер кэша из заголовка GGUF (`GGUFInfo.kvBytes`); без него — грубая оценка.
+    /// `kv` — точный размер кэша из заголовка GGUF (`GGUFInfo.kvBytes`); без него — грубая оценка
+    /// для сжатого кэша q8_0 (у f16 было 160 000 байт на токен).
     static func needed(fileSize: Int64, context: Int = 4096, kv: Int64? = nil) -> Int64 {
-        let cache = kv ?? Int64(context) * 160_000
+        let cache = kv ?? Int64(context) * 85_000
         return fileSize + cache + 400_000_000
     }
 

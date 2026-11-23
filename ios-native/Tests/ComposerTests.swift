@@ -8,17 +8,19 @@ final class ComposerTests: XCTestCase {
 
     func testKVBytesFromHeader() {
         let info = GGUFInfo(architecture: "llama", layers: 2, heads: 8, kvHeads: [2], keyLength: 64, valueLength: 64)
-        // 2 слоя × 2 головы × (64 + 64) × 2 байта × 1000 токенов.
-        XCTAssertEqual(info.kvBytes(context: 1000), 1_024_000)
+        // 2 слоя × 2 головы × (64 + 64) × 2 байта (f16) × 1000 токенов.
+        XCTAssertEqual(info.kvBytes(context: 1000, compact: false), 1_024_000)
+        // Сжатый кэш q8_0 (по умолчанию): 34 байта на 32 значения — чуть больше половины f16.
+        XCTAssertEqual(info.kvBytes(context: 1000), 544_000)
         var sliding = info
         sliding.slidingWindow = 100
         sliding.slidingPattern = [true, false]
         // Слой с окном хранит 100 + 512 токенов, а не 1000.
         let expected: Int64 = 313_344 + 512_000
-        XCTAssertEqual(sliding.kvBytes(context: 1000), expected)
+        XCTAssertEqual(sliding.kvBytes(context: 1000, compact: false), expected)
         XCTAssertNil(GGUFInfo(architecture: "llama").kvBytes(context: 1000))
         let fromEmbedding = GGUFInfo(layers: 1, heads: 4, kvHeads: [], embedding: 256)
-        XCTAssertEqual(fromEmbedding.kvBytes(context: 10), 10_240)
+        XCTAssertEqual(fromEmbedding.kvBytes(context: 10, compact: false), 10_240)
     }
 
     func testHeaderReadsPerLayerHeads() {
@@ -59,7 +61,7 @@ final class ComposerTests: XCTestCase {
         XCTAssertEqual(info?.slidingPattern, [true, false])
         // Слой 0: 1 голова, окно 612 токенов; слой 1: 2 головы, весь контекст.
         let expected: Int64 = 156_672 + 512_000
-        XCTAssertEqual(info?.kvBytes(context: 1000), expected)
+        XCTAssertEqual(info?.kvBytes(context: 1000, compact: false), expected)
     }
 
     func testMemoryUsesHeaderEstimate() {

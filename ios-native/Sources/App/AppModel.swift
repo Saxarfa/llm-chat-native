@@ -529,6 +529,12 @@ final class LiveText {
     /// Полученный текст, из которого идёт вывод, и его длина в символах (считается раз на событие сервера).
     @ObservationIgnored var source = ""
     @ObservationIgnored var sourceCount = 0
+    /// Темп вывода, знаков в секунду: меняется плавно, чтобы рывки сети не становились рывками текста.
+    @ObservationIgnored var pace = 0.0
+    /// Сколько знаков вывод может показать сейчас; уходит в минус, когда показано целое длинное слово.
+    @ObservationIgnored var credit = 0.0
+    /// Когда был прошлый шаг вывода.
+    @ObservationIgnored var lastStep: Date?
     @ObservationIgnored private var stream = MarkdownStream()
 
     /// Новый показанный текст. Разметка разбирается только для чата на экране (`parse`) и только с начала

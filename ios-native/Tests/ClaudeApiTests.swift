@@ -94,6 +94,15 @@ final class ClaudeApiTests: XCTestCase {
         XCTAssertEqual(AppModel.wordEnd(text, from: 0, total: text.count), 0)
     }
 
+    func testStreamPaceSpendsBacklogEvenly() {
+        XCTAssertEqual(AppModel.streamPace(backlog: 0, closing: false), 0, "нечего выводить — стоим")
+        XCTAssertEqual(AppModel.streamPace(backlog: 10, closing: false), 40, "малый запас — не медленнее 40 знаков/с")
+        XCTAssertEqual(AppModel.streamPace(backlog: 120, closing: false), 100, accuracy: 0.001, "запас — за 1,2 с")
+        XCTAssertGreaterThan(AppModel.streamPace(backlog: 120, closing: true),
+                             AppModel.streamPace(backlog: 120, closing: false), "после конца ответа — быстрее")
+        XCTAssertEqual(AppModel.streamPace(backlog: 100_000, closing: true), 1500, "предел темпа")
+    }
+
     func testChatCostLikeSite() {
         XCTAssertEqual(ChatCost.money(0), "$0")
         XCTAssertEqual(ChatCost.money(0.000607), "$0,000607", "меньше доллара — три значащие цифры")

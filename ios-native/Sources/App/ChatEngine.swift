@@ -783,13 +783,8 @@ extension AppModel {
                     let total = content.sourceCount
                     if content.shownCount < 0 { content.shownCount = content.text.count }
                     let shown = min(content.shownCount, total)
-                    // Чем больше накопилось, тем быстрее догоняем; после конца ответа — ещё быстрее.
-                    let closing = pendingFinish[id] != nil
-                    let share = Double(total - shown) * (closing ? 0.25 : 0.1)
-                    var next = min(total, shown + max(closing ? 6 : 2, Int(share.rounded(.up))))
-                    // Текст выходит словами, а не буквами: край показа не останавливается посреди слова
-                    // (так выводят Claude и ChatGPT; полслова мигало и читалось как набор на клавиатуре).
-                    if next < total { next = Self.wordEnd(raw.text, from: next, total: total) }
+                    let next = Self.pacedEnd(content, text: raw.text, shown: shown, total: total,
+                                             closing: pendingFinish[id] != nil)
                     content.show(next == total ? raw.text : String(raw.text.prefix(next)), count: next, parse: true)
                     if next < total { more = true }
                     if next > shown {
@@ -814,6 +809,35 @@ extension AppModel {
             finish(id, chat: done.chat, error: nil, notify: done.notify)
         }
         return more
+    }
+
+    /// Докуда показать текст на этом шаге. Ровный вывод (выбор пользователя 23.11.2026): вывод держит запас
+    /// около секунды и тратит его с плавно меняющимся темпом, поэтому паузы сети и крупные куски AI Studio
+    /// не становятся рывками текста; к концу ответа запас тратится быстрее. Раньше шаг брал долю накопленного:
+    /// кусок проносился, а потом вывод стоял до следующего.
+    static func pacedEnd(_ content: LiveText, text: String, shown: Int, total: Int, closing: Bool) -> Int {
+        let now = Date()
+        let step = min(0.1, content.lastStep.map { now.timeIntervalSince($0) } ?? 1.0 / 30)
+        content.lastStep = now
+        let backlog = total - shown
+        let target = streamPace(backlog: backlog, closing: closing)
+        // Первые слова ответа — сразу, без разгона.
+        content.pace = shown == 0 ? target : content.pace + (target - content.pace) * min(1, step * 6)
+        content.credit = min(content.credit + content.pace * step, 40)
+        guard backlog > 0, content.credit >= 1 else { return shown }
+        var next = min(total, shown + Int(content.credit))
+        // Текст выходит словами, а не буквами: край показа не останавливается посреди слова
+        // (так выводят Claude и ChatGPT; полслова мигало и читалось как набор на клавиатуре).
+        if next < total { next = wordEnd(text, from: next, total: total) }
+        content.credit -= Double(next - shown)
+        return next
+    }
+
+    /// Темп, к которому тянется вывод, знаков в секунду: накопленное — за 1,2 с, после конца ответа — за 0,45 с.
+    nonisolated static func streamPace(backlog: Int, closing: Bool) -> Double {
+        guard backlog > 0 else { return 0 }
+        let pace = Double(backlog) / (closing ? 0.45 : 1.2)
+        return min(1500, max(closing ? 70 : 40, pace))
     }
 
     /// Конец слова, на котором остановился вывод (`offset` — в символах `Character`): показ доходит до пробела или

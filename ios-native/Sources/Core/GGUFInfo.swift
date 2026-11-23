@@ -26,9 +26,12 @@ struct GGUFInfo: Equatable, Sendable {
 
     var thinking: PhoneThinking { PhoneThinking.kind(template: chatTemplate) }
 
-    /// Сколько байт займёт кэш ключей и значений (f16) при таком контексте. Слои со скользящим
-    /// окном llama.cpp хранит только на ширину окна. `nil` — в заголовке не хватает сведений.
-    func kvBytes(context: Int) -> Int64? {
+    /// Сколько байт займёт кэш ключей и значений при таком контексте. `compact` — кэш в q8_0, как его
+    /// создаёт `LlamaRunner` (34 байта на 32 значения), иначе f16 (2 байта). Слои со скользящим окном
+    /// llama.cpp хранит только на ширину окна. `nil` — в заголовке не хватает сведений.
+    func kvBytes(context: Int, compact: Bool = true) -> Int64? {
+        // Байт на значение, в шестнадцатых: q8_0 — 17/16, f16 — 32/16.
+        let sixteenths: Int64 = compact ? 17 : 32
         guard let layers, layers > 0 else { return nil }
         var headDim = keyLength
         if headDim == nil, let embedding, let heads, heads > 0 { headDim = embedding / heads }
@@ -45,7 +48,7 @@ struct GGUFInfo: Equatable, Sendable {
             if let window = slidingWindow, window > 0, isSliding(layer) {
                 tokens = min(context, window + 512)
             }
-            total += Int64(count) * Int64(key + value) * 2 * Int64(tokens)
+            total += Int64(count) * Int64(key + value) * Int64(tokens) * sixteenths / 16
         }
         return total
     }
