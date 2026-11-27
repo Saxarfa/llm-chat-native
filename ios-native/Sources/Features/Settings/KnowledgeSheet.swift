@@ -2,10 +2,11 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// «Базы знаний» — документы, по которым модель ищет ответ (`knowledge.py`, `KnowledgeSettings.tsx`).
-/// Список баз и одна открытая база показываются в одном окне.
+/// Список баз и открытая база — страницы одного системного стека: назад и свайпом от края.
 struct KnowledgeSheet: View {
     @Environment(AppModel.self) private var model
-    @State private var opened: KnowledgeLibrary?
+    /// Открытые базы по `id`: страница берёт базу из свежего списка, имя и число документов не устаревают.
+    @State private var path: [String] = []
     @State private var loaded = false
     @State private var failed = false
     @State private var creating = false
@@ -13,20 +14,17 @@ struct KnowledgeSheet: View {
     @State private var notice: String?
 
     var body: some View {
-        Group {
-            if let library = opened {
-                LibraryView(library: library, onBack: {
-                    withAnimation(Theme.spring) { opened = nil }
-                }, onRemoved: {
-                    opened = nil
-                })
-                .transition(.move(edge: .trailing).combined(with: .opacity))
-            } else {
-                list
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-            }
+        NavigationStack(path: $path) {
+            list
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(Theme.sheet)
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(for: String.self) { id in
+                    if let library = model.knowledgeLibraries.first(where: { $0.id == id }) {
+                        LibraryView(library: library, onRemoved: { path.removeAll() })
+                    }
+                }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.sheet)
@@ -34,11 +32,14 @@ struct KnowledgeSheet: View {
         .task(id: model.knowledgeRevision) {
             failed = !(await model.loadLibraries())
             loaded = true
-            if let current = opened {
-                opened = model.knowledgeLibraries.first { $0.id == current.id }
+            // Открытую базу удалили в другом месте — страница закрывается, а не остаётся пустой.
+            if !failed, let id = path.last, !model.knowledgeLibraries.contains(where: { $0.id == id }) {
+                path.removeAll()
             }
-            if model.preview == .knowledge, opened == nil, loaded {
-                opened = model.knowledgeLibraries.first
+            if model.preview == .knowledge, path.isEmpty, let first = model.knowledgeLibraries.first {
+                var instant = Transaction()
+                instant.disablesAnimations = true
+                withTransaction(instant) { path = [first.id] }
             }
         }
         .alert("Новая база", isPresented: $creating) {
@@ -68,7 +69,7 @@ struct KnowledgeSheet: View {
                                 if index > 0 { CardDivider() }
                                 Button {
                                     Haptics.tap()
-                                    withAnimation(Theme.spring) { opened = library }
+                                    path.append(library.id)
                                 } label: {
                                     HStack(spacing: 12) {
                                         Image(systemName: "books.vertical")
@@ -141,8 +142,8 @@ struct KnowledgeSheet: View {
 /// Одна база: документы, загрузка файла, заметка.
 private struct LibraryView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
     let library: KnowledgeLibrary
-    let onBack: () -> Void
     let onRemoved: () -> Void
 
     @State private var documents: [KnowledgeDocument]?
@@ -167,7 +168,7 @@ private struct LibraryView: View {
         VStack(spacing: 0) {
             // Шапка как у Claude: круглая «‹», название базы по центру, «⋯» в стеклянном круге справа.
             SheetBar(title: library.name, subtitle: Plural.knowledge(documents?.count ?? library.documents, .document),
-                     symbol: "chevron.left", label: "Все базы", action: onBack) {
+                     symbol: "chevron.left", label: "Все базы", action: { dismiss() }) {
                 HStack(spacing: 6) {
                 if busy {
                     ProgressView().controlSize(.small).tint(Theme.muted)
@@ -225,6 +226,9 @@ private struct LibraryView: View {
                 .padding(.bottom, 32)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.sheet)
+        .toolbar(.hidden, for: .navigationBar)
         .task(id: "\(library.id)-\(model.knowledgeRevision)") {
             await load()
             // Пока документы обрабатываются, список обновляется сам.

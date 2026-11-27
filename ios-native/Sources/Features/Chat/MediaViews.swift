@@ -667,11 +667,18 @@ struct ImageViewer: View {
                 CircleIconButton(symbol: "xmark", label: "Закрыть") { close() }
                     .accessibilityIdentifier("viewer.close")
                 Spacer()
-                if image != nil {
-                    CircleIconButton(symbol: "square.and.arrow.down", label: "Сохранить в Фото") {
-                        Task { await save() }
+                if let image {
+                    HStack(spacing: 10) {
+                        CircleIconButton(symbol: "square.and.arrow.up", label: "Поделиться") {
+                            Haptics.tap()
+                            ChatShare.present(items: [image])
+                        }
+                        .accessibilityIdentifier("viewer.share")
+                        CircleIconButton(symbol: "square.and.arrow.down", label: "Сохранить в Фото") {
+                            Task { await save() }
+                        }
+                        .disabled(saving)
                     }
-                    .disabled(saving)
                 }
             }
             .padding(.horizontal, 12)

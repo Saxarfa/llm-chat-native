@@ -86,14 +86,19 @@ enum ChatShare {
         present(text)
     }
 
-    /// Системное окно «Поделиться» поверх самого верхнего экрана (меню и шторки тоже экраны).
     @MainActor
     static func present(_ text: String) {
+        present(items: [text])
+    }
+
+    /// Системное окно «Поделиться» поверх самого верхнего экрана (меню и шторки тоже экраны).
+    @MainActor
+    static func present(items: [Any]) {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         guard let window = scenes.flatMap(\.windows).first(where: \.isKeyWindow) ?? scenes.first?.windows.first,
               var top = window.rootViewController else { return }
         while let next = top.presentedViewController, !next.isBeingDismissed { top = next }
-        let sheet = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+        let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
         sheet.popoverPresentationController?.sourceView = top.view
         top.present(sheet, animated: true)
     }
