@@ -386,17 +386,28 @@ private struct NoteEditor: View {
     @State private var title = ""
     @State private var text = ""
     @State private var saving = false
+    @State private var confirmDiscard = false
 
     private var canSave: Bool {
         !saving && !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// Что-то уже набрано: свайп вниз окно не закрывает, «Отмена» сначала спрашивает.
+    private var dirty: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Button("Отмена") { dismiss() }
+                Button("Отмена", action: cancel)
                     .foregroundStyle(Theme.muted)
+                    .confirmationDialog("Заметка не сохранена", isPresented: $confirmDiscard, titleVisibility: .visible) {
+                        Button("Не сохранять", role: .destructive) { dismiss() }
+                        Button("Продолжить", role: .cancel) {}
+                    }
                 Spacer()
                 Text("Заметка")
                     .font(.system(size: 17, weight: .semibold))
@@ -454,6 +465,12 @@ private struct NoteEditor: View {
         .presentationDetents([.large])
         .presentationBackground(Theme.sheet)
         .presentationCornerRadius(28)
+        // Недописанная заметка не теряется от случайного свайпа вниз.
+        .interactiveDismissDisabled(dirty || saving)
+    }
+
+    private func cancel() {
+        if dirty { confirmDiscard = true } else { dismiss() }
     }
 }
 

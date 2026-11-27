@@ -351,7 +351,7 @@ private struct DownloadRow: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.muted)
                         .frame(width: 36, height: 36)
-                        .contentShape(Rectangle())
+                        .hitPadding(4)
                 }
                 .accessibilityLabel("Отменить загрузку")
             }

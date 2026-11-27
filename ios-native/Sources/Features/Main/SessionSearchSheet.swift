@@ -45,7 +45,7 @@ struct SessionSearchSheet: View {
                                 .font(.system(size: 16))
                                 .foregroundStyle(Theme.subtle)
                                 .frame(width: 32, height: 40)
-                                .contentShape(Rectangle())
+                                .hitPadding(6)
                         }
                         .accessibilityLabel("Очистить поиск")
                         .transition(.opacity.combined(with: .scale(scale: 0.8)))

@@ -448,6 +448,21 @@ struct PressScaleStyle: ButtonStyle {
     }
 }
 
+extension View {
+    /// Зона нажатия шире видимой на `amount` с указанных сторон: вид и место в раскладке прежние, а в кнопку
+    /// легче попасть пальцем (не меньше 44 pt). Ставится внутри метки кнопки, после её размера и фона.
+    func hitPadding(_ edges: Edge.Set, _ amount: CGFloat) -> some View {
+        padding(edges, amount)
+            .contentShape(Rectangle())
+            .padding(edges, -amount)
+    }
+
+    /// То же со всех сторон.
+    func hitPadding(_ amount: CGFloat) -> some View {
+        hitPadding(.all, amount)
+    }
+}
+
 struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         Face(configuration: configuration)

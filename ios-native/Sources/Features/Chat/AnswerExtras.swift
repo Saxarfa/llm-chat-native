@@ -36,7 +36,7 @@ struct SourcesButton: View {
             .padding(.trailing, 12)
             .frame(height: 32)
             .background(Theme.fill, in: Capsule())
-            .contentShape(Capsule())
+            .hitPadding(.vertical, 6)
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityLabel("Источники ответа: \(sources.count)")
@@ -228,7 +228,7 @@ struct SuggestionsView: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Theme.muted)
                     .frame(minHeight: 32)
-                    .contentShape(Rectangle())
+                    .hitPadding(.vertical, 6)
                 }
                 .buttonStyle(.plain)
                 .disabled(chosen != nil)

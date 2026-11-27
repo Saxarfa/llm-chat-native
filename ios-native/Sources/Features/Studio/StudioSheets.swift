@@ -415,6 +415,7 @@ private struct StudioLoraPanel: View {
                             Image(systemName: "arrow.clockwise")
                                 .foregroundStyle(Theme.muted)
                                 .frame(width: 40, height: 40)
+                                .hitPadding(2)
                         }
                         .accessibilityLabel("Обновить список LoRA")
                     }
@@ -493,6 +494,7 @@ private struct LoraCatalogRow: View {
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.muted)
                         .frame(width: 40, height: 40)
+                        .hitPadding(2)
                 }
                 .buttonStyle(PressScaleStyle())
                 .accessibilityLabel("Добавить слова активации \(entry.title) в промпт")
@@ -526,6 +528,7 @@ private struct LoraStrengthRow: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.muted)
                         .frame(width: 36, height: 36)
+                        .hitPadding(4)
                 }
                 .accessibilityLabel("Убрать LoRA \(StudioModels.loraName(lora.name))")
             }

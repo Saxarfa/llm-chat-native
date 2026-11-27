@@ -432,7 +432,7 @@ struct ParameterRow: View {
                         } label: {
                             Label("Сбросить", systemImage: "arrow.uturn.backward")
                                 .frame(minHeight: 32)
-                                .contentShape(Rectangle())
+                                .hitPadding(.vertical, 6)
                         }
                         .buttonStyle(PressScaleStyle())
                         .foregroundStyle(Theme.muted)
@@ -586,6 +586,8 @@ struct InstructionEditor: View {
             }
         }
         .padding(12)
+        // Несохранённый промпт не теряется от случайного свайпа окна вниз: есть «Сохранить» и «Отменить».
+        .interactiveDismissDisabled(text != saved)
         .onAppear { text = saved }
         .onChange(of: saved) { _, new in
             if !saving { text = new }

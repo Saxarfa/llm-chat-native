@@ -35,7 +35,7 @@ struct OfflineBanner: View {
                 }
                 .frame(minWidth: 76, minHeight: 32)
                 .background(Theme.fill, in: Capsule())
-                .contentShape(Capsule())
+                .hitPadding(.vertical, 6)
             }
             .buttonStyle(PressScaleStyle())
             .disabled(checking)
