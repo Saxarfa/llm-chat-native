@@ -101,12 +101,12 @@ struct ModelOption: Identifiable, Equatable {
     let loaded: Bool
 }
 
-/// Облачные сервисы по API: бесплатные OpenAI-совместимые (`hosted_providers.py`) и Claude (только Rust:
+/// Облачные сервисы по API: OpenAI-совместимые (`hosted_providers.py`) и Claude (только Rust:
 /// `server-rs/src/hosted.rs` + `claude.rs`, Messages API). На сайте — вкладка «API» и
 /// `hostedProviders`/`hostedName` в `domain.ts`; модель — `<сервис>/<id каталога>`.
 /// Ключи и выбор моделей настраиваются на сайте; приложение только показывает включённые модели.
 enum HostedService: String, CaseIterable {
-    case nvidia, openrouter, groq, claude
+    case nvidia, openrouter, groq, claude, gemini
 
     var title: String {
         switch self {
@@ -114,6 +114,7 @@ enum HostedService: String, CaseIterable {
         case .openrouter: return "OpenRouter"
         case .groq: return "Groq"
         case .claude: return "Claude"
+        case .gemini: return "Google"
         }
     }
 
@@ -296,8 +297,8 @@ enum ChatConfig {
         if model.hasPrefix("aistudio/") {
             return ["temperature": 1, "top_p": 0.95, "top_k": 64, "thinking": true, "max_tokens": -1]
         }
-        // Claude (Messages API, `claude.rs`): параметров выборки нет — текущие модели их отвергают.
-        if model.hasPrefix("claude/") {
+        // Сервер не передаёт параметры выборки этим двум сервисам.
+        if model.hasPrefix("claude/") || model.hasPrefix("gemini/") {
             return ["thinking": true, "max_tokens": -1]
         }
         // Облачные сервисы, как `modelDefaults` в `domain.ts`: Groq — без штрафов (отвергает лишние поля).

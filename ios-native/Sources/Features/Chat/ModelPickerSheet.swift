@@ -292,7 +292,9 @@ struct ModelPickerSheet: View {
         case .local: return item.loaded ? "На компьютере · загружена в память" : "На компьютере"
         case .phone: return "На телефоне"
         case .studio: return Self.isImageModel(item.id) ? "AI Studio · создаёт изображения" : "AI Studio"
-        case .hosted: return "\(HostedService.of(item.id)?.title ?? "API") · бесплатный API"
+        case .hosted:
+            if HostedService.of(item.id) == .gemini { return "Google · API" }
+            return "\(HostedService.of(item.id)?.title ?? "API") · бесплатный API"
         case .claude: return "Claude API"
         }
     }

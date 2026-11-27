@@ -878,6 +878,7 @@ private struct AssistantMessageView: View {
             }
             if !message.blocks.isEmpty {
                 MarkdownView(blocks: message.blocks)
+                    .modifier(AnswerMenu(message: message, canRegenerate: canRegenerate))
             }
             ForEach(message.arts) { art in
                 ArtView(art: art)
@@ -895,6 +896,9 @@ private struct AssistantMessageView: View {
                         Rectangle().fill(Theme.danger.opacity(0.6)).frame(width: 2)
                     }
                     .textSelection(.enabled)
+                if canRegenerate {
+                    RetryAnswerButton(message: message)
+                }
             }
             if !message.text.isEmpty || !message.arts.isEmpty || !message.error.isEmpty {
                 // Как под ответом у Claude: скопировать, поделиться, прочитать вслух, ответить заново.
@@ -985,6 +989,36 @@ private struct AnswerIcon: View {
     }
 }
 
+/// «Повторить» под оборвавшимся ответом — то же, что «Ответить заново», но словом: значок в ряду ниже легко
+/// не заметить. Видимая капсула 34 pt, зона нажатия 44: промежутки ленты не меняются.
+private struct RetryAnswerButton: View {
+    @Environment(AppModel.self) private var model
+    let message: FeedMessage
+
+    var body: some View {
+        Button(action: retry) {
+            Label("Повторить", systemImage: "arrow.clockwise")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.ink)
+                .padding(.horizontal, 14)
+                .frame(height: 34)
+                .background(Theme.fill, in: Capsule())
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressScaleStyle())
+        .disabled(model.branchBusy)
+        .padding(.vertical, -5)
+        .accessibilityIdentifier("answer.retry")
+    }
+
+    private func retry() {
+        // Палец, начавший свайп шторки на кнопке, отпускается на ней же — это не нажатие.
+        guard !DrawerSwipe.blocksTaps else { return }
+        Task { await model.regenerate(message) }
+    }
+}
+
 /// «Прочитать вслух»: голос iOS; повторное нажатие — стоп.
 private struct ReadAloudButton: View {
     let id: String
@@ -1012,6 +1046,8 @@ final class ReadAloud: NSObject, AVSpeechSynthesizerDelegate {
 
     private(set) var speakingID: String?
     @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
+    /// Фраза, которую читаем сейчас: конец прерванной ради новой не должен отдавать звук.
+    @ObservationIgnored private var current: ObjectIdentifier?
 
     override init() {
         super.init()
@@ -1027,6 +1063,7 @@ final class ReadAloud: NSObject, AVSpeechSynthesizerDelegate {
         try? AVAudioSession.sharedInstance().setActive(true)
         let utterance = AVSpeechUtterance(string: Self.plain(text))
         utterance.voice = AVSpeechSynthesisVoice(language: "ru-RU")
+        current = ObjectIdentifier(utterance)
         speakingID = id
         synthesizer.speak(utterance)
     }
@@ -1041,15 +1078,22 @@ final class ReadAloud: NSObject, AVSpeechSynthesizerDelegate {
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.finished() }
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor in self.finished(id) }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.finished() }
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor in self.finished(id) }
     }
 
-    private func finished() {
-        if !synthesizer.isSpeaking { speakingID = nil }
+    /// Чтение кончилось или остановлено: звук отдаётся обратно, и музыка, которую оно поставило на паузу,
+    /// продолжается (раньше сессия звука оставалась занятой до закрытия приложения).
+    private func finished(_ utterance: ObjectIdentifier) {
+        guard utterance == current else { return }
+        current = nil
+        speakingID = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 }
 

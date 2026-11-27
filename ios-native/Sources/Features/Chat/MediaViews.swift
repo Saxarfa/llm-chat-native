@@ -374,6 +374,12 @@ struct VideoViewer: View {
         }
         .onDisappear {
             player?.pause()
+            player?.replaceCurrentItem(with: nil)
+            // Звук отдаётся обратно — музыка, которую ролик поставил на паузу, продолжается.
+            // Если в это время читается ответ, сессию не трогаем: чтение отдаст её само.
+            if ReadAloud.shared.speakingID == nil {
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            }
         }
     }
 

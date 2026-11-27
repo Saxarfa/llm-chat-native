@@ -105,9 +105,9 @@ enum ChatParameters {
     static func supported(_ model: String, _ key: String) -> Bool {
         if key == "max_tokens" || isNano(model) { return false }
         if model == "aistudio/gemini-4-argon" || model == "aistudio/gemini-4-carbon" { return false }
-        // Облачные сервисы: Groq не принимает штрафы, Claude — ничего.
+        // Облачные сервисы: Groq не принимает штрафы, Claude и Google — без параметров выборки.
         if model.hasPrefix("groq/") { return ["temperature", "top_p"].contains(key) }
-        if model.hasPrefix("claude/") { return false }
+        if model.hasPrefix("claude/") || model.hasPrefix("gemini/") { return false }
         if HostedService.of(model) != nil {
             return ["temperature", "top_p", "presence_penalty", "frequency_penalty"].contains(key)
         }

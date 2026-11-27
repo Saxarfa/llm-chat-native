@@ -17,6 +17,13 @@ final class ClaudeApiTests: XCTestCase {
         XCTAssertEqual(ChatConfig.modelName("claude/claude-sonnet-5-5", profiles: [:]), "Claude Sonnet 5.5")
     }
 
+    func testGoogleSharesTheAPICatalog() {
+        let model = "gemini/gemini-3.8-flash"
+        XCTAssertEqual(HostedService.of(model), .gemini)
+        XCTAssertEqual(ChatConfig.group(of: model), .hosted)
+        XCTAssertFalse(ChatParameters.supported(model, "temperature"))
+    }
+
     func testClaudeOrderLikeClaudeApp() {
         let ids = ["claude/claude-haiku-5-5", "claude/claude-sonnet-5-5", "claude/claude-opus-4-8",
                    "claude/claude-opus-5-5", "claude/claude-fable-5-2"]

@@ -388,6 +388,9 @@ struct ComposerBar: View {
     /// Подпись чипа, замороженная на время окна выбора: под окном смену не видно, поэтому новая
     /// подпись встаёт после его закрытия, с анимацией (`chipMotion`).
     @State private var heldChip: ChipLabel?
+    /// Ошибка неушедшего сообщения, которое вернулось в поле целиком: пока плашка показывает её,
+    /// в плашке есть «Повторить».
+    @State private var retryError: String?
 
     /// Смена модели из окна выбора — «счётчик уровня» (выбор пользователя 23.11.2026): название
     /// перетекает через размытие, уровень прокручивается, ширина чипа идёт той же пружиной.
@@ -441,10 +444,10 @@ struct ComposerBar: View {
         let resting: CGFloat = Screen.bottomInset > 0 ? 0 : 8
         VStack(spacing: 8) {
             if let error = model.sendError {
-                errorBanner(error)
+                errorBanner(error, onRetry: canRetry(error) ? submit : nil)
             }
             if let problem = dictation.problem {
-                errorBanner(problem) { dictation.problem = nil }
+                errorBanner(problem, onClose: { dictation.problem = nil })
             }
             ForEach(model.activeQueue) { item in
                 queuedRow(item)
@@ -619,27 +622,57 @@ struct ComposerBar: View {
         .padding(.bottom, 7)
     }
 
-    private func errorBanner(_ error: String, onClose: (() -> Void)? = nil) -> some View {
-        Button {
+    /// «Повторить» в плашке — когда в поле снова то же неушедшее сообщение и его можно отправить.
+    private func canRetry(_ error: String) -> Bool {
+        retryError == error && canSend && model.activeLive == nil && model.editing == nil
+    }
+
+    /// Плашка ошибки: касание по ней или крестик прячут её; у неушедшего сообщения есть «Повторить».
+    private func errorBanner(_ error: String, onRetry: (() -> Void)? = nil,
+                             onClose: (() -> Void)? = nil) -> some View {
+        let close = {
             if let onClose { onClose() } else { model.sendError = nil }
-        } label: {
+        }
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        return HStack(spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "exclamationmark.circle")
                 Text(error)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.muted)
             }
             .font(.system(size: 15))
             .foregroundStyle(Theme.danger)
-            .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            if let onRetry {
+                Button(action: onRetry) {
+                    Text("Повторить")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                        .padding(.horizontal, 14)
+                        .frame(height: 32)
+                        .background(Theme.fill, in: Capsule())
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressScaleStyle())
+                .accessibilityIdentifier("composer.retry")
+            }
+            Button(action: close) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.muted)
+                    .frame(width: 40, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Скрыть сообщение")
         }
-        .buttonStyle(.plain)
-        .accessibilityHint("Скрыть сообщение")
+        .padding(.leading, 14)
+        .padding(.trailing, 2)
+        .background(Theme.surface, in: shape)
+        .contentShape(shape)
+        .onTapGesture(perform: close)
         .transition(.opacity)
     }
 
@@ -899,12 +932,17 @@ struct ComposerBar: View {
         let files = model.draftAttachments
         text = ""
         model.draftAttachments = []
+        retryError = nil
         Task {
             // Не ушло — возвращаем текст и вложения, если пользователь не начал новое сообщение.
             let sent = await model.send(message, attachments: files)
             if !sent {
-                if text.isEmpty { text = message }
-                if model.draftAttachments.isEmpty { model.draftAttachments = files }
+                let restoreText = text.isEmpty
+                let restoreFiles = model.draftAttachments.isEmpty
+                if restoreText { text = message }
+                if restoreFiles { model.draftAttachments = files }
+                // «Повторить» отправит то, что в поле, — поэтому только если вернулось всё сообщение.
+                retryError = restoreText && restoreFiles ? model.sendError : nil
             }
         }
     }
