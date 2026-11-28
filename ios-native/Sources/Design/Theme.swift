@@ -265,10 +265,19 @@ enum Keyboard {
             input.selectedTextRange = input.textRange(from: input.endOfDocument, to: input.endOfDocument)
         }
     }
+
+    /// В каком-то поле стоит курсор — открыта клавиатура (или ввод идёт с внешней).
+    @MainActor
+    static var isEditing: Bool {
+        focused = nil
+        UIApplication.shared.sendAction(#selector(UIResponder.llmchatRememberFocused), to: nil, from: nil, for: nil)
+        defer { focused = nil }
+        return focused is UITextInput
+    }
 }
 
 private extension UIResponder {
-    /// Ответ первого ответчика на `Keyboard.caretToEnd`: запоминает себя.
+    /// Ответ первого ответчика на `Keyboard.caretToEnd` и `Keyboard.isEditing`: запоминает себя.
     @objc func llmchatRememberFocused() {
         Keyboard.focused = self
     }

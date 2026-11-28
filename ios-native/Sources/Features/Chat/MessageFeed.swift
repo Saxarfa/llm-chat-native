@@ -41,7 +41,7 @@ struct MessageFeed: View {
     private static let page = 30
     /// Отступы столбца ленты: между сообщениями (`FeedMetrics`), сверху (под шапкой) и снизу.
     private static let spacing = FeedMetrics.messageGap
-    private static let topPad: CGFloat = 20 + Theme.headerOverhang
+    static let topPad: CGFloat = 20 + Theme.headerOverhang
     private static let bottomPad: CGFloat = 14
 
     /// Сколько в ленте своих вопросов: по этому числу анимируется появление нового.
@@ -107,7 +107,10 @@ struct MessageFeed: View {
         bottomEdge = edge
         // Палец ведёт ленту или она катится после него: время для `userScrolling` — по самой прокрутке,
         // без отдельного жеста на ленте (он лишь дублировал `isTracking`).
-        if let view = scroll.view, view.isTracking || view.isDecelerating { touch.last = Date() }
+        if let view = scroll.view, view.isTracking || view.isDecelerating {
+            touch.last = Date()
+            FeedMotion.last = touch.last
+        }
         refreshBottom(box: box)
         layoutPin()
         guard let view = scroll.view else { return }
@@ -402,6 +405,16 @@ private final class TouchClock {
     var last = Date.distantPast
     /// До этого времени лента едет вниз по кнопке «вниз».
     var jumpUntil = Date.distantPast
+}
+
+/// Когда лента последний раз ехала под пальцем или по инерции. Касание, которым её остановили, —
+/// не нажатие по тексту размышлений (`ReasoningView`).
+@MainActor
+enum FeedMotion {
+    static var last = Date.distantPast
+
+    /// Лента стоит дольше четверти секунды.
+    static var settled: Bool { Date.now.timeIntervalSince(last) > 0.25 }
 }
 
 /// UIScrollView ленты — для кнопки «вниз» — и подложка её содержимого (по ней считается низ переписки,
@@ -1187,6 +1200,9 @@ private struct ReasoningView: View {
     @State private var turn = 0
     @State private var reveal = RevealState()
     @State private var probe = FrameProbe()
+    @State private var headProbe = FrameProbe()
+    /// Сколько текста сверху срезано при сворачивании из середины: окно показывает текст с этого места.
+    @State private var cut: CGFloat = 0
     /// Подпись «Размышляет» держится, пока электроны стягиваются, и сменяется на вспышке.
     @State private var thinkingLabel: Bool
     /// Рассуждение закончилось на глазах — итоговая подпись собирается по буквам.
@@ -1243,7 +1259,9 @@ private struct ReasoningView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(PressScaleStyle())
+            .frameProbe(headProbe)
             .allowsHitTesting(!text.isEmpty)
+            .accessibilityIdentifier("reasoning.header")
             .accessibilityRemoveTraits(text.isEmpty ? .isButton : [])
             .accessibilityHint(text.isEmpty ? "" : (open ? "Свернуть" : "Развернуть"))
 
@@ -1262,15 +1280,12 @@ private struct ReasoningView: View {
                     }
                     // Текст гаснет быстрее, чем закрывается окно.
                     .animation(.easeOut(duration: 0.12)) { $0.opacity(open ? 1 : 0) }
+                    .offset(y: -cut)
                     .frame(height: mask, alignment: .top)
                     .clipped()
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-                        reveal.window = height
-                        if reveal.pendingCollapse {
-                            reveal.pendingCollapse = false
-                            fold()
-                        }
-                    }
+                    .contentShape(.rect)
+                    .onTapGesture(perform: foldFromText)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { windowChanged($0) }
                     .transition(.identity)
             }
         }
@@ -1302,6 +1317,13 @@ private struct ReasoningView: View {
     private func expand() {
         turn += 1
         reveal.pendingCollapse = false
+        reveal.pendingShift = 0
+        if cut != 0 {
+            // Раскрыли снова, пока блок складывался после нажатия по тексту: окно опять показывает текст с начала.
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) { cut = 0 }
+        }
         if mounted {
             // Нажали во время сворачивания — раскрываться от текущего края окна.
             unfold()
@@ -1332,6 +1354,8 @@ private struct ReasoningView: View {
     private func collapse() {
         turn += 1
         reveal.pendingOpen = false
+        reveal.pendingShift = 0
+        if mask == nil, foldFromMiddle() { return }
         let visible = probe.visibleHeight
         if mask == nil, visible < reveal.window - 0.5 {
             var instant = Transaction()
@@ -1356,8 +1380,62 @@ private struct ReasoningView: View {
             withTransaction(instant) {
                 mounted = false
                 mask = nil
+                cut = 0
             }
         }
+    }
+
+    /// Окно попало в раскладку. Ждавшее сворачивание начинается отсюда; если сверху срезан текст, лента отматывается
+    /// назад на столько же в том же кадре, что и срез.
+    private func windowChanged(_ height: CGFloat) {
+        reveal.window = height
+        guard reveal.pendingCollapse else { return }
+        reveal.pendingCollapse = false
+        if reveal.pendingShift > 0, let scroll = headProbe.scrollView {
+            scroll.contentOffset.y -= reveal.pendingShift
+        }
+        reveal.pendingShift = 0
+        fold()
+    }
+
+    /// Шапка ушла за верх ленты — свернули нажатием по тексту посреди чтения. Текст над экраном убирается сразу,
+    /// а лента в том же кадре отматывается назад на столько же: на экране ничего не сдвигается, шапка встаёт к верху
+    /// ленты, на место шапки первого сообщения. Дальше, как обычно, плавно закрывается только видимая часть.
+    /// `false` — шапка и так на экране.
+    private func foldFromMiddle() -> Bool {
+        guard let scroll = headProbe.scrollView, let head = headProbe.top(in: scroll),
+              let window = probe.top(in: scroll) else { return false }
+        let landing = scroll.bounds.minY + scroll.adjustedContentInset.top
+            + MessageFeed.topPad + FeedMetrics.headerExtra - FeedMetrics.hitOverhang
+        let shift = min(landing - head, reveal.height)
+        guard shift > 0.5 else { return false }
+        // Видимая часть окна после отмотки: от его верха до низа экрана, не больше оставшегося текста.
+        let visible = min(max(0, scroll.bounds.maxY - shift - window), reveal.height - shift)
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) {
+            cut = shift
+            mask = visible
+        }
+        // Лента отмотается и анимация пойдёт, когда новое окно попадёт в раскладку.
+        reveal.pendingShift = shift
+        reveal.pendingCollapse = true
+        return true
+    }
+
+    /// Нажатие по самому тексту сворачивает размышления там, где человек читает (выбор пользователя 28.11.2026
+    /// по живому примеру). Касание, которым остановили катящуюся ленту, не считается; при открытой клавиатуре
+    /// первое касание только убирает её, как по всей ленте.
+    private func foldFromText() {
+        guard open, !DrawerSwipe.blocksTaps else { return }
+        if Keyboard.isEditing {
+            Keyboard.hide()
+            return
+        }
+        guard FeedMotion.settled else { return }
+        Haptics.tap()
+        collapse()
+        if let memoryKey { ReasoningOpen.keys.remove(memoryKey) }
     }
 }
 
@@ -1372,6 +1450,8 @@ private final class RevealState {
     var pendingOpen = false
     /// Окно мгновенно сжато до видимой части и ждёт раскладки, чтобы свернуться.
     var pendingCollapse = false
+    /// На сколько отмотать ленту назад, когда срезанное сверху окно попадёт в раскладку.
+    var pendingShift: CGFloat = 0
 }
 
 /// Слово с волной по буквам: каждая буква по очереди светлеет и чуть приподнимается.

@@ -65,11 +65,22 @@ final class FrameProbe {
     /// Сколько вида видно от его верха до низа прокрутки, которая его держит; вся высота, если прокрутки нет.
     var visibleHeight: CGFloat {
         guard let view, view.window != nil else { return 0 }
-        var parent = view.superview
-        while let current = parent, !(current is UIScrollView) { parent = current.superview }
-        guard let scroll = parent else { return view.bounds.height }
+        guard let scroll = scrollView else { return view.bounds.height }
         let bottom = scroll.convert(scroll.bounds, to: view).maxY
         return min(max(bottom, 0), view.bounds.height)
+    }
+
+    /// Ближайшая прокрутка, которая держит вид.
+    var scrollView: UIScrollView? {
+        var parent = view?.superview
+        while let current = parent, !(current is UIScrollView) { parent = current.superview }
+        return parent as? UIScrollView
+    }
+
+    /// Верх вида в координатах содержимого прокрутки — там же, где отсчитывается `contentOffset`.
+    func top(in scroll: UIScrollView) -> CGFloat? {
+        guard let view, view.window != nil else { return nil }
+        return view.convert(view.bounds, to: scroll).minY
     }
 }
 
